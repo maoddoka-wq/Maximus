@@ -22,6 +22,8 @@ export interface StockProduct {
   archived: boolean;
 }
 
+export type StockProductInput = Omit<StockProduct, 'id' | 'companyId' | 'archived' | 'imageUrl'>;
+
 export interface StockWarehouse {
   id: string;
   companyId: string;
@@ -53,7 +55,20 @@ export const createStockApi = (companyId: string) => {
   const withCompany = (path: string) => `${path}${path.includes('?') ? '&' : '?'}companyId=${encodeURIComponent(companyId)}`;
   return {
     bootstrap: (scope: StockBootstrapScope = 'all') => request<Partial<StockBootstrap>>(withCompany(`/stock/bootstrap?scope=${scope}`)),
-    createProduct: (body: Omit<StockProduct, 'id' | 'companyId' | 'archived'>) => request<StockProduct>(withCompany('/stock/products'), json(body)),
+    createProduct: (body: StockProductInput, image?: File) => {
+      if (!image) return request<StockProduct>(withCompany('/stock/products'), json(body));
+      const formData = new FormData();
+      Object.entries(body).forEach(([key, value]) => {
+        formData.append(key, value == null ? '' : String(value));
+      });
+      formData.append('image', image);
+      return request<StockProduct>(withCompany('/stock/products'), { method: 'POST', body: formData });
+    },
+    uploadProductImage: (id: string, image: File) => {
+      const formData = new FormData();
+      formData.append('image', image);
+      return request<StockProduct>(withCompany(`/stock/products/${id}/image`), { method: 'POST', body: formData });
+    },
     updateProduct: (id: string, body: Partial<StockProduct>) => request<StockProduct>(withCompany(`/stock/products/${id}`), { method: 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
     archiveProduct: (id: string) => request<StockProduct>(withCompany(`/stock/products/${id}`), { method: 'DELETE' }),
     createWarehouse: (body: { name: string; manager: string; address: string }) => request<StockWarehouse>(withCompany('/stock/warehouses'), json(body)),

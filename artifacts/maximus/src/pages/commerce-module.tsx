@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import type { Sale, Status, StoreData } from '@/lib/store';
 import { addNotification, money, recordControlEvent, uid } from '@/lib/store';
+import { uploadCommerceProductImage } from '@/lib/commerce-product-images';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
@@ -264,18 +265,65 @@ function ProductsPageComplete({ data, query, mutate, canCreate, canModify, compa
   const blank = { name: '', sku: '', category: 'Divers', stock: '0', threshold: '0', price: '0' };
   const [modal, setModal] = useState<Product | 'new' | null>(null);
   const [form, setForm] = useState(blank);
-  const open = (product?: Product) => { setModal(product ?? 'new'); setForm(product ? { name: product.name, sku: product.sku, category: product.category, stock: String(product.stock), threshold: String(product.threshold), price: String(product.price) } : blank); };
-  const save = () => {
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const photoPreview = useMemo(() => photo ? URL.createObjectURL(photo) : '', [photo]);
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
+  const close = () => { setModal(null); setPhoto(null); };
+  const open = (product?: Product) => {
+    setModal(product ?? 'new');
+    setForm(product
+      ? { name: product.name, sku: product.sku, category: product.category, stock: String(product.stock), threshold: String(product.threshold), price: String(product.price) }
+      : blank);
+    setPhoto(null);
+  };
+  const save = async () => {
     const stock = Number(form.stock); const threshold = Number(form.threshold); const price = Number(form.price);
     if (!form.name.trim() || !form.sku.trim() || [stock, threshold, price].some(value => !Number.isFinite(value) || value < 0)) return;
-    if (data.products.some(product => product.id !== (modal !== 'new' && modal ? modal.id : '') && product.sku.toLowerCase() === form.sku.trim().toLowerCase())) { void alert({ title: 'Référence déjà utilisée', description: 'Cette référence existe déjà dans le catalogue.', confirmLabel: 'Compris' }); return; }
-    mutate(draft => {
-      if (modal !== 'new' && modal) {
-        const target = draft.products.find(product => product.id === modal.id);
-        if (target) Object.assign(target, { name: form.name.trim(), sku: form.sku.trim(), category: form.category.trim() || 'Divers', stock, threshold, price });
-      } else draft.products.unshift({ id: uid('product'), name: form.name.trim(), sku: form.sku.trim(), category: form.category.trim() || 'Divers', stock, threshold, price, companyId });
-    }, modal !== 'new' && modal ? 'Produit modifié.' : 'Produit ajouté au catalogue.');
-    setModal(null);
+    const isNew = modal === 'new' || !modal;
+    const existing = !isNew && modal ? modal : null;
+    if (data.products.some(product => product.id !== (existing?.id ?? '') && product.sku.toLowerCase() === form.sku.trim().toLowerCase())) {
+      void alert({ title: 'Référence déjà utilisée', description: 'Cette référence existe déjà dans le catalogue.', confirmLabel: 'Compris' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const productId = existing?.id ?? uid('product');
+      const imageUrl = photo
+        ? (await uploadCommerceProductImage(productId, photo, isNew)).imageUrl
+        : existing?.imageUrl;
+      mutate(draft => {
+        if (existing) {
+          const target = draft.products.find(product => product.id === existing.id);
+          if (target) Object.assign(target, {
+            name: form.name.trim(),
+            sku: form.sku.trim(),
+            category: form.category.trim() || 'Divers',
+            stock,
+            threshold,
+            price,
+            ...(imageUrl ? { imageUrl } : {}),
+          });
+        } else {
+          draft.products.unshift({
+            id: productId,
+            name: form.name.trim(),
+            sku: form.sku.trim(),
+            category: form.category.trim() || 'Divers',
+            stock,
+            threshold,
+            price,
+            ...(imageUrl ? { imageUrl } : {}),
+            companyId,
+          });
+        }
+      }, existing ? 'Produit modifié.' : 'Produit ajouté au catalogue.');
+      close();
+    } catch (cause) {
+      showAppToast(cause instanceof Error ? cause.message : 'La photo du produit n’a pas pu être téléversée.', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
   const remove = async (product: Product) => {
     if (data.sales.some(sale => sale.items.some(item => item.productId === product.id))) { await alert({ title: 'Suppression impossible', description: 'Ce produit est référencé par une vente et ne peut pas être supprimé.', confirmLabel: 'Compris', tone: 'danger' }); return; }
@@ -283,7 +331,62 @@ function ProductsPageComplete({ data, query, mutate, canCreate, canModify, compa
     mutate(draft => { draft.products = draft.products.filter(item => item.id !== product.id); }, 'Produit supprimé.');
   };
   const products = data.products.filter(product => `${product.name} ${product.sku} ${product.category}`.toLowerCase().includes(query.toLowerCase()));
-   return <div className="space-y-5"><Panel title="Catalogue produits" description="Gérez les références et les prix commerciaux. Les quantités restent partagées avec le module de stock." action={canCreate ? <Button primary onClick={() => open()}><Plus size={15} />Nouveau produit</Button> : undefined}><div className="grid gap-3 sm:grid-cols-3"><Metric label="Références" value={String(data.products.length)} detail="Catalogue actif" icon={Boxes} /><Metric label="Unités en stock" value={String(data.products.reduce((sum, item) => sum + item.stock, 0))} detail="Toutes catégories" icon={Package} /><Metric label="Sous seuil" value={String(data.products.filter(item => item.stock <= item.threshold).length)} detail="À réapprovisionner" icon={Archive} warning /></div></Panel><Panel title="Catalogue produits"><DataTable headers={['Produit', 'SKU', 'Catégorie', 'Stock', 'Prix de vente', 'État', 'Actions']} rows={products.map(product => [<strong key={product.id}>{product.name}</strong>, <span className="mono text-xs">{product.sku}</span>, product.category, <span className={product.stock <= product.threshold ? 'font-bold text-[hsl(var(--destructive))]' : 'font-bold'}>{product.stock}</span>, money(product.price), <StatusBadge status={product.stock <= product.threshold ? 'EN ATTENTE' : 'ACTIF'} />, <div className="flex flex-wrap gap-1">{canModify && <button type="button" onClick={() => open(product)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold">Modifier</button>}{canModify && <button type="button" onClick={() => remove(product)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))]"><Trash2 size={13} /></button>}</div>])} /></Panel>{modal && <Modal title={modal === 'new' ? 'Nouveau produit' : 'Modifier le produit'} onClose={() => setModal(null)}><div className="grid gap-4 sm:grid-cols-2"><Field label="Nom" value={form.name} onChange={value => setForm(current => ({ ...current, name: value }))} /><Field label="SKU" value={form.sku} onChange={value => setForm(current => ({ ...current, sku: value }))} /><Field label="Catégorie" value={form.category} onChange={value => setForm(current => ({ ...current, category: value }))} /><Field label="Stock actuel" value={form.stock} onChange={value => setForm(current => ({ ...current, stock: value }))} type="number" /><Field label="Seuil d’alerte" value={form.threshold} onChange={value => setForm(current => ({ ...current, threshold: value }))} type="number" /><Field label="Prix de vente" value={form.price} onChange={value => setForm(current => ({ ...current, price: value }))} type="number" /></div><div className="mt-5 flex justify-end gap-2"><Button onClick={() => setModal(null)}>Annuler</Button><Button primary onClick={save}><Check size={15} />Enregistrer</Button></div></Modal>}</div>;
+    return <div className="space-y-5">
+      <Panel title="Catalogue produits" description="Gérez les références et les prix commerciaux. Les quantités restent partagées avec le module de stock." action={canCreate ? <Button primary onClick={() => open()}><Plus size={15} />Nouveau produit</Button> : undefined}>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Metric label="Références" value={String(data.products.length)} detail="Catalogue actif" icon={Boxes} />
+          <Metric label="Unités en stock" value={String(data.products.reduce((sum, item) => sum + item.stock, 0))} detail="Toutes catégories" icon={Package} />
+          <Metric label="Sous seuil" value={String(data.products.filter(item => item.stock <= item.threshold).length)} detail="À réapprovisionner" icon={Archive} warning />
+        </div>
+      </Panel>
+      <Panel title="Catalogue produits">
+        <DataTable headers={['Produit', 'SKU', 'Catégorie', 'Stock', 'Prix de vente', 'État', 'Actions']} rows={products.map(product => [
+          <div key={product.id} className="flex items-center gap-3">
+            {product.imageUrl
+              ? <img src={product.imageUrl} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+              : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"><Package size={16} /></span>}
+            <strong>{product.name}</strong>
+          </div>,
+          <span key={`${product.id}-sku`} className="mono text-xs">{product.sku}</span>,
+          product.category,
+          <span key={`${product.id}-stock`} className={product.stock <= product.threshold ? 'font-bold text-[hsl(var(--destructive))]' : 'font-bold'}>{product.stock}</span>,
+          money(product.price),
+          <StatusBadge key={`${product.id}-status`} status={product.stock <= product.threshold ? 'EN ATTENTE' : 'ACTIF'} />,
+          <div key={`${product.id}-actions`} className="flex flex-wrap gap-1">{canModify && <button type="button" onClick={() => open(product)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold">Modifier</button>}{canModify && <button type="button" onClick={() => remove(product)} className="rounded-lg border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))]"><Trash2 size={13} /></button>}</div>,
+        ])} />
+      </Panel>
+      {modal && <Modal title={modal === 'new' ? 'Nouveau produit' : 'Modifier le produit'} onClose={close}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Nom" value={form.name} onChange={value => setForm(current => ({ ...current, name: value }))} />
+          <Field label="SKU" value={form.sku} onChange={value => setForm(current => ({ ...current, sku: value }))} />
+          <Field label="Catégorie" value={form.category} onChange={value => setForm(current => ({ ...current, category: value }))} />
+          <Field label="Stock actuel" value={form.stock} onChange={value => setForm(current => ({ ...current, stock: value }))} type="number" />
+          <Field label="Seuil d’alerte" value={form.threshold} onChange={value => setForm(current => ({ ...current, threshold: value }))} type="number" />
+          <Field label="Prix de vente" value={form.price} onChange={value => setForm(current => ({ ...current, price: value }))} type="number" />
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-bold">Photo du produit
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={event => {
+                  const file = event.currentTarget.files?.[0] ?? null;
+                  event.currentTarget.value = '';
+                  if (file && (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024)) {
+                    showAppToast('Choisissez une image JPEG, PNG ou WebP de 10 Mo maximum.', 'error');
+                    return;
+                  }
+                  setPhoto(file);
+                }}
+                className="mt-2 block w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2 text-sm font-normal"
+              />
+            </label>
+            <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">JPEG, PNG ou WebP — 10 Mo maximum. La photo reste propre au catalogue Gestion commerciale.</p>
+            {(photoPreview || (modal !== 'new' && modal.imageUrl)) && <img src={photoPreview || (modal !== 'new' && modal ? modal.imageUrl : '')} alt={`Aperçu de ${form.name || 'la photo du produit'}`} className="mt-3 h-20 w-20 rounded-xl border object-cover" />}
+          </div>
+        </div>
+        <div className="mt-5 flex justify-end gap-2"><Button onClick={close}>Annuler</Button><Button primary disabled={saving} onClick={() => void save()}>{saving ? <RefreshCw size={15} className="animate-spin" /> : <Check size={15} />}{saving ? 'Enregistrement…' : 'Enregistrer'}</Button></div>
+      </Modal>}
+    </div>;
 }
 
 function ClientsPageComplete({ state, query, canCreate, canModify, onUpdate }: { state: CommerceState; query: string; canCreate: boolean; canModify: boolean; onUpdate: (fn: (draft: CommerceState) => void, message?: string) => void }) {
@@ -491,7 +594,7 @@ function Metric({ label, value, detail, icon: Icon, accent = false, warning = fa
 }
 function DataTable({ headers, rows }: { headers: string[]; rows: ReactNode[][] }) { return <div className="table-scroll"><table className="data-table w-full min-w-[720px] text-left text-sm"><thead className="bg-[hsl(var(--muted)/.55)] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]"><tr>{headers.map(header => <th key={header} className="px-4 py-3">{header}</th>)}</tr></thead><tbody className="divide-y">{rows.map((row, index) => <tr key={index} className="hover:bg-[hsl(var(--muted)/.35)]">{row.map((cell, cellIndex) => <td key={cellIndex} className="px-4 py-3">{cell}</td>)}</tr>)}</tbody></table></div>; }
 function StatusBadge({ status }: { status: Status }) { return <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold ${status === 'VALIDÉ' || status === 'CONFIRMÉ' || status === 'ACTIF' ? 'bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary))]' : status === 'REFUSÉ' || status === 'SUSPENDU' ? 'bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]' : 'bg-[hsl(var(--accent)/.2)] text-[hsl(var(--foreground))]'}`}>{status}</span>; }
-function Button({ children, onClick, primary = false }: { children: ReactNode; onClick: () => void; primary?: boolean }) { return <button type="button" onClick={onClick} className={`inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2.5 text-xs font-bold transition hover:-translate-y-0.5 ${primary ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))]'}`}>{children}</button>; }
+function Button({ children, onClick, primary = false, disabled = false }: { children: ReactNode; onClick: () => void; primary?: boolean; disabled?: boolean }) { return <button type="button" disabled={disabled} onClick={onClick} className={`inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2.5 text-xs font-bold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 ${primary ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border bg-[hsl(var(--card))] hover:bg-[hsl(var(--muted))]'}`}>{children}</button>; }
 function Field({ label, value, onChange, type = 'text', placeholder, help, readOnly = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string; help?: string; readOnly?: boolean }) { return <label className="block text-xs font-bold">{label}<input type={type} value={value} placeholder={placeholder} readOnly={readOnly} onChange={event => onChange(event.target.value)} className={`mt-2 w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm font-normal outline-none focus:border-[hsl(var(--primary))] ${readOnly ? 'cursor-not-allowed opacity-60' : ''}`} /><span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">{help ?? `Saisissez ${label.toLowerCase()}.`}</span></label>; }
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) { return <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-[hsl(var(--foreground)/.35)] p-4 backdrop-blur-sm"><div className="modal-panel card-surface max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl p-6"><div className="modal-header mb-6 flex items-center justify-between"><h2 className="text-xl font-bold">{title}</h2><button type="button" onClick={onClose} className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"><X size={18} /></button></div><div className="modal-body">{children}</div></div></div>; }
 function Empty({ text }: { text: string }) { return <div className="py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">{text}</div>; }

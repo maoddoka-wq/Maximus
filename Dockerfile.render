@@ -22,6 +22,7 @@ ENV APP_ENV=production \
     LOG_LEVEL=warning \
     DB_CONNECTION=pgsql \
     DIGITAL_STORAGE_PATH=/var/data/digital-products \
+    MODULE_PRODUCT_IMAGES_STORAGE_PATH=/var/data/module-product-images \
     COMPOSER_MAX_PARALLEL_HTTP=4 \
     COMPOSER_PROCESS_TIMEOUT=900
 

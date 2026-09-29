@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:stocks'])->prefix('stock')->group(function (): void {
     Route::get('/bootstrap', [StockController::class, 'bootstrap']);
     Route::post('/products', [StockController::class, 'createProduct']);
+    Route::post('/products/{id}/image', [StockController::class, 'uploadProductImage']);
+    Route::get('/products/{id}/image', [StockController::class, 'serveProductImage']);
     Route::patch('/products/{id}', [StockController::class, 'updateProduct']);
     Route::delete('/products/{id}', [StockController::class, 'archiveProduct']);
     Route::post('/suppliers', [StockController::class, 'createSupplier']);
