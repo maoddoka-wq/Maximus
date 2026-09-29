@@ -1899,7 +1899,7 @@ class TransportController extends Controller
                 ? 'Le chauffeur le plus proche a reçu votre demande. Il doit la valider pour démarrer la course.'
                 : 'Votre demande est enregistrée. Aucun chauffeur disponible avec une position GPS récente.');
         if ($response['routePending']) {
-            $message .= ' Le tarif et l’itinéraire seront finalisés dès que le service cartographique répondra.';
+            $message .= ' L’itinéraire sera finalisé dès que le service cartographique répondra.';
         }
 
         return response()->json([

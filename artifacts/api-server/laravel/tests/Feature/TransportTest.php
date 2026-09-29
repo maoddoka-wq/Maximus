@@ -15,6 +15,21 @@ class TransportTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        DB::table('company_public_site_access')->updateOrInsert(
+            ['company_id' => 'kora'],
+            [
+                'enabled' => true,
+                'updated_by' => 'transport-test',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+    }
+
     public function test_taxi_cycle_is_persisted_and_vehicle_returns_to_available_after_completion(): void
     {
         $request = $this->asActor();
@@ -336,7 +351,7 @@ class TransportTest extends TestCase
             ->assertJsonPath('trackingIntervalSeconds', 10)
             ->assertJsonPath('baseFare', 750)
             ->assertJsonPath('pricePerKm', 425)
-            ->assertJsonPath('heroImageUrl', '/api/transport/settings/hero-image');
+            ->assertJsonPath('heroImageUrl', '/api/transport/settings/hero-image/0');
         $request->get('/api/transport/settings/hero-image?companyId=kora')
             ->assertOk()
             ->assertHeader('Content-Type', 'image/png');
@@ -347,7 +362,7 @@ class TransportTest extends TestCase
             ->assertJsonPath('settings.trackingIntervalSeconds', 10)
             ->assertJsonPath('settings.baseFare', 750)
             ->assertJsonPath('settings.pricePerKm', 425)
-            ->assertJsonPath('settings.heroImageUrl', '/api/transport/settings/hero-image');
+            ->assertJsonPath('settings.heroImageUrl', '/api/transport/settings/hero-image/0');
 
         $request->patchJson('/api/transport/settings?companyId=kora', [
             'gpsValidityMinutes' => 8,
@@ -470,7 +485,44 @@ class TransportTest extends TestCase
 
     public function test_public_taxi_matches_the_nearest_driver_with_a_recent_gps_position(): void
     {
-        Http::fake();
+        config(['services.openrouteservice.api_key' => '']);
+        Http::fakeSequence()
+            ->push([
+                [
+                    'lat' => '14.7300',
+                    'lon' => '-17.4500',
+                    'display_name' => 'Almadies, Dakar, Sénégal',
+                    'type' => 'neighbourhood',
+                ],
+            ])
+            ->push([
+                'code' => 'Ok',
+                'routes' => [[
+                    'distance' => 8200,
+                    'duration' => 900,
+                    'geometry' => [
+                        'type' => 'LineString',
+                        'coordinates' => [
+                            [-17.4677, 14.7167],
+                            [-17.4500, 14.7300],
+                        ],
+                    ],
+                ]],
+            ])
+            ->push([
+                'code' => 'Ok',
+                'routes' => [[
+                    'distance' => 300,
+                    'duration' => 120,
+                    'geometry' => [
+                        'type' => 'LineString',
+                        'coordinates' => [
+                            [-17.4677, 14.7180],
+                            [-17.4677, 14.7167],
+                        ],
+                    ],
+                ]],
+            ]);
         ModuleCatalog::ensureCompanyAccess('kora');
         DB::table('maximus_company_modules')
             ->where('company_id', 'kora')
@@ -558,7 +610,7 @@ class TransportTest extends TestCase
             ->assertJsonPath('trip.vehicleImageUrl', '/taxi-car.svg');
 
         $this->asActor('employee', [
-            'transport:menu:trips' => ['voir', 'modifier'],
+            'transport:menu:trips' => ['voir', 'créer', 'modifier'],
         ], $freshDriver)
             ->patchJson('/api/transport/trips/'.$tripId.'/status?companyId=kora', [
                 'status' => 'ASSIGNED',

@@ -1122,7 +1122,8 @@ function PublicTransportLocationPreview({
       <TaxiRouteMap
         clientStop={{ latitude: position.latitude, longitude: position.longitude }}
         displayMode="location"
-      className="h-36 sm:h-60"
+        showClientStopMarker={false}
+        className="h-36 sm:h-60"
       />
     ) : (
       <div className="grid h-36 place-items-center bg-muted px-5 text-center sm:h-48" aria-live="polite">
@@ -1134,10 +1135,10 @@ function PublicTransportLocationPreview({
     )}
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-3 py-3 sm:px-4">
       <div className="min-w-0">
-        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Position GPS exacte</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Départ GPS</p>
         {position ? <>
-          <p data-testid="text-public-transport-coordinates" className="mt-1 break-all font-mono text-xs font-semibold sm:text-sm">
-            {position.latitude.toFixed(6)}, {position.longitude.toFixed(6)}
+          <p data-testid="text-public-transport-location-ready" className="mt-1 text-xs font-semibold sm:text-sm">
+            Votre position est prête pour la demande.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">Précision GPS · environ {Math.round(position.accuracy)} m</p>
         </> : <p role="status" className="mt-1 text-xs text-muted-foreground">{locationStatus}</p>}
@@ -1169,7 +1170,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   }));
   const theme = publicTransportTheme(transportColors);
   const customerStorageKey = useMemo(() => `maximus-taxi-customer:${domain ? window.location.host : slug ?? 'shop'}`, [domain, slug]);
-  const [form, setForm] = useState({ pickup: '', destination: '', passengerName: 'Client Taxi', passengerPhone: '' });
+  const [form, setForm] = useState({ destination: '', passengerName: 'Client Taxi', passengerPhone: '' });
   const [position, setPosition] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
   const [locationState, setLocationState] = useState<'idle' | 'locating' | 'ready' | 'error'>('idle');
   const [locationMessage, setLocationMessage] = useState('');
@@ -1534,7 +1535,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     try {
       const result = await api.createTrip({
         ...form,
-        pickup: form.pickup.trim(),
+        pickup: 'Position GPS du client',
         destination: form.destination.trim(),
         passengerName: form.passengerName.trim(),
         passengerPhone: form.passengerPhone.trim(),
@@ -1572,7 +1573,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
   };
 
   const gpsReady = locationState === 'ready' && position !== null;
-  const routeComplete = form.pickup.trim().length >= 3 && isDestinationPlaceCommitted(form.destination, selectedPlace);
+  const routeComplete = isDestinationPlaceCommitted(form.destination, selectedPlace);
   const showHero = !formOpen && !trip && !restoringTrip && !restoreError && !tripEnded;
   const passengerDetails = <Card className="border-border bg-card shadow-sm" aria-label="Coordonnées passager">
     <CardHeader className="gap-1 p-4 pb-3">
@@ -1594,10 +1595,8 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     </CardContent>
   </Card>;
   const advanceToPassenger = () => {
-    const pickupInput = document.getElementById('transport-pickup') as HTMLInputElement | null;
     const destinationInput = document.getElementById('transport-destination') as HTMLInputElement | null;
-    if (!pickupInput || !destinationInput) return;
-    if (!pickupInput.reportValidity() || !destinationInput.reportValidity()) return;
+    if (!destinationInput?.reportValidity()) return;
     if (!routeComplete) {
       setError('Choisissez une destination dans les résultats avant de continuer.');
       destinationInput.focus();
@@ -1607,14 +1606,14 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     setBookingStep('passenger');
     window.requestAnimationFrame(() => document.getElementById('transport-phone')?.focus());
   };
-  const estimateCard = <Card className="h-fit border-border bg-card" aria-label="Estimation du trajet">
+  const estimateCard = <Card className="h-fit border-border bg-card" aria-label="Itinéraire estimé">
     <CardHeader className="border-b border-border p-3 sm:p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <CardTitle className="text-sm">Estimation</CardTitle>
-          <p className="mt-1 truncate text-xs text-muted-foreground">{form.pickup || 'Point GPS'} → {form.destination || 'destination'}</p>
+          <CardTitle className="text-sm">Itinéraire estimé</CardTitle>
+          <p className="mt-1 truncate text-xs text-muted-foreground">Position GPS → {form.destination || 'destination'}</p>
         </div>
-        {quoteLoading ? <RefreshCw size={18} className="shrink-0 animate-spin text-muted-foreground" /> : <p className="shrink-0 text-xl font-bold">{quote ? money(quote.fare, store.currency) : '—'}</p>}
+        {quoteLoading && <RefreshCw size={18} className="shrink-0 animate-spin text-muted-foreground" aria-label="Calcul de l’itinéraire" />}
       </div>
     </CardHeader>
     <CardContent className="space-y-2 p-3 sm:p-4">
@@ -1638,6 +1637,7 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
               clientStop={position ? { latitude: position.latitude, longitude: position.longitude } : null}
               destination={{ latitude: quote.destinationLatitude, longitude: quote.destinationLongitude }}
               routeGeometry={quote.geometry}
+              showClientStopMarker={false}
               className="h-40 sm:h-56"
             />
           </CollapsibleContent>
@@ -1747,10 +1747,10 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
              />
              <div>
                 <p className="text-sm font-semibold sm:text-base">Un taxi fiable pour vos trajets quotidiens.</p>
-                <p className="mt-1.5 text-xs leading-5 text-muted-foreground sm:mt-2 sm:text-sm sm:leading-6">Votre GPS situe le départ ; ajoutez un repère visible pour faciliter la rencontre avec le chauffeur.</p>
+                <p className="mt-1.5 text-xs leading-5 text-muted-foreground sm:mt-2 sm:text-sm sm:leading-6">Votre position GPS sert de départ et est transmise au chauffeur. Aucun repère supplémentaire n’est demandé.</p>
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground sm:mt-4 sm:text-xs">
                   <span className="flex items-center gap-1.5"><MapPin size={13} className="text-primary" /> GPS précis</span>
-                  <span className="flex items-center gap-1.5"><Clock3 size={13} className="text-primary" /> Devis avant départ</span>
+                  <span className="flex items-center gap-1.5"><Clock3 size={13} className="text-primary" /> Itinéraire estimé</span>
                </div>
                <TransportButton
                  data-testid="button-start-taxi-order"
@@ -1808,25 +1808,6 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
                     <span className="shrink-0 text-xs font-semibold text-primary">GPS · {Math.round(position.accuracy)} m</span>
                   </CardHeader>
                   <CardContent className="space-y-3 p-3 sm:space-y-4 sm:p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground"><MapPin size={15} /></div>
-                      <Label htmlFor="transport-pickup" className="min-w-0 flex-1">
-                        <span className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Repère de prise en charge</span>
-                        <Input
-                          id="transport-pickup"
-                          data-testid="input-transport-pickup"
-                          required
-                          minLength={3}
-                          maxLength={180}
-                          value={form.pickup}
-                          onChange={event => { setError(''); setForm(current => ({ ...current, pickup: event.target.value })); }}
-                          className="mt-1"
-                          placeholder="Ex. entrée principale, station-service…"
-                        />
-                        <span className="mt-1 block text-xs font-normal text-muted-foreground">Le GPS donne le point exact ; ce repère aide le chauffeur à vous trouver.</span>
-                      </Label>
-                    </div>
-                    <div className="ml-4 h-3 border-l border-dashed border-border" />
                     <div className="relative">
                       <Label htmlFor="transport-destination" className="flex items-start gap-3">
                         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"><MapPin size={15} /></span>
@@ -1877,12 +1858,11 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
                   </CardHeader>
                   <CardContent className="space-y-2 p-3 sm:p-4">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Départ</p>
-                    <p className="text-sm font-medium">{form.pickup || 'Point GPS'}</p>
+                    <p className="text-sm font-medium">Position GPS du client</p>
                     <p className="pt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Destination</p>
                     <p className="text-sm font-medium">{form.destination}</p>
                     <div className="flex items-center justify-between gap-3 border-t border-border pt-2">
-                      <span className="text-xs text-muted-foreground">{quote ? `${quote.durationMinutes} min · ${quote.distanceKm.toFixed(1)} km` : 'Tarif indicatif'}</span>
-                      <span className="shrink-0 text-sm font-bold">{quote ? money(quote.fare, store.currency) : quoteLoading ? 'Calcul…' : 'À confirmer'}</span>
+                      <span className="text-xs text-muted-foreground">{quote ? `${quote.durationMinutes} min · ${quote.distanceKm.toFixed(1)} km` : quoteLoading ? 'Calcul de l’itinéraire…' : 'Itinéraire à confirmer'}</span>
                     </div>
                     <TransportButton type="button" variant="link" onClick={() => setBookingStep('route')} className="h-auto px-0 text-xs">
                       Modifier le trajet
@@ -2115,7 +2095,7 @@ function SharedTransportTrackingPage({
       <div>
         <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Taxi Urbain · Dakar</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
-        {trip && <p className="mt-2 text-sm text-muted-foreground">Course {trip.reference} · {money(trip.fare, store.currency)}</p>}
+        {trip && <p className="mt-2 text-sm text-muted-foreground">Course {trip.reference}</p>}
       </div>
 
       {loading && !trip && <Card className="border-primary/30 bg-primary/5" aria-live="polite">
@@ -2147,11 +2127,7 @@ function SharedTransportTrackingPage({
         </CardHeader>
         <CardContent className="space-y-4 p-4">
           <p className="text-sm leading-6 text-muted-foreground">{message}</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-md border border-border bg-muted/30 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Prise en charge</p>
-              <p className="mt-1 text-sm font-semibold">{trip.pickup}</p>
-            </div>
+          <div>
             <div className="rounded-md border border-border bg-muted/30 p-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Destination</p>
               <p className="mt-1 text-sm font-semibold">{trip.destination}</p>
@@ -2165,7 +2141,7 @@ function SharedTransportTrackingPage({
               <p className="mt-1 text-muted-foreground">{trip.vehicleType || 'Taxi'}</p>
             </div>
           </div>}
-          <p className="border-t border-border pt-3 text-xs leading-5 text-muted-foreground">Ce lien affiche le statut, les points de départ et d’arrivée et la position du taxi. Il ne révèle ni nom ni téléphone, n’affiche pas le code de prise en charge et ne permet aucune action sur la course.</p>
+          <p className="border-t border-border pt-3 text-xs leading-5 text-muted-foreground">Ce lien affiche le statut, la destination et la position du taxi. Il ne révèle ni nom ni téléphone, n’affiche pas le point de départ ni le code de prise en charge et ne permet aucune action sur la course.</p>
         </CardContent>
       </Card>}
     </div>
@@ -2197,14 +2173,13 @@ function PublicTaxiTracking({ trip }: { trip: PublicTransportTrip | PublicTransp
         </div>
       </CardHeader>
      <CardContent className="space-y-3 p-4 pt-0">
-     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <div className="rounded-md border border-border bg-card px-3 py-2.5"><p className="text-xs font-semibold uppercase text-muted-foreground">Taxi → arrêt client</p><p data-testid="text-pickup-distance" className="mt-1 text-sm font-bold">{trip.pickupRouteDistanceKm !== null && trip.pickupRouteDistanceKm !== undefined ? `${trip.pickupRouteDistanceKm.toFixed(1)} km` : 'Calcul…'}</p></div>
         <div className="rounded-md border border-border bg-card px-3 py-2.5"><p className="text-xs font-semibold uppercase text-muted-foreground">Arrivée estimée</p><p data-testid="text-pickup-eta" className="mt-1 text-sm font-bold">{trip.pickupEtaMinutes !== null && trip.pickupEtaMinutes !== undefined ? `${trip.pickupEtaMinutes} min` : 'GPS en attente'}</p></div>
         <div className="rounded-md border border-border bg-card px-3 py-2.5"><p className="text-xs font-semibold uppercase text-muted-foreground">Votre trajet</p><p className="mt-1 text-sm font-bold">{trip.routeDistanceKm !== null && trip.routeDistanceKm !== undefined ? `${trip.routeDistanceKm.toFixed(1)} km` : '—'}</p></div>
-        <div className="rounded-md border border-border bg-card px-3 py-2.5"><p className="text-xs font-semibold uppercase text-muted-foreground">Tarif</p><p data-testid="text-trip-fare" className="mt-1 text-sm font-bold">{trip.routePending ? 'Calcul en cours' : trip.fare > 0 ? `${new Intl.NumberFormat('fr-FR').format(trip.fare)} XOF` : 'À calculer'}</p></div>
      </div>
-      <div className="rounded-md border border-border bg-card px-3 py-2.5"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Itinéraire complet</p><p className="mt-1 text-sm font-semibold">Position du taxi <span className="mx-1 text-muted-foreground">→</span> arrêt client <span className="mx-1 text-muted-foreground">→</span> destination</p><p className="mt-1 text-xs text-muted-foreground">Le point rouge identifie l’endroit où le client attend le taxi.</p></div>
-      {pickup && <TaxiRouteMap clientStop={pickup} destination={destination} driver={driver} routeGeometry={trip.routeGeometry} pickupRouteGeometry={trip.pickupRouteGeometry} className="h-52 sm:h-80" />}
+      <div className="rounded-md border border-border bg-card px-3 py-2.5"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Itinéraire</p><p className="mt-1 text-sm font-semibold">Position du taxi <span className="mx-1 text-muted-foreground">→</span> destination</p></div>
+      {pickup && <TaxiRouteMap clientStop={pickup} destination={destination} driver={driver} routeGeometry={trip.routeGeometry} pickupRouteGeometry={trip.pickupRouteGeometry} showClientStopMarker={false} className="h-52 sm:h-80" />}
       {!trip.pickupRouteDistanceKm && <p className="px-1 text-xs text-muted-foreground">La distance et le temps d’arrivée seront recalculés dès que la position GPS du chauffeur est reçue.</p>}
    </CardContent></Card>;
 }
