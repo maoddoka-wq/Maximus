@@ -259,7 +259,7 @@ export const createTransportApi = (companyId: string) => {
       headers: { 'Content-Type': 'application/json' },
     }),
     createDriver: (body: CreateDriverInput) => request<Driver>(withCompany('/transport/drivers'), json(body)),
-    updateDriverLocation: (id: string, body: { latitude: number; longitude: number }) =>
+    updateDriverLocation: (id: string, body: { latitude: number; longitude: number; accuracy: number }) =>
       request<Driver>(withCompany(`/transport/drivers/${encodeURIComponent(id)}/location`), {
         method: 'PATCH',
         body: JSON.stringify(body),

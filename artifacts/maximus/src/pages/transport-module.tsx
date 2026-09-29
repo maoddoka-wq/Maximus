@@ -52,6 +52,10 @@ import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { buildDriverNavigationUrl } from '@/lib/transport-routing';
+import {
+  isNewerTransportGpsSample,
+  isTransportGpsAccuracyAcceptable,
+} from '@/lib/transport-gps-quality';
 import { useQueryTab } from '@/lib/query-tab';
 import { resolveTransportTab, transportTabByFeatureId, type TransportTabId } from '@/lib/transport-tabs';
 
@@ -123,8 +127,10 @@ const isWithinDakar = (latitude: number, longitude: number) =>
 const isDriverGpsFresh = (locationUpdatedAt: string | null | undefined, validityMinutes: number) => {
   if (!locationUpdatedAt) return false;
   const updatedAt = Date.parse(locationUpdatedAt);
+  const age = Date.now() - updatedAt;
   return Number.isFinite(updatedAt)
-    && Date.now() - updatedAt <= Math.max(1, validityMinutes) * 60_000;
+    && age >= -30_000
+    && age <= Math.max(1, validityMinutes) * 60_000;
 };
 
 const driverGpsAgeLabel = (locationUpdatedAt: string | null | undefined) => {
@@ -312,30 +318,68 @@ export default function TransportModulePage({
       return undefined;
     }
     let disposed = false;
-    const sendLocation = (coords: { latitude: number; longitude: number }) => {
-      if (disposed || !isWithinDakar(coords.latitude, coords.longitude)) {
+    type GpsSample = {
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+      timestamp: number;
+    };
+    let lastObservedTimestamp: number | null = null;
+    let pendingSample: GpsSample | null = null;
+    let sendingLocation = false;
+
+    const flushLocationQueue = async () => {
+      if (sendingLocation || disposed) return;
+      sendingLocation = true;
+      try {
+        while (!disposed && pendingSample) {
+          const sample = pendingSample;
+          pendingSample = null;
+          try {
+            const driver = await api.updateDriverLocation(currentDriverId, sample);
+            if (disposed || sample.timestamp !== lastObservedTimestamp) continue;
+            setData(current => current ? {
+              ...current,
+              drivers: current.drivers.map(item => item.id === driver.id ? driver : item),
+            } : current);
+            setLocationActive(true);
+            setLocationError('');
+          } catch (cause) {
+            if (disposed || sample.timestamp !== lastObservedTimestamp) continue;
+            setLocationActive(false);
+            setLocationError(cause instanceof Error ? cause.message : 'La position GPS n’a pas pu être partagée.');
+          }
+        }
+      } finally {
+        sendingLocation = false;
+        if (!disposed && pendingSample) void flushLocationQueue();
+      }
+    };
+
+    const sendLocation = (sample: GpsSample) => {
+      if (disposed || !isNewerTransportGpsSample(lastObservedTimestamp, sample.timestamp)) return;
+      lastObservedTimestamp = sample.timestamp;
+      if (!isTransportGpsAccuracyAcceptable(sample.accuracy)) {
+        setLocationActive(false);
+        setLocationError(`Signal GPS trop imprécis (${Math.round(sample.accuracy)} m). Attendez une précision de 100 m ou mieux.`);
+        return;
+      }
+      if (!isWithinDakar(sample.latitude, sample.longitude)) {
         setLocationActive(false);
         setLocationError('La position GPS reçue est hors de la zone de Dakar et n’a pas été partagée.');
         return;
       }
-      void api.updateDriverLocation(currentDriverId, coords).then(driver => {
-        if (disposed) return;
-        setData(current => current ? { ...current, drivers: current.drivers.map(item => item.id === driver.id ? driver : item) } : current);
-        setLocationActive(true);
-        setLocationError('');
-      }).catch(cause => {
-        if (disposed) return;
-        setLocationActive(false);
-        setLocationError(cause instanceof Error ? cause.message : 'La position GPS n’a pas pu être partagée.');
-      });
+      pendingSample = sample;
+      void flushLocationQueue();
     };
+
     const watchId = navigator.geolocation.watchPosition(
-      ({ coords }) => {
-        sendLocation({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-        });
-      },
+      position => sendLocation({
+        timestamp: position.timestamp,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+      }),
       ({ code }) => {
         setLocationActive(false);
         setLocationError(code === 1
@@ -346,9 +390,12 @@ export default function TransportModulePage({
     );
     const refreshId = window.setInterval(() => {
       navigator.geolocation.getCurrentPosition(
-        ({ coords }) => {
-          sendLocation({ latitude: coords.latitude, longitude: coords.longitude });
-        },
+        position => sendLocation({
+          timestamp: position.timestamp,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        }),
         () => {
           if (!disposed) {
             setLocationActive(false);
@@ -486,6 +533,7 @@ export default function TransportModulePage({
     if (status === trip.status || !canModifyTrips) return;
     if (preview) {
       setData(current => current ? { ...current, trips: current.trips.map(item => item.id === trip.id ? { ...item, status } : item) } : current);
+      if (status === 'ASSIGNED') setTab('trips');
       showAppToast('Statut de la course mis à jour.', 'success');
       return;
     }
@@ -518,6 +566,7 @@ export default function TransportModulePage({
               : current.metrics,
         };
       });
+      if (status === 'ASSIGNED') setTab('trips');
       showAppToast(status === 'ASSIGNED' ? 'Course validée. Vous pouvez rejoindre le client.' : 'Statut de la course mis à jour.', 'success');
       // La réponse de l’action est affichée sans attendre le bootstrap complet.
       // Le rafraîchissement complet réconcilie les autres indicateurs en arrière-plan.
@@ -658,7 +707,7 @@ export default function TransportModulePage({
 
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
         {canOperateTrips && offeredTrip && <DriverRequestCard trip={offeredTrip} vehicle={tripVehicle(offeredTrip)} driver={currentDriver} pending={Boolean(pendingAction === `trip:${offeredTrip.id}`)} onAccept={trip => updateStatus(trip, 'ASSIGNED')} onDecline={trip => updateStatus(trip, 'REQUESTED')} />}
-        {canOperateTrips && tab === 'trips' && activeTrip && <DriverTripTracking trip={activeTrip} driver={tripDriver} vehicle={tripVehicle(activeTrip)} />}
+        {canOperateTrips && tab === 'trips' && activeTrip && <DriverTripTracking trip={activeTrip} driver={tripDriver} vehicle={tripVehicle(activeTrip)} gpsValidityMinutes={gpsValidityMinutes} />}
           {tab === 'overview' && <><Overview data={data} onTab={setTab} />{currentDriver && <DriverLocationPanel driver={currentDriver} active={driverGpsTracking} error={locationError} onAvailabilityChange={canModifyDrivers ? updateAvailability : undefined} onPricingModeChange={canModifyDrivers ? updatePricingMode : undefined} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} />}</>}
         {tab === 'trips' && <TripsPanel data={data} drivers={data.drivers} vehicles={data.vehicles} canCreate={canCreateTrips} canModify={canModifyTrips} onCreate={() => setDialog('trip')} onStatusChange={updateStatus} onAssign={assignTrip} />}
           {tab === 'drivers' && <><DriversPanel drivers={data.drivers} modeEvents={data.modeEvents} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={driverGpsTracking} error={locationError} onAvailabilityChange={canModifyDrivers ? updateAvailability : undefined} onPricingModeChange={canModifyDrivers ? updatePricingMode : undefined} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} /></>}
@@ -719,14 +768,76 @@ function DriverRequestCard({ trip, vehicle, driver, pending, onAccept, onDecline
   return <section className="card-surface border-2 border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)] p-5 shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-start gap-3">{vehicle?.imageUrl && <img src={vehicle.imageUrl} alt={`Photo de ${vehicle.model}`} className="h-16 w-20 shrink-0 rounded-xl border bg-white object-cover" />}<div className="min-w-0"><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--primary))]">Nouvelle demande détectée</p><h2 className="mt-1 text-lg font-black">Course à valider</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Passager : {trip.passengerName} · {trip.routePending ? 'Tarif en cours de calcul' : money(trip.fare)}</p>{vehicle && <p className="mt-2 text-xs font-bold">{vehicle.model} · {vehicle.registration}</p>}<p className="mt-2 text-sm font-black text-sky-700">{trip.matchedDistanceKm !== null && trip.matchedDistanceKm !== undefined ? `Distance vers le client : ${formatDistance(trip.matchedDistanceKm)}` : 'Distance vers le client en attente du GPS'}</p>{remainingSeconds !== null && <p className={`mt-2 text-xs font-black ${remainingSeconds <= 20 ? 'text-rose-700' : 'text-amber-700'}`}>Réponse requise dans {Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, '0')}</p>}</div></div><div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end"><a href={routeUrl ?? '#'} onClick={event => { if (!routeUrl) event.preventDefault(); }} target={routeUrl ? '_blank' : undefined} rel="noreferrer" aria-disabled={!routeUrl} className={`inline-flex min-w-[12rem] items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}><Navigation size={16} />Guidage vers le client</a><button type="button" onClick={() => onDecline(trip)} disabled={pending} className="inline-flex items-center justify-center rounded-xl border border-rose-200 px-4 py-3 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-70">Refuser</button><button type="button" onClick={() => onAccept(trip)} disabled={pending} className="inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-5 py-3 text-sm font-black text-[hsl(var(--primary-foreground))] shadow-sm disabled:cursor-wait disabled:opacity-70">{pending ? <RefreshCw size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}{pending ? 'Validation…' : 'Valider la course'}</button></div></div></section>;
 }
 
-function DriverTripTracking({ trip, driver, vehicle }: { trip: Trip | null; driver: Driver | null; vehicle: Vehicle | null }) {
+function DriverTripTracking({ trip, driver, vehicle, gpsValidityMinutes }: {
+  trip: Trip | null;
+  driver: Driver | null;
+  vehicle: Vehicle | null;
+  gpsValidityMinutes: number;
+}) {
   if (!trip) return null;
-  const remainingDistance = trip.pickupRouteDistanceKm ?? (trip.pickupLatitude !== null && trip.pickupLatitude !== undefined && trip.pickupLongitude !== null && trip.pickupLongitude !== undefined && driver?.latitude !== null && driver?.latitude !== undefined && driver?.longitude !== null && driver?.longitude !== undefined
-    ? distanceInKm(driver.latitude, driver.longitude, trip.pickupLatitude, trip.pickupLongitude)
-    : null);
-  const visibleDistance = remainingDistance ?? trip.matchedDistanceKm ?? null;
-  const routeUrl = buildDriverNavigationUrl(trip, driver);
-  return <section className="card-surface overflow-hidden p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="flex min-w-0 items-start gap-3">{vehicle?.imageUrl && <img src={vehicle.imageUrl} alt={`Photo de ${vehicle.model}`} className="h-14 w-20 shrink-0 rounded-xl border bg-white object-cover" />}<div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Guidage chauffeur</p><h2 className="mt-1 text-lg font-black">Rejoindre l’arrêt client</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p>{visibleDistance !== null ? <p className="mt-2 text-sm font-black text-sky-700">{formatDistance(visibleDistance)} jusqu’à l’arrêt client</p> : <p className="mt-2 text-xs font-semibold text-amber-700">Distance disponible dès que le GPS chauffeur est actif</p>}{trip.pickupEtaMinutes !== null && trip.pickupEtaMinutes !== undefined && <p className="mt-1 text-xs font-bold text-sky-700">Arrivée à l’arrêt : {trip.pickupEtaMinutes} min</p>}</div></div><a href={routeUrl ?? '#'} onClick={event => { if (!routeUrl) event.preventDefault(); }} target={routeUrl ? '_blank' : undefined} rel="noreferrer" className={`inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}><Navigation size={16} />Lancer le guidage</a></div>{trip.pickupLatitude !== null && trip.pickupLatitude !== undefined && trip.pickupLongitude !== null && trip.pickupLongitude !== undefined && <TaxiRouteMap clientStop={{ latitude: trip.pickupLatitude, longitude: trip.pickupLongitude }} destination={trip.destinationLatitude !== null && trip.destinationLatitude !== undefined && trip.destinationLongitude !== null && trip.destinationLongitude !== undefined ? { latitude: trip.destinationLatitude, longitude: trip.destinationLongitude } : null} driver={driver?.latitude !== null && driver?.latitude !== undefined && driver?.longitude !== null && driver?.longitude !== undefined ? { latitude: driver.latitude, longitude: driver.longitude } : null} routeGeometry={trip.routeGeometry} pickupRouteGeometry={trip.pickupRouteGeometry} className="mt-5 h-[clamp(21rem,58vw,32rem)] sm:h-[30rem]" />}<p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">Itinéraire complet : la voiture rejoint l’arrêt client, puis le trajet continue jusqu’à la destination. GPS, distance et ETA actualisés automatiquement.</p></section>;
+
+  const hasPickupCoordinates = trip.pickupLatitude !== null
+    && trip.pickupLatitude !== undefined
+    && trip.pickupLongitude !== null
+    && trip.pickupLongitude !== undefined;
+  const hasDriverCoordinates = driver?.latitude !== null
+    && driver?.latitude !== undefined
+    && driver?.longitude !== null
+    && driver?.longitude !== undefined;
+  const freshDriver = driver
+    && hasDriverCoordinates
+    && isDriverGpsFresh(driver.locationUpdatedAt, gpsValidityMinutes)
+    ? driver
+    : null;
+  const driverPoint = freshDriver
+    ? { latitude: freshDriver.latitude!, longitude: freshDriver.longitude! }
+    : null;
+  const remainingDistance = driverPoint && hasPickupCoordinates
+    ? distanceInKm(driverPoint.latitude, driverPoint.longitude, trip.pickupLatitude!, trip.pickupLongitude!)
+    : null;
+  const visibleDistance = driverPoint && hasPickupCoordinates
+    ? trip.pickupRouteDistanceKm ?? remainingDistance ?? trip.matchedDistanceKm ?? null
+    : null;
+  const routeUrl = buildDriverNavigationUrl(trip, freshDriver);
+  const hasMapPoint = hasPickupCoordinates || Boolean(driverPoint);
+
+  return <section className="card-surface overflow-hidden p-5">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 items-start gap-3">
+        {vehicle?.imageUrl && <img src={vehicle.imageUrl} alt={`Photo de ${vehicle.model}`} className="h-14 w-20 shrink-0 rounded-xl border bg-white object-cover" />}
+        <div>
+          <p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Guidage chauffeur</p>
+          <h2 className="mt-1 text-lg font-black">Rejoindre l’arrêt client</h2>
+          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{trip.pickup} <span className="mx-1">→</span> {trip.destination}</p>
+          {visibleDistance !== null
+            ? <p className="mt-2 text-sm font-black text-sky-700">{formatDistance(visibleDistance)} jusqu’à l’arrêt client</p>
+            : <p className="mt-2 text-xs font-semibold text-amber-700">Distance disponible dès que le GPS chauffeur et l’arrêt client sont géolocalisés</p>}
+          {driverPoint && trip.pickupEtaMinutes !== null && trip.pickupEtaMinutes !== undefined
+            && <p className="mt-1 text-xs font-bold text-sky-700">Arrivée à l’arrêt : {trip.pickupEtaMinutes} min</p>}
+        </div>
+      </div>
+      <a href={routeUrl ?? '#'} onClick={event => { if (!routeUrl) event.preventDefault(); }} target={routeUrl ? '_blank' : undefined} rel="noreferrer" className={`inline-flex min-w-[12rem] shrink-0 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold ${routeUrl ? 'text-sky-700 hover:bg-sky-50' : 'cursor-not-allowed text-slate-400'}`}><Navigation size={16} />Lancer le guidage</a>
+    </div>
+
+    {hasMapPoint
+      ? <TaxiRouteMap
+          clientStop={hasPickupCoordinates ? { latitude: trip.pickupLatitude!, longitude: trip.pickupLongitude! } : null}
+          destination={hasPickupCoordinates && trip.destinationLatitude !== null && trip.destinationLatitude !== undefined && trip.destinationLongitude !== null && trip.destinationLongitude !== undefined
+            ? { latitude: trip.destinationLatitude, longitude: trip.destinationLongitude }
+            : null}
+          driver={driverPoint}
+          routeGeometry={hasPickupCoordinates ? trip.routeGeometry : null}
+          pickupRouteGeometry={driverPoint ? trip.pickupRouteGeometry : null}
+          className="mt-5 h-[clamp(21rem,58vw,32rem)] sm:h-[30rem]"
+        />
+      : <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm leading-6 text-amber-900">
+          <p className="font-bold">Carte en attente d’une position GPS fiable</p>
+          <p className="mt-1">Le point de départ ou la position actuelle du chauffeur n’est pas disponible. Le guidage s’affichera dès qu’une coordonnée GPS valide sera reçue.</p>
+        </div>}
+    {!hasPickupCoordinates && <p className="mt-3 rounded-lg bg-amber-500/10 p-3 text-xs leading-5 text-amber-900">Cette course ne contient pas les coordonnées GPS de l’arrêt client. La carte ne peut pas calculer le trajet vers le client; faites corriger le point de départ avant de démarrer.</p>}
+    {!driverPoint && <p className="mt-3 rounded-lg bg-amber-500/10 p-3 text-xs leading-5 text-amber-900">La position actuelle du chauffeur est absente ou trop ancienne. La carte ne l’affichera pas comme une position en direct.</p>}
+    <p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">Itinéraire complet : la voiture rejoint l’arrêt client, puis le trajet continue jusqu’à la destination. GPS, distance et ETA actualisés automatiquement.</p>
+  </section>;
 }
 
 function distanceInKm(latitudeA: number, longitudeA: number, latitudeB: number, longitudeB: number): number {

@@ -263,6 +263,7 @@ class TransportController extends Controller
         $input = $this->validated($request, [
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'accuracy' => ['required', 'numeric', 'between:0,100'],
         ]);
         $company = $this->company($request);
         if (! $this->isWithinDakar((float) $input['latitude'], (float) $input['longitude'])) {
@@ -1571,11 +1572,15 @@ class TransportController extends Controller
     private function publicTrip(object $row, ?object $driver, ?object $vehicle, ?string $vehicleImageUrl = null): array
     {
         $trip = $this->trip($row, $driver);
+        $driverGpsFresh = $driver !== null && $this->driverHasFreshGps($driver, (string) $row->company_id);
         return [
             ...$trip,
             'pickupCode' => $row->pickup_code ?? null,
-            'driverLatitude' => $driver?->latitude === null ? null : (float) $driver->latitude,
-            'driverLongitude' => $driver?->longitude === null ? null : (float) $driver->longitude,
+            'pickupRouteDistanceKm' => $driverGpsFresh ? $trip['pickupRouteDistanceKm'] : null,
+            'pickupEtaMinutes' => $driverGpsFresh ? $trip['pickupEtaMinutes'] : null,
+            'pickupRouteGeometry' => $driverGpsFresh ? $trip['pickupRouteGeometry'] : null,
+            'driverLatitude' => $driverGpsFresh && $driver?->latitude !== null ? (float) $driver->latitude : null,
+            'driverLongitude' => $driverGpsFresh && $driver?->longitude !== null ? (float) $driver->longitude : null,
             'vehicleModel' => $vehicle?->model,
             'vehicleRegistration' => $vehicle?->registration,
             'vehicleType' => $vehicle?->vehicle_type,
@@ -2449,7 +2454,8 @@ class TransportController extends Controller
         $updatedAt = \Illuminate\Support\Carbon::parse($driver->location_updated_at);
         $validityMinutes = $this->transportSettings($company)['gpsValidityMinutes'];
 
-        return $updatedAt->greaterThanOrEqualTo(now()->subMinutes($validityMinutes));
+        return $updatedAt->greaterThanOrEqualTo(now()->subMinutes($validityMinutes))
+            && $updatedAt->lessThanOrEqualTo(now()->addSeconds(30));
     }
 
     private function transportColor(array $settings, string $key): string

@@ -20,6 +20,10 @@ import {
 import { ApiRequestError } from '@/lib/api-request';
 import { publicImmobilierApi } from '@/lib/immobilier-api';
 import { createPublicTransportApi, type PublicTransportPlace, type PublicTransportQuote, type PublicTransportShareTrip, type PublicTransportTrip } from '@/lib/transport-api';
+import {
+  isTransportGpsAccuracyAcceptable,
+  MAX_TRANSPORT_GPS_ACCURACY_METERS,
+} from '@/lib/transport-gps-quality';
 import { isDestinationPlaceCommitted } from '@/lib/transport-place-selection';
 import { buildPublicTransportShareUrl, parsePublicTransportShareUrl } from '@/lib/transport-share-link';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
@@ -1342,12 +1346,15 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
     setLocationState('locating');
     setLocationMessage('Recherche d’une position GPS précise dans la zone de Dakar…');
     let bestAccuracy = Number.POSITIVE_INFINITY;
+    let bestObservedAccuracy = Number.POSITIVE_INFINITY;
     let outsideDakar = false;
     const handlePosition = ({ coords }: GeolocationPosition) => {
+      bestObservedAccuracy = Math.min(bestObservedAccuracy, coords.accuracy);
       if (!isWithinDakar(coords.latitude, coords.longitude)) {
         outsideDakar = true;
         return;
       }
+      if (!isTransportGpsAccuracyAcceptable(coords.accuracy)) return;
       if (coords.accuracy >= bestAccuracy) return;
       bestAccuracy = coords.accuracy;
       setPosition({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy });
@@ -1376,7 +1383,9 @@ function TransportPublicPage({ store, slug, domain, onBack }: { store: PublicSho
         setLocationState('error');
         setLocationMessage(outsideDakar
           ? 'La position reçue est hors de la zone de Dakar.'
-          : 'La position GPS n’a pas pu être obtenue. Vérifiez le signal et réessayez.');
+          : Number.isFinite(bestObservedAccuracy)
+            ? `La précision GPS reste insuffisante (${Math.round(bestObservedAccuracy)} m). Une précision de ${MAX_TRANSPORT_GPS_ACCURACY_METERS} m ou mieux est requise; attendez un meilleur signal ou choisissez le point sur la carte.`
+            : 'La position GPS n’a pas pu être obtenue. Vérifiez le signal et réessayez.');
       }
     }, 20_000);
   };

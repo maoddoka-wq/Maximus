@@ -138,11 +138,18 @@ class TransportTest extends TestCase
         $request->patchJson('/api/transport/drivers/'.$driver->json('id').'/location?companyId=kora', [
             'latitude' => 0,
             'longitude' => 0,
+            'accuracy' => 10,
         ])->assertStatus(422)
             ->assertJsonPath('error', 'La position GPS doit se trouver dans la zone de Dakar.');
         $request->patchJson('/api/transport/drivers/'.$driver->json('id').'/location?companyId=kora', [
             'latitude' => 14.7167,
             'longitude' => -17.4677,
+            'accuracy' => 101,
+        ])->assertStatus(422);
+        $request->patchJson('/api/transport/drivers/'.$driver->json('id').'/location?companyId=kora', [
+            'latitude' => 14.7167,
+            'longitude' => -17.4677,
+            'accuracy' => 10,
         ])->assertOk();
         $request->patchJson('/api/transport/drivers/'.$driver->json('id').'/availability?companyId=kora', [
             'availability' => 'AVAILABLE',
@@ -233,6 +240,7 @@ class TransportTest extends TestCase
         $admin->patchJson('/api/transport/drivers/'.$driverId.'/location?companyId=kora', [
             'latitude' => 14.7167,
             'longitude' => -17.4677,
+            'accuracy' => 10,
         ])->assertOk();
         $admin->patchJson($availabilityPath, ['availability' => 'AVAILABLE'])
             ->assertOk()
@@ -252,12 +260,23 @@ class TransportTest extends TestCase
             'availability' => 'PAUSED',
         ]);
 
+        DB::table('transport_drivers')->where('id', $driverId)->update([
+            'location_updated_at' => now()->addMinutes(5),
+            'updated_at' => now(),
+        ]);
+        $admin->patchJson($availabilityPath, ['availability' => 'AVAILABLE'])
+            ->assertStatus(422);
+
         $admin->patchJson('/api/transport/settings?companyId=kora', [
             'gpsValidityMinutes' => 8,
             'trackingIntervalSeconds' => 10,
             'baseFare' => 500,
             'pricePerKm' => 300,
         ])->assertOk();
+        DB::table('transport_drivers')->where('id', $driverId)->update([
+            'location_updated_at' => now(),
+            'updated_at' => now(),
+        ]);
         $admin->patchJson($availabilityPath, ['availability' => 'AVAILABLE'])
             ->assertOk()
             ->assertJsonPath('availability', 'AVAILABLE');
@@ -504,6 +523,7 @@ class TransportTest extends TestCase
             'status' => 'ASSIGNED',
         ]);
         $this->assertDatabaseMissing('transport_trips', ['driver_id' => $staleDriver]);
+
     }
 
     public function test_public_taxi_matches_a_distant_driver_inside_dakar_with_fast_gps_distance_calculation(): void
