@@ -351,6 +351,134 @@ class MaximusAuthTest extends TestCase
         ]);
     }
 
+    public function test_company_admin_revokes_the_matching_employee_only_in_its_company(): void
+    {
+        $ownEmployee = AuthUser::query()->create([
+            'id' => 'delete-own-company-employee',
+            'email' => 'shared-employee@kora.demo',
+            'password_hash' => MaximusPassword::hash('Employee123!'),
+            'display_name' => 'Employé Kora',
+            'role' => 'employee',
+            'company_id' => 'kora',
+            'employee_id' => 'shared-employee-id',
+            'sector_ids' => ['kora-sector'],
+            'status' => 'ACTIF',
+        ]);
+        $otherEmployee = AuthUser::query()->create([
+            'id' => 'delete-other-company-employee',
+            'email' => 'shared-employee@other.demo',
+            'password_hash' => MaximusPassword::hash('Employee123!'),
+            'display_name' => 'Employé autre entreprise',
+            'role' => 'employee',
+            'company_id' => 'other-company',
+            'employee_id' => 'shared-employee-id',
+            'sector_ids' => ['other-sector'],
+            'status' => 'ACTIF',
+        ]);
+        $admin = AuthUser::query()->create([
+            'id' => 'delete-company-admin',
+            'email' => 'delete-admin@kora.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!'),
+            'display_name' => 'Admin Kora',
+            'role' => 'company_admin',
+            'company_id' => 'kora',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        MaximusAuth::issueSession($ownEmployee);
+        MaximusAuth::issueSession($otherEmployee);
+        $adminToken = MaximusAuth::issueSession($admin);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $adminToken)
+            ->deleteJson('/api/auth/accounts/shared-employee-id?companyId=kora')
+            ->assertNoContent();
+
+        $this->assertDatabaseHas('auth_users', [
+            'id' => $ownEmployee->id,
+            'status' => 'SUSPENDU',
+        ]);
+        $this->assertDatabaseHas('auth_users', [
+            'id' => $otherEmployee->id,
+            'status' => 'ACTIF',
+        ]);
+        $this->assertDatabaseMissing('auth_sessions', ['user_id' => $ownEmployee->id]);
+        $this->assertDatabaseHas('auth_sessions', ['user_id' => $otherEmployee->id]);
+    }
+
+    public function test_company_admin_cannot_select_another_company_for_account_revocation(): void
+    {
+        $otherEmployee = AuthUser::query()->create([
+            'id' => 'foreign-delete-target',
+            'email' => 'foreign-delete-target@other.demo',
+            'password_hash' => MaximusPassword::hash('Employee123!'),
+            'display_name' => 'Employé autre entreprise',
+            'role' => 'employee',
+            'company_id' => 'other-company',
+            'employee_id' => 'foreign-delete-id',
+            'sector_ids' => ['other-sector'],
+            'status' => 'ACTIF',
+        ]);
+        $admin = AuthUser::query()->create([
+            'id' => 'foreign-delete-company-admin',
+            'email' => 'foreign-delete-admin@kora.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!'),
+            'display_name' => 'Admin Kora',
+            'role' => 'company_admin',
+            'company_id' => 'kora',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $adminToken = MaximusAuth::issueSession($admin);
+        MaximusAuth::issueSession($otherEmployee);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $adminToken)
+            ->deleteJson('/api/auth/accounts/foreign-delete-id?companyId=other-company')
+            ->assertNoContent();
+
+        $this->assertDatabaseHas('auth_users', [
+            'id' => $otherEmployee->id,
+            'status' => 'ACTIF',
+        ]);
+        $this->assertDatabaseHas('auth_sessions', ['user_id' => $otherEmployee->id]);
+    }
+
+    public function test_maximus_admin_must_specify_a_company_for_account_revocation(): void
+    {
+        $employee = AuthUser::query()->create([
+            'id' => 'company-selected-delete-target',
+            'email' => 'company-selected-delete-target@kora.demo',
+            'password_hash' => MaximusPassword::hash('Employee123!'),
+            'display_name' => 'Employé Kora',
+            'role' => 'employee',
+            'company_id' => 'kora',
+            'employee_id' => 'company-selected-delete-id',
+            'sector_ids' => ['kora-sector'],
+            'status' => 'ACTIF',
+        ]);
+        $admin = AuthUser::query()->create([
+            'id' => 'maximus-delete-admin',
+            'email' => 'maximus-delete-admin@maximus.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!'),
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $adminToken = MaximusAuth::issueSession($admin);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $adminToken)
+            ->deleteJson('/api/auth/accounts/company-selected-delete-id')
+            ->assertUnprocessable();
+
+        $this->assertDatabaseHas('auth_users', [
+            'id' => $employee->id,
+            'status' => 'ACTIF',
+        ]);
+    }
+
     public function test_deleted_company_invalidates_credentials_sessions_tokens_and_protected_data_access(): void
     {
         Company::query()->create([

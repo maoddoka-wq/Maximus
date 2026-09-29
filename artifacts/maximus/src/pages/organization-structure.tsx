@@ -12,6 +12,7 @@ import {
 } from '@/lib/store';
 import { getEffectiveModuleFeatureIds, getModuleFeatureOptions } from '@/lib/module-features';
 import { synchronizeUnitPackRoles } from '@/lib/module-role-sync';
+import { getOrganizationSubtreeIds, unitHasAssignmentsInSubtree } from '@/lib/organization-deletion';
 import { ActionButton, Field, Modal } from './organization-shared';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
@@ -25,38 +26,42 @@ export function StructureTab({
   data: StoreData;
   mutate: Mutate;
 }) {
-  const { alert } = useAppDialog();
+  const { alert, confirm } = useAppDialog();
   const companyNodes = data.orgNodes.filter(node => node.companyId === company.id);
   const availableModules = getConfiguredModules(data).filter(module => company.allowedModules.includes(module.id));
   const [modalOpen, setModalOpen] = useState(false);
   const [editingNode, setEditingNode] = useState<OrgNode | null>(null);
 
   const deleteNode = async (id: string) => {
-    const ids = new Set([id]);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      companyNodes.forEach(node => {
-        if (node.parentId && ids.has(node.parentId) && !ids.has(node.id)) {
-          ids.add(node.id);
-          changed = true;
-        }
-      });
-    }
-    const assigned =
-      data.employees.some(employee => employee.sectorId && ids.has(employee.sectorId)) ||
-      data.roles.some(role => role.sectorId && ids.has(role.sectorId));
-    if (assigned) {
+    const node = companyNodes.find(candidate => candidate.id === id);
+    if (!node) return;
+
+    const ids = getOrganizationSubtreeIds(companyNodes, id);
+    if (unitHasAssignmentsInSubtree(data, company.id, ids)) {
       await alert({
         title: 'Suppression impossible',
-        description: 'Des rôles ou employés sont encore affectés à cette unité.',
+        description: 'Cette unité ou l’une de ses sous-unités contient encore des rôles ou des employés. Retirez-les ou affectez-les ailleurs avant de supprimer la branche.',
         confirmLabel: 'Compris',
         tone: 'danger',
       });
       return;
     }
+
+    const descendantCount = ids.size - 1;
+    const confirmed = await confirm({
+      title: descendantCount > 0 ? 'Supprimer cette unité et ses sous-unités ?' : 'Supprimer cette unité ?',
+      description: descendantCount > 0
+        ? `« ${node.name} » et ses ${descendantCount} sous-unité(s) seront supprimés.`
+        : `L’unité « ${node.name} » sera supprimée.`,
+      confirmLabel: 'Supprimer',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+
     mutate(draft => {
-      draft.orgNodes = draft.orgNodes.filter(node => !ids.has(node.id));
+      draft.orgNodes = draft.orgNodes.filter(
+        item => item.companyId !== company.id || !ids.has(item.id),
+      );
     }, 'Unité et sous-unités supprimées.');
   };
 

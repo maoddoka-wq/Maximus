@@ -346,7 +346,23 @@ class AuthController extends Controller
     public function deleteAccount(Request $request, string $employeeId): Response|JsonResponse
     {
         $actor = $request->attributes->get('authActor');
-        $user = AuthUser::query()->where('employee_id', $employeeId)->first();
+        $actorRole = $actor['role'] ?? null;
+        if ($actorRole === 'maximus_admin') {
+            $companyId = trim((string) $request->query('companyId', ''));
+            if ($companyId === '') {
+                return response()->json(['error' => 'Une entreprise cible est requise pour révoquer ce compte.'], 422);
+            }
+        } else {
+            $companyId = trim((string) ($actor['companyId'] ?? ''));
+            if ($companyId === '') {
+                return response()->json(['error' => 'Aucune entreprise associée à cet acteur.'], 403);
+            }
+        }
+
+        $user = AuthUser::query()
+            ->where('company_id', $companyId)
+            ->where('employee_id', $employeeId)
+            ->first();
         if (! $user) {
             return response()->noContent();
         }

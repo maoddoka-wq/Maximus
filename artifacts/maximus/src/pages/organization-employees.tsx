@@ -54,7 +54,7 @@ export function EmployeesTab({
     setDeletingEmployeeId(employee.id);
     const ok = await confirm({
       title: 'Supprimer ce compte employé ?',
-      description: `Le compte de ${employee.firstName} ${employee.lastName} sera supprimé.`,
+      description: `La fiche de ${employee.firstName} ${employee.lastName} sera retirée de l’entreprise et son accès de connexion sera révoqué.`,
       confirmLabel: 'Supprimer',
       tone: 'danger',
     });
@@ -63,9 +63,16 @@ export function EmployeesTab({
       return;
     }
     try {
-      await authApi.revokeAccount(employee.id);
+      await authApi.revokeAccount(employee.id, company.id);
       mutate(draft => {
-        draft.employees = draft.employees.filter(item => item.id !== employee.id);
+        draft.employees = draft.employees.filter(
+          item => item.companyId !== company.id || item.id !== employee.id,
+        );
+        draft.orgNodes.forEach(node => {
+          if (node.companyId === company.id && node.managerEmployeeId === employee.id) {
+            node.managerEmployeeId = undefined;
+          }
+        });
       }, 'Employé supprimé.');
     } catch (error) {
       await alert({

@@ -66,7 +66,10 @@ export function RolesTab({
   const [editingRole, setEditingRole] = useState<Role | null>(null);
 
   const deleteRole = async (role: Role) => {
-    if (data.employees.some(employee => employee.roleId === role.id) || company.managerRoleId === role.id) {
+    if (
+      data.employees.some(employee => employee.companyId === company.id && employee.roleId === role.id) ||
+      company.managerRoleId === role.id
+    ) {
       await alert({
         title: 'Suppression impossible',
         description: 'Ce rôle est encore affecté à un employé ou au manager de l’entreprise.',
@@ -76,7 +79,7 @@ export function RolesTab({
       return;
     }
     mutate(draft => {
-      draft.roles = draft.roles.filter(item => item.id !== role.id);
+      draft.roles = draft.roles.filter(item => item.companyId !== company.id || item.id !== role.id);
     }, 'Rôle supprimé.');
   };
 
