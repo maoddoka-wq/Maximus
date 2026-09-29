@@ -419,9 +419,10 @@ function ManagerClockPanel({ date, setDate, settings, onRequestQr }: { date: str
 }
 
 function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: PresenceRow; date: string; canCreate: boolean; onScanClock: (token: string, action: 'arrival' | 'exit') => Promise<void> }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
   const scannerRef = useRef<QrScanner | null>(null);
   const cameraRequestRef = useRef<Promise<MediaStream> | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
   const onScanClockRef = useRef(onScanClock);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -440,7 +441,7 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
   }, [onScanClock]);
 
   useEffect(() => {
-    if (!scannerOpen || !videoRef.current || !action) return;
+    if (!scannerOpen || !videoElement || !action) return;
     const cameraRequest = cameraRequestRef.current;
     if (!cameraRequest) {
       setScannerOpen(false);
@@ -454,7 +455,7 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
     let handled = false;
     let cancelled = false;
     const scanAction = action;
-    const scanner = new QrScanner(videoRef.current, result => {
+    const scanner = new QrScanner(videoElement, result => {
       if (cancelled || handled || !result.data) return;
       handled = true;
       scanner.stop();
@@ -487,15 +488,11 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
     let startupTimedOut = false;
     const startup = cameraRequest.then(stream => {
       if (cancelled || startupTimedOut || cameraRequestRef.current !== cameraRequest) {
+        if (cameraStreamRef.current === stream) cameraStreamRef.current = null;
         stopCameraStream(stream);
         return;
       }
-      const video = videoRef.current;
-      if (!video) {
-        stopCameraStream(stream);
-        throw new Error('Video element is unavailable.');
-      }
-      video.srcObject = stream;
+      videoElement.srcObject = stream;
       return scanner.start();
     });
     void withCameraStartupTimeout(startup).then(() => {
@@ -519,13 +516,13 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
       if (scannerRef.current === scanner) scannerRef.current = null;
       scanner.stop();
       scanner.destroy();
-      const video = videoRef.current;
-      if (video?.srcObject instanceof MediaStream) {
-        stopCameraStream(video.srcObject);
-        video.srcObject = null;
-      }
+      const videoStream = videoElement.srcObject instanceof MediaStream ? videoElement.srcObject : null;
+      const stream = cameraStreamRef.current ?? videoStream;
+      if (stream) stopCameraStream(stream);
+      if (videoStream) videoElement.srcObject = null;
+      cameraStreamRef.current = null;
     };
-  }, [scannerOpen, action]);
+  }, [scannerOpen, action, videoElement]);
 
   const openScanner = () => {
     setMessage('');
@@ -552,7 +549,11 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
       });
       cameraRequestRef.current = request;
       void request.then(stream => {
-        if (cameraRequestRef.current !== request) stopCameraStream(stream);
+        if (cameraRequestRef.current !== request) {
+          stopCameraStream(stream);
+          return;
+        }
+        cameraStreamRef.current = stream;
       }).catch(() => {});
       setScannerOpen(true);
     } catch (cause) {
@@ -593,7 +594,15 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
       </div>
     </Panel>
     <Dialog open={scannerOpen} onOpenChange={open => {
-      if (!open) cameraRequestRef.current = null;
+      if (!open) {
+        cameraRequestRef.current = null;
+        const stream = cameraStreamRef.current;
+        cameraStreamRef.current = null;
+        if (stream) {
+          stopCameraStream(stream);
+          if (videoElement?.srcObject === stream) videoElement.srcObject = null;
+        }
+      }
       setScannerOpen(open);
     }}>
       <DialogContent
@@ -603,7 +612,7 @@ function EmployeeScannerPanel({ row, date, canCreate, onScanClock }: { row?: Pre
         <DialogTitle className="sr-only">Scanner le QR code de pointage</DialogTitle>
         <DialogDescription className="sr-only">Cadrez le QR code affiché par le responsable pour enregistrer votre pointage.</DialogDescription>
         <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden text-[hsl(var(--sidebar-foreground))]">
-          <video ref={videoRef} data-testid="video-attendance-scanner" className="absolute inset-0 h-full w-full object-cover" muted playsInline autoPlay />
+          <video ref={setVideoElement} data-testid="video-attendance-scanner" className="absolute inset-0 h-full w-full object-cover" muted playsInline autoPlay />
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[hsl(var(--sidebar)/.2)]" />
 
           <header className="relative z-20 flex items-center justify-between px-5 pb-3" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>

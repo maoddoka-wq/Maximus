@@ -5,6 +5,7 @@
 - [Périmètre des dossiers employés](employee-record-scope.md) — employé limité à lui-même sans sélecteur, manager à ses unités autorisées, admin d’entreprise à tous les employés du tenant.
 - [Persistance des présences](presence-storage.md) — les workflows Présences sont stockés dans PostgreSQL via des éléments typés, payload extensible et historique.
 - [Pointage par QR code](presence-qr-clock.md) — le gérant affiche le QR du jour ; chaque employé scanne avec son propre compte pour enregistrer arrivée puis sortie.
+- [Montage du scanner caméra](presence-camera-portal.md) — relier le démarrage au nœud vidéo monté; un portail Radix conditionnel peut sinon laisser le scanner bloqué.
 - [Parcours Organisation](organization-workflow.md) — construire la hiérarchie, configurer les rôles, puis créer les employés et désigner les managers.
 - [Validation des vues authentifiées](authenticated-preview.md) — pour contrôler les écrans connectés, conserver une session locale via le navigateur CDP avant les captures.
 - [Frontière des données Commerce](commerce-data-boundary.md) — les workflows Commerce doivent synchroniser explicitement l’état local entreprise et le StoreData partagé lorsqu’ils touchent au stock.
