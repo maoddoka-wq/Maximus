@@ -6,9 +6,7 @@ use App\Models\AuthUser;
 use App\Support\MaximusAuth;
 use App\Support\ModuleAuthorization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class StockTest extends TestCase
@@ -87,38 +85,6 @@ class StockTest extends TestCase
         $this->assertDatabaseHas('stock_audit_logs', [
             'user_name' => 'Gestionnaire Stock',
         ]);
-    }
-
-    public function test_stock_product_photo_upload_is_persisted_and_served_from_its_own_disk_path(): void
-    {
-        Storage::fake('module-product-images');
-        $request = $this->asActor();
-        $product = $request->post('/api/stock/products?companyId=kora', [
-            'name' => 'Café avec photo',
-            'sku' => 'CAF-PHOTO-01',
-            'imageUrl' => '',
-            'image' => UploadedFile::fake()->image('cafe.jpg'),
-        ])->assertCreated();
-
-        $productId = $product->json('id');
-        $imageUrl = '/api/stock/products/'.$productId.'/image';
-        $path = 'stocks/kora/'.$productId.'/photo';
-
-        $this->assertSame($imageUrl, $product->json('imageUrl'));
-        Storage::disk('module-product-images')->assertExists($path);
-        $request->get($imageUrl.'?companyId=other-company')->assertForbidden();
-        $imageResponse = $request->get($imageUrl.'?companyId=kora')
-            ->assertOk()
-            ->assertHeader('Content-Type', 'image/jpeg');
-        $this->assertSame(Storage::disk('module-product-images')->get($path), $imageResponse->baseResponse->getFile()->getContent());
-
-        $replacement = $request->post($imageUrl.'?companyId=kora', [
-            'image' => UploadedFile::fake()->image('cafe-remplace.png'),
-        ])->assertOk();
-
-        $this->assertSame($imageUrl, $replacement->json('imageUrl'));
-        $request->get($imageUrl.'?companyId=kora')->assertOk()->assertHeader('Content-Type', 'image/png');
-        $this->assertSame($imageUrl, DB::table('stock_products')->where('id', $productId)->value('image_url'));
     }
 
     public function test_inventory_validation_applies_only_the_difference(): void

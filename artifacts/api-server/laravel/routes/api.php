@@ -7,7 +7,6 @@ use App\Http\Controllers\Api\CompanyPaymentController;
 use App\Http\Controllers\Api\CompanyPublicSiteAccessController;
 use App\Http\Controllers\Api\CompanyPublicSiteSettingsController;
 use App\Http\Controllers\Api\CompanyPublicSiteDomainsController;
-use App\Http\Controllers\Api\CommerceProductImageController;
 use App\Http\Controllers\Api\DiagnosticTokenController;
 use App\Http\Controllers\Api\MaximusWalletController;
 use App\Http\Controllers\Api\MaximusAssistantController;
@@ -137,17 +136,6 @@ Route::middleware(['maximus.auth', 'maximus.company'])
     Route::post('/domains', [CompanyPublicSiteDomainsController::class, 'store']);
     Route::post('/domains/{id}/verify', [CompanyPublicSiteDomainsController::class, 'verify']);
     Route::delete('/domains/{id}', [CompanyPublicSiteDomainsController::class, 'destroy']);
-    });
-
-Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:commerce'])
-    ->prefix('commerce')
-    ->group(function (): void {
-        Route::post('/product-images/{productId}', [CommerceProductImageController::class, 'storeNew'])
-            ->where('productId', '[A-Za-z0-9_-]+');
-        Route::get('/products/{productId}/image', [CommerceProductImageController::class, 'show'])
-            ->where('productId', '[A-Za-z0-9_-]+');
-        Route::post('/products/{productId}/image', [CommerceProductImageController::class, 'replace'])
-            ->where('productId', '[A-Za-z0-9_-]+');
     });
 
 Route::middleware('maximus.auth')->prefix('auth/company-admins')->group(function (): void {

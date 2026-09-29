@@ -47,14 +47,6 @@ return [
             'report' => false,
         ],
 
-        'module-product-images' => [
-            'driver' => 'local',
-            'root' => env('MODULE_PRODUCT_IMAGES_STORAGE_PATH', storage_path('app/private/module-product-images')),
-            'visibility' => 'private',
-            'throw' => false,
-            'report' => false,
-        ],
-
         'digital' => [
             'driver' => 'local',
             'root' => env(

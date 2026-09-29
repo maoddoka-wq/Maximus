@@ -40,8 +40,6 @@ services:
         value: database
       - key: DIGITAL_STORAGE_PATH
         value: /var/data/digital-products
-      - key: MODULE_PRODUCT_IMAGES_STORAGE_PATH
-        value: /var/data/module-product-images
       - key: SESSION_DRIVER
         value: database
       - key: SESSION_SECURE_COOKIE

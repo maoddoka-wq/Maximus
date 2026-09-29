@@ -84,7 +84,7 @@ export interface SectorBusinessProfile { id: string; name: string; description?:
 export interface SectorPreset { id: string; name: string; moduleIds: ModuleId[]; modulePackIds?: Partial<Record<ModuleId, string[]>>; moduleFeatures?: Partial<Record<ModuleId, string[]>>; businessProfiles?: SectorBusinessProfile[]; }
 export interface Employee { id: string; firstName: string; lastName: string; email: string; phone: string; position: string; department: string; subDepartment: string; role: string; status: Status; loginPassword?: string; isSectorAdmin?: boolean; companyId?: string; sectorId?: string; roleId?: string; }
 export interface Role { id: string; name: string; description: string; modulePermissions: Record<string, string[]>; companyId?: string; sectorId?: string; packId?: string; packModuleId?: ModuleId; }
-export interface Product { id: string; sku: string; name: string; category: string; stock: number; threshold: number; price: number; imageUrl?: string; companyId?: string; }
+export interface Product { id: string; sku: string; name: string; category: string; stock: number; threshold: number; price: number; companyId?: string; }
 export interface Movement { id: string; product: string; quantity: number; type: 'ENTRÉE' | 'SORTIE'; date: string; user: string; location: string; companyId?: string; }
 export interface Sale { id: string; reference: string; client: string; amount: number; status: Status; date: string; items: { productId: string; quantity: number }[]; discount?: number; taxRate?: number; companyId?: string; }
 export interface Activity { id: string; user: string; action: string; module: string; object: string; date: string; status: Status; companyId?: string; }

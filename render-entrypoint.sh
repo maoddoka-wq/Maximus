@@ -70,22 +70,6 @@ if ! su -s /bin/sh -c "test -w '$digital_storage_path'" www-data; then
     exit 1
 fi
 
-module_product_images_storage_path="${MODULE_PRODUCT_IMAGES_STORAGE_PATH:-/var/data/module-product-images}"
-case "$module_product_images_storage_path" in
-    /var/data/*) ;;
-    *)
-        echo "Render startup error: MODULE_PRODUCT_IMAGES_STORAGE_PATH must use the persistent /var/data disk in production." >&2
-        exit 1
-        ;;
-esac
-mkdir -p "$module_product_images_storage_path"
-chown www-data:www-data "$module_product_images_storage_path"
-chmod ug+rwX "$module_product_images_storage_path"
-if ! su -s /bin/sh -c "test -w '$module_product_images_storage_path'" www-data; then
-    echo "Render startup error: module product image storage is not writable: $module_product_images_storage_path" >&2
-    exit 1
-fi
-
 attempt=1
 max_attempts=30
 

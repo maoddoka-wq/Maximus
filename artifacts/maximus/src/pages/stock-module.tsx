@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Boxes, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Edit3, FileBarChart, History, MapPin, Package, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, UserRound, Users, Warehouse, X } from 'lucide-react';
-import { createStockApi, type StockApi, type StockBootstrap, type StockBootstrapScope, type StockInventory, type StockLocation, type StockMovement, type StockMovementType, type StockProduct, type StockProductInput, type StockRequest, type StockSupplier, type StockWarehouse } from '@/lib/stock-api';
+import { createStockApi, type StockApi, type StockBootstrap, type StockBootstrapScope, type StockInventory, type StockLocation, type StockMovement, type StockMovementType, type StockProduct, type StockRequest, type StockSupplier, type StockWarehouse } from '@/lib/stock-api';
 import { useQueryTab } from '@/lib/query-tab';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { useAppDialog } from '@/components/confirm-dialog';
@@ -25,12 +25,12 @@ const tabs = [
 ] as const;
 
 type Tab = typeof tabs[number][0];
-type ProductForm = StockProductInput;
+type ProductForm = Omit<StockProduct, 'id' | 'companyId' | 'archived'>;
 type WarehouseForm = Pick<StockWarehouse, 'name' | 'manager' | 'address'>;
 type SupplierForm = Pick<StockSupplier, 'name' | 'contactName' | 'email' | 'phone' | 'address' | 'notes'>;
 type MovementForm = { productId: string; warehouseId: string; destinationWarehouseId: string; quantity: number; purchasePrice: number; reason: string; movementDate: string; userName: string; reference: string; comment: string };
 
-const blankProduct: ProductForm = { name: '', category: 'Divers', subcategory: '', brand: '', sku: '', barcode: '', unit: 'unité', purchasePrice: 0, salePrice: 0, minStock: 0, maxStock: 0, supplierId: null, description: '' };
+const blankProduct: ProductForm = { name: '', category: 'Divers', subcategory: '', brand: '', sku: '', barcode: '', imageUrl: '', unit: 'unité', purchasePrice: 0, salePrice: 0, minStock: 0, maxStock: 0, supplierId: null, description: '' };
 const blankWarehouse: WarehouseForm = { name: '', manager: '', address: '' };
 const blankSupplier: SupplierForm = { name: '', contactName: '', email: '', phone: '', address: '', notes: '' };
 const emptyStockBootstrap: StockBootstrap = { products: [], warehouses: [], locations: [], suppliers: [], balances: [], movements: [], requests: [], inventories: [], inventoryLines: [] };
@@ -100,14 +100,13 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     if (!loadedScopes.current.has(scope)) void load(false, scope);
   }, [tab, preview, data]);
   useAutoRefresh(() => load(true, scopeForTab(tab)), { enabled: !preview && Boolean(data) });
-  const run = async (action: () => Promise<unknown>, success: string, onSuccess?: () => void) => {
+  const run = async (action: () => Promise<unknown>, success: string) => {
     if (pendingAction) return;
     setPendingAction(true);
     showAppToast('Action en cours…', 'info');
     try {
       await action();
       showAppToast(success, 'success');
-      onSuccess?.();
       // The mutation is complete; do not make the user wait for the
       // consistency refresh. Keep the existing view usable while it runs.
       void load(true, scopeForTab(tab));
@@ -226,14 +225,14 @@ function SettingToggle({ title, text, checked, onChange, disabled = false }: { t
   return <div className="flex items-center justify-between gap-4 border-b pb-5 last:border-0"><div><p className="text-sm font-bold">{title}</p><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">{text}</p></div><button type="button" role="switch" aria-checked={checked} disabled={disabled} onClick={() => onChange(!checked)} className={`h-6 w-11 shrink-0 rounded-full p-1 transition disabled:cursor-not-allowed disabled:opacity-50 ${checked ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--muted))]'}`}><span className={`block h-4 w-4 rounded-full bg-white transition ${checked ? 'translate-x-5' : ''}`} /></button></div>;
 }
 
-function ProductsPanel({ data, run }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string, onSuccess?: () => void) => Promise<void> }) {
+function ProductsPanel({ data, run }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
   const { confirm } = useAppDialog();
   const stockApi = useStockApi();
   const { canCreate, canModify } = useStockAccess();
   const [query, setQuery] = useState(''); const [category, setCategory] = useState('Toutes'); const [page, setPage] = useState(1); const [modal, setModal] = useState<StockProduct | 'new' | null>(null); const [history, setHistory] = useState<StockProduct | null>(null);
   const products = data.products.filter(product => !product.archived).filter(product => `${product.name} ${product.sku} ${product.barcode} ${product.brand}`.toLowerCase().includes(query.toLowerCase())).filter(product => category === 'Toutes' || product.category === category); const categories = ['Toutes', ...new Set(data.products.map(product => product.category))]; const pageData = paginate(products, page);
   const getQuantity = (id: string) => data.balances.filter(balance => balance.productId === id).reduce((sum, balance) => sum + balance.quantity, 0);
-  return <div className="space-y-5"><Panel title="Référentiel produits" action={canCreate ? <button onClick={() => setModal('new')} className="flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-white"><Plus size={15} />Ajouter un produit</button> : undefined}><div className="mb-4 flex flex-col gap-3 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={15} /><input value={query} onChange={event => { setQuery(event.target.value); setPage(1); }} placeholder="Rechercher par nom, SKU, marque ou code-barres..." className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm" /></div><select value={category} onChange={event => setCategory(event.target.value)} className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm">{categories.map(item => <option key={item}>{item}</option>)}</select></div><div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className="bg-[hsl(var(--muted)/.55)] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]"><tr>{['Produit', 'Référence', 'Catégorie', 'Stock', 'Prix achat', 'Prix vente', 'Seuils', 'Fournisseur', 'Actions'].map(header => <th key={header} className="px-4 py-3">{header}</th>)}</tr></thead><tbody className="divide-y">{pageData.items.map(product => <tr key={product.id} className="hover:bg-[hsl(var(--muted)/.35)]"><td className="px-4 py-3"><div className="flex items-center gap-3">{product.imageUrl ? <img src={product.imageUrl} alt="" className="h-9 w-9 rounded-lg object-cover" /> : <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Package size={16} /></span>}<span><strong className="block">{product.name}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{product.brand || 'Marque non définie'} · {product.unit}</small></span></div></td><td className="mono px-4 py-3 text-xs">{product.sku}<small className="block text-[hsl(var(--muted-foreground))]">{product.barcode || 'Sans code-barres'}</small></td><td className="px-4 py-3">{product.category}<small className="block text-xs text-[hsl(var(--muted-foreground))]">{product.subcategory}</small></td><td className={`px-4 py-3 font-bold ${getQuantity(product.id) <= product.minStock ? 'text-[hsl(var(--destructive))]' : ''}`}>{getQuantity(product.id).toLocaleString('fr-FR')}</td><td className="px-4 py-3">{money(product.purchasePrice)}</td><td className="px-4 py-3">{money(product.salePrice)}</td><td className="px-4 py-3 text-xs">{product.minStock} min · {product.maxStock || '—'} max</td><td className="px-4 py-3 text-xs">{data.suppliers.find(supplier => supplier.id === product.supplierId)?.name ?? '—'}</td><td className="px-4 py-3"><div className="flex flex-wrap gap-1"><button aria-label={`Voir l’historique de ${product.name}`} title="Historique" onClick={() => setHistory(product)} className="inline-flex items-center gap-1 rounded border px-2 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><History size={13} /><span>Historique</span></button>{canModify && <><button aria-label={`Modifier ${product.name}`} title="Modifier" onClick={() => setModal(product)} className="inline-flex items-center gap-1 rounded border px-2 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Edit3 size={13} /><span>Modifier</span></button><button aria-label={`Archiver ${product.name}`} title="Archiver" onClick={() => void confirm({ title: 'Archiver ce produit ?', description: `Le produit ${product.name} sera archivé.`, confirmLabel: 'Archiver', tone: 'danger' }).then(ok => { if (ok) void run(() => stockApi.archiveProduct(product.id), 'Produit archivé.'); })} className="inline-flex items-center gap-1 rounded border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Trash2 size={13} /><span>Archiver</span></button></>}</div></td></tr>)}</tbody></table></div><Pager page={page} pages={pageData.pages} setPage={setPage} total={products.length} /></Panel>{modal && <ProductModal value={modal === 'new' ? blankProduct : modal} suppliers={data.suppliers} onClose={() => setModal(null)} onSave={async (body, image) => { await run(async () => { if (modal === 'new') return stockApi.createProduct(body, image ?? undefined); const updated = await stockApi.updateProduct(modal.id, body); return image ? stockApi.uploadProductImage(modal.id, image) : updated; }, modal === 'new' ? 'Produit créé.' : 'Produit modifié.', () => setModal(null)); }} />}{history && <HistoryModal product={history} data={data} onClose={() => setHistory(null)} />}</div>;
+  return <div className="space-y-5"><Panel title="Référentiel produits" action={canCreate ? <button onClick={() => setModal('new')} className="flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-white"><Plus size={15} />Ajouter un produit</button> : undefined}><div className="mb-4 flex flex-col gap-3 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={15} /><input value={query} onChange={event => { setQuery(event.target.value); setPage(1); }} placeholder="Rechercher par nom, SKU, marque ou code-barres..." className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm" /></div><select value={category} onChange={event => setCategory(event.target.value)} className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm">{categories.map(item => <option key={item}>{item}</option>)}</select></div><div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className="bg-[hsl(var(--muted)/.55)] text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground))]"><tr>{['Produit', 'Référence', 'Catégorie', 'Stock', 'Prix achat', 'Prix vente', 'Seuils', 'Fournisseur', 'Actions'].map(header => <th key={header} className="px-4 py-3">{header}</th>)}</tr></thead><tbody className="divide-y">{pageData.items.map(product => <tr key={product.id} className="hover:bg-[hsl(var(--muted)/.35)]"><td className="px-4 py-3"><div className="flex items-center gap-3">{product.imageUrl ? <img src={product.imageUrl} alt="" className="h-9 w-9 rounded-lg object-cover" /> : <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Package size={16} /></span>}<span><strong className="block">{product.name}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{product.brand || 'Marque non définie'} · {product.unit}</small></span></div></td><td className="mono px-4 py-3 text-xs">{product.sku}<small className="block text-[hsl(var(--muted-foreground))]">{product.barcode || 'Sans code-barres'}</small></td><td className="px-4 py-3">{product.category}<small className="block text-xs text-[hsl(var(--muted-foreground))]">{product.subcategory}</small></td><td className={`px-4 py-3 font-bold ${getQuantity(product.id) <= product.minStock ? 'text-[hsl(var(--destructive))]' : ''}`}>{getQuantity(product.id).toLocaleString('fr-FR')}</td><td className="px-4 py-3">{money(product.purchasePrice)}</td><td className="px-4 py-3">{money(product.salePrice)}</td><td className="px-4 py-3 text-xs">{product.minStock} min · {product.maxStock || '—'} max</td><td className="px-4 py-3 text-xs">{data.suppliers.find(supplier => supplier.id === product.supplierId)?.name ?? '—'}</td><td className="px-4 py-3"><div className="flex flex-wrap gap-1"><button aria-label={`Voir l’historique de ${product.name}`} title="Historique" onClick={() => setHistory(product)} className="inline-flex items-center gap-1 rounded border px-2 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><History size={13} /><span>Historique</span></button>{canModify && <><button aria-label={`Modifier ${product.name}`} title="Modifier" onClick={() => setModal(product)} className="inline-flex items-center gap-1 rounded border px-2 py-1.5 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Edit3 size={13} /><span>Modifier</span></button><button aria-label={`Archiver ${product.name}`} title="Archiver" onClick={() => void confirm({ title: 'Archiver ce produit ?', description: `Le produit ${product.name} sera archivé.`, confirmLabel: 'Archiver', tone: 'danger' }).then(ok => { if (ok) void run(() => stockApi.archiveProduct(product.id), 'Produit archivé.'); })} className="inline-flex items-center gap-1 rounded border px-2 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Trash2 size={13} /><span>Archiver</span></button></>}</div></td></tr>)}</tbody></table></div><Pager page={page} pages={pageData.pages} setPage={setPage} total={products.length} /></Panel>{modal && <ProductModal value={modal === 'new' ? blankProduct : modal} suppliers={data.suppliers} onClose={() => setModal(null)} onSave={body => void run(() => modal === 'new' ? stockApi.createProduct(body) : stockApi.updateProduct(modal.id, body), modal === 'new' ? 'Produit créé.' : 'Produit modifié.').then(() => setModal(null))} />}{history && <HistoryModal product={history} data={data} onClose={() => setHistory(null)} />}</div>;
 }
 
 function WarehousesPanel({ data, run }: { data: StockBootstrap; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
@@ -539,62 +538,11 @@ function RequestModal({ value, data, onClose, onChange, onSave }: { value: Stock
   return <Modal title={'id' in value ? 'Modifier la demande de réapprovisionnement' : 'Nouvelle demande de réapprovisionnement'} onClose={onClose}><Select label="Article" value={value.productId} onChange={productId => onChange({ ...value, productId })} options={data.products.filter(product => !product.archived).map(product => [product.id, `${product.name} (${product.sku})`])} /><Select label="Entrepôt" value={value.warehouseId} onChange={warehouseId => onChange({ ...value, warehouseId })} options={data.warehouses.filter(warehouse => !warehouse.archived).map(warehouse => [warehouse.id, warehouse.name])} /><Input label="Quantité demandée" type="number" value={String(value.quantity)} onChange={quantity => onChange({ ...value, quantity: Number(quantity) })} /><Input label="Motif" value={value.reason} onChange={reason => onChange({ ...value, reason })} placeholder="Seuil atteint, commande client..." /><div className="mt-6 flex justify-end"><Button primary required={'id' in value ? 'modify' : 'create'} disabled={!value.productId || !value.warehouseId || value.quantity < 1 || !value.reason.trim()} onClick={onSave}>{'id' in value ? 'Enregistrer les modifications' : 'Enregistrer la demande'}</Button></div></Modal>;
 }
 
-function ProductModal({ value, suppliers, onClose, onSave }: { value: ProductForm | StockProduct; suppliers: StockSupplier[]; onClose: () => void; onSave: (body: ProductForm, image: File | null) => Promise<void> }) {
+function ProductModal({ value, suppliers, onClose, onSave }: { value: ProductForm | StockProduct; suppliers: StockSupplier[]; onClose: () => void; onSave: (body: ProductForm) => void }) {
   const { canCreate, canModify } = useStockAccess();
-  const [form, setForm] = useState<ProductForm>({ ...blankProduct, ...value });
-  const [image, setImage] = useState<File | null>(null);
-  const [saving, setSaving] = useState(false);
-  const previewUrl = useMemo(() => image ? URL.createObjectURL(image) : '', [image]);
-  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
-  const update = (key: keyof ProductForm, value: string | number | null) => setForm(current => ({ ...current, [key]: value }));
-  const save = async () => {
-    if (saving || ('id' in value ? !canModify : !canCreate)) return;
-    setSaving(true);
-    try {
-      await onSave(form, image);
-    } finally {
-      setSaving(false);
-    }
-  };
-  const currentImage = 'id' in value ? value.imageUrl : '';
-  return <Modal large title={'id' in value ? 'Modifier le produit' : 'Ajouter un produit'} onClose={onClose}>
-    <div className="grid gap-4 sm:grid-cols-2">
-      <Input label="Nom du produit" value={form.name} onChange={value => update('name', value)} />
-      <Input label="SKU / référence" value={form.sku} onChange={value => update('sku', value)} />
-      <Input label="Code-barres" value={form.barcode} onChange={value => update('barcode', value)} />
-      <Input label="Marque" value={form.brand} onChange={value => update('brand', value)} />
-      <Input label="Catégorie" value={form.category} onChange={value => update('category', value)} />
-      <Input label="Sous-catégorie" value={form.subcategory} onChange={value => update('subcategory', value)} />
-      <Input label="Unité" value={form.unit} onChange={value => update('unit', value)} />
-      <Input label="Prix d’achat (FCFA)" type="number" value={String(form.purchasePrice)} onChange={value => update('purchasePrice', Number(value))} />
-      <Input label="Prix de vente (FCFA)" type="number" value={String(form.salePrice)} onChange={value => update('salePrice', Number(value))} />
-      <Input label="Stock minimum" type="number" value={String(form.minStock)} onChange={value => update('minStock', Number(value))} />
-      <Input label="Stock maximum" type="number" value={String(form.maxStock)} onChange={value => update('maxStock', Number(value))} />
-      <div className="sm:col-span-2">
-        <label className="block text-xs font-bold">Photo de l’article
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={event => {
-              const file = event.currentTarget.files?.[0] ?? null;
-              event.currentTarget.value = '';
-              if (file && (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024)) {
-                showAppToast('Choisissez une image JPEG, PNG ou WebP de 10 Mo maximum.', 'error');
-                return;
-              }
-              setImage(file);
-            }}
-            className="mt-2 block w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2 text-sm font-normal"
-          />
-        </label>
-        <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">JPEG, PNG ou WebP — 10 Mo maximum. La photo reste dans le catalogue Stock.</p>
-        {(previewUrl || currentImage) && <img src={previewUrl || currentImage} alt={`Aperçu de ${form.name || 'la photo de l’article'}`} className="mt-3 h-20 w-20 rounded-xl border object-cover" />}
-      </div>
-    </div>
-    <Select label="Fournisseur" value={form.supplierId ?? ''} onChange={value => update('supplierId', value || null)} options={[['', 'Aucun fournisseur'], ...suppliers.filter(supplier => !supplier.archived).map(supplier => [supplier.id, supplier.name])]} />
-    <label className="mt-4 block text-xs font-bold">Description<textarea value={form.description} onChange={event => update('description', event.target.value)} rows={3} className="mt-2 w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" /></label>
-    <div className="mt-6 flex justify-end"><Button primary required={'id' in value ? 'modify' : 'create'} disabled={!form.name || !form.sku || saving} onClick={() => void save()}>{saving ? 'Enregistrement…' : 'Enregistrer'}</Button></div>
-  </Modal>;
+  const [form, setForm] = useState<ProductForm>({ ...blankProduct, ...value }); const update = (key: keyof ProductForm, value: string | number | null) => setForm(current => ({ ...current, [key]: value }));
+  const save = () => { if ('id' in value ? !canModify : !canCreate) return; onSave(form); };
+  return <Modal large title={'id' in value ? 'Modifier le produit' : 'Ajouter un produit'} onClose={onClose}><div className="grid gap-4 sm:grid-cols-2"><Input label="Nom du produit" value={form.name} onChange={value => update('name', value)} /><Input label="SKU / référence" value={form.sku} onChange={value => update('sku', value)} /><Input label="Code-barres" value={form.barcode} onChange={value => update('barcode', value)} /><Input label="Marque" value={form.brand} onChange={value => update('brand', value)} /><Input label="Catégorie" value={form.category} onChange={value => update('category', value)} /><Input label="Sous-catégorie" value={form.subcategory} onChange={value => update('subcategory', value)} /><Input label="Unité" value={form.unit} onChange={value => update('unit', value)} /><Input label="Image (URL)" value={form.imageUrl} onChange={value => update('imageUrl', value)} /><Input label="Prix d’achat (FCFA)" type="number" value={String(form.purchasePrice)} onChange={value => update('purchasePrice', Number(value))} /><Input label="Prix de vente (FCFA)" type="number" value={String(form.salePrice)} onChange={value => update('salePrice', Number(value))} /><Input label="Stock minimum" type="number" value={String(form.minStock)} onChange={value => update('minStock', Number(value))} /><Input label="Stock maximum" type="number" value={String(form.maxStock)} onChange={value => update('maxStock', Number(value))} /></div><Select label="Fournisseur" value={form.supplierId ?? ''} onChange={value => update('supplierId', value || null)} options={[['', 'Aucun fournisseur'], ...suppliers.filter(supplier => !supplier.archived).map(supplier => [supplier.id, supplier.name])]} /><label className="mt-4 block text-xs font-bold">Description<textarea value={form.description} onChange={event => update('description', event.target.value)} rows={3} className="mt-2 w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm" /></label><div className="mt-6 flex justify-end"><Button primary required={'id' in value ? 'modify' : 'create'} disabled={!form.name || !form.sku} onClick={save}>Enregistrer</Button></div></Modal>;
 }
 
  function WarehouseModal({ value, onClose, onSave }: { value: WarehouseForm | StockWarehouse; onClose: () => void; onSave: (body: WarehouseForm) => void }) { const { canCreate, canModify } = useStockAccess(); const [form, setForm] = useState<WarehouseForm>({ ...blankWarehouse, ...value }); const save = () => { if ('id' in value ? !canModify : !canCreate) return; onSave(form); }; return <Modal title={'id' in value ? 'Modifier l’entrepôt' : 'Ajouter un entrepôt'} onClose={onClose}><div className="space-y-4"><Input label="Nom" value={form.name} onChange={value => setForm({ ...form, name: value })} /><Input label="Responsable" value={form.manager} onChange={value => setForm({ ...form, manager: value })} /><Input label="Adresse" value={form.address} onChange={value => setForm({ ...form, address: value })} /></div><div className="mt-6 flex justify-end"><Button primary required={'id' in value ? 'modify' : 'create'} disabled={!form.name} onClick={save}>Enregistrer</Button></div></Modal>; }

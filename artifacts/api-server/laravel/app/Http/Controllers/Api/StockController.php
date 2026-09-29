@@ -3,9 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\ModuleProductImageStorage;
 use App\Support\ModuleAuthorization;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -60,16 +58,12 @@ class StockController extends Controller
         return response()->json($payload);
     }
 
-    public function createProduct(Request $request, ModuleProductImageStorage $images): JsonResponse
+    public function createProduct(Request $request): JsonResponse
     {
         if (! $this->allowed($request, 'create', 'products')) {
             return $this->forbidden();
         }
         $input = $this->productInput($request);
-        $imageInput = Validator::make($request->all(), [
-            'image' => ['sometimes', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-        ])->validate();
-        $image = $imageInput['image'] ?? null;
         $company = $this->company($request);
         if (! empty($input['supplierId']) && ! $this->activeResourceExists('stock_suppliers', $input['supplierId'], $company)) {
             return $this->notFound('Fournisseur introuvable');
@@ -78,68 +72,9 @@ class StockController extends Controller
         $row['id'] = $this->id('product');
         $row['created_at'] = now();
         $row['updated_at'] = now();
-        try {
-            $row = DB::transaction(function () use ($row, $image, $company, $images): array {
-                DB::table('stock_products')->insert($row);
-                if ($image instanceof UploadedFile) {
-                    $row['image_url'] = $images->store('stocks', $company, $row['id'], $image);
-                    DB::table('stock_products')->where('id', $row['id'])->update([
-                        'image_url' => $row['image_url'],
-                        'updated_at' => now(),
-                    ]);
-                }
-
-                return $row;
-            });
-        } catch (Throwable $exception) {
-            if ($image instanceof UploadedFile) {
-                $images->delete('stocks', $company, $row['id']);
-            }
-
-            throw $exception;
-        }
+        DB::table('stock_products')->insert($row);
 
         return response()->json($this->product((object) $row), 201);
-    }
-
-    public function uploadProductImage(Request $request, string $id, ModuleProductImageStorage $images): JsonResponse
-    {
-        if (! $this->allowed($request, 'modify', 'products')) {
-            return $this->forbidden();
-        }
-        $company = $this->company($request);
-        $product = DB::table('stock_products')->where('id', $id)->where('company_id', $company)->first();
-        if (! $product) {
-            return $this->notFound('Produit introuvable');
-        }
-        $input = Validator::make($request->all(), [
-            'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-        ])->validate();
-
-        $imageUrl = $images->store('stocks', $company, $id, $input['image']);
-        DB::table('stock_products')->where('id', $id)->where('company_id', $company)->update([
-            'image_url' => $imageUrl,
-            'updated_at' => now(),
-        ]);
-
-        return response()->json($this->product(DB::table('stock_products')->where('id', $id)->first()));
-    }
-
-    public function serveProductImage(Request $request, string $id, ModuleProductImageStorage $images)
-    {
-        if (! $this->allowed($request, 'view', 'products')) {
-            return $this->forbidden();
-        }
-        $company = $this->company($request);
-        $product = DB::table('stock_products')
-            ->where('id', $id)
-            ->where('company_id', $company)
-            ->first(['image_url']);
-        if (! $product || $product->image_url !== $images->url('stocks', $id)) {
-            abort(404);
-        }
-
-        return $images->response('stocks', $company, $id);
     }
 
     public function updateProduct(Request $request, string $id): JsonResponse
@@ -559,7 +494,7 @@ class StockController extends Controller
         $required = $partial ? ['sometimes'] : ['required'];
 
         return $this->validated($request, [
-            'name' => array_merge($required, ['string', 'min:1']), 'category' => ['nullable', 'string'], 'subcategory' => ['nullable', 'string'], 'brand' => ['nullable', 'string'], 'sku' => array_merge($required, ['string', 'min:1']), 'barcode' => ['nullable', 'string'], 'unit' => ['nullable', 'string'], 'purchasePrice' => ['nullable', 'integer', 'min:0'], 'salePrice' => ['nullable', 'integer', 'min:0'], 'minStock' => ['nullable', 'integer', 'min:0'], 'maxStock' => ['nullable', 'integer', 'min:0'], 'supplierId' => ['nullable', 'string'], 'description' => ['nullable', 'string'],
+            'name' => array_merge($required, ['string', 'min:1']), 'category' => ['nullable', 'string'], 'subcategory' => ['nullable', 'string'], 'brand' => ['nullable', 'string'], 'sku' => array_merge($required, ['string', 'min:1']), 'barcode' => ['nullable', 'string'], 'imageUrl' => ['nullable', 'string'], 'unit' => ['nullable', 'string'], 'purchasePrice' => ['nullable', 'integer', 'min:0'], 'salePrice' => ['nullable', 'integer', 'min:0'], 'minStock' => ['nullable', 'integer', 'min:0'], 'maxStock' => ['nullable', 'integer', 'min:0'], 'supplierId' => ['nullable', 'string'], 'description' => ['nullable', 'string'],
         ]);
     }
 
