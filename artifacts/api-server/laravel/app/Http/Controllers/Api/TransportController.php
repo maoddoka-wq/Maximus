@@ -243,7 +243,7 @@ class TransportController extends Controller
             'license_number' => trim($input['licenseNumber']),
             'employee_id' => $employeeId,
             'status' => $input['status'] ?? 'ACTIVE',
-            'availability' => 'AVAILABLE',
+            'availability' => 'PAUSED',
             'pricing_mode' => 'NORMAL',
             'availability_updated_at' => now(),
             'created_at' => now(),
@@ -318,6 +318,11 @@ class TransportController extends Controller
         }
         if ($driver->status !== 'ACTIVE') {
             return response()->json(['error' => 'Un chauffeur inactif ne peut pas se rendre disponible.'], 422);
+        }
+        if ($input['availability'] === 'AVAILABLE' && ! $this->driverHasFreshGps($driver, $company)) {
+            return response()->json([
+                'error' => 'Activez le GPS et partagez une position récente avant de vous rendre disponible.',
+            ], 422);
         }
         if ($input['availability'] === 'PAUSED' && DB::table('transport_trips')
             ->where('company_id', $company)
@@ -1040,11 +1045,18 @@ class TransportController extends Controller
                 $updates['vehicle_id'] = null;
                 $updates['offer_expires_at'] = null;
                 if ($trip->driver_id !== null) {
-                    DB::table('transport_drivers')->where('id', $trip->driver_id)->update([
-                        'availability' => 'AVAILABLE',
-                        'availability_updated_at' => now(),
-                        'updated_at' => now(),
-                    ]);
+                    $releasedDriver = DB::table('transport_drivers')
+                        ->where('company_id', $trip->company_id)
+                        ->where('id', $trip->driver_id)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($releasedDriver) {
+                        DB::table('transport_drivers')->where('id', $releasedDriver->id)->update([
+                            'availability' => $this->driverHasFreshGps($releasedDriver, (string) $trip->company_id) ? 'AVAILABLE' : 'PAUSED',
+                            'availability_updated_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
                 }
             }
             if ($input['status'] === 'IN_PROGRESS') {
@@ -1056,11 +1068,21 @@ class TransportController extends Controller
             DB::table('transport_trips')->where('id', $trip->id)->update($updates);
             if ($trip->vehicle_id !== null && in_array($input['status'], ['COMPLETED', 'CANCELLED'], true)) {
                 DB::table('transport_vehicles')->where('id', $trip->vehicle_id)->where('status', 'ON_TRIP')->update(['status' => 'AVAILABLE', 'updated_at' => now()]);
-                DB::table('transport_drivers')->where('id', $trip->driver_id)->where('availability', 'ON_TRIP')->update([
-                    'availability' => 'AVAILABLE',
-                    'availability_updated_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                if ($trip->driver_id !== null) {
+                    $releasedDriver = DB::table('transport_drivers')
+                        ->where('company_id', $trip->company_id)
+                        ->where('id', $trip->driver_id)
+                        ->where('availability', 'ON_TRIP')
+                        ->lockForUpdate()
+                        ->first();
+                    if ($releasedDriver) {
+                        DB::table('transport_drivers')->where('id', $releasedDriver->id)->update([
+                            'availability' => $this->driverHasFreshGps($releasedDriver, (string) $trip->company_id) ? 'AVAILABLE' : 'PAUSED',
+                            'availability_updated_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
             }
             $this->logTripEvent((string) $trip->company_id, (string) $trip->id, 'status_changed', $trip->status, $input['status']);
         });
@@ -2413,6 +2435,23 @@ class TransportController extends Controller
         ];
     }
 
+    private function driverHasFreshGps(object $driver, string $company): bool
+    {
+        if (
+            $driver->latitude === null
+            || $driver->longitude === null
+            || empty($driver->location_updated_at)
+            || ! $this->isWithinDakar((float) $driver->latitude, (float) $driver->longitude)
+        ) {
+            return false;
+        }
+
+        $updatedAt = \Illuminate\Support\Carbon::parse($driver->location_updated_at);
+        $validityMinutes = $this->transportSettings($company)['gpsValidityMinutes'];
+
+        return $updatedAt->greaterThanOrEqualTo(now()->subMinutes($validityMinutes));
+    }
+
     private function transportColor(array $settings, string $key): string
     {
         $value = strtoupper(trim((string) ($settings[$key] ?? '')));
@@ -2441,11 +2480,18 @@ class TransportController extends Controller
                     'updated_at' => now(),
                 ]);
                 if ($trip->driver_id !== null) {
-                    DB::table('transport_drivers')->where('company_id', $company)->where('id', $trip->driver_id)->update([
-                        'availability' => 'AVAILABLE',
-                        'availability_updated_at' => now(),
-                        'updated_at' => now(),
-                    ]);
+                    $releasedDriver = DB::table('transport_drivers')
+                        ->where('company_id', $company)
+                        ->where('id', $trip->driver_id)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($releasedDriver) {
+                        DB::table('transport_drivers')->where('id', $releasedDriver->id)->update([
+                            'availability' => $this->driverHasFreshGps($releasedDriver, $company) ? 'AVAILABLE' : 'PAUSED',
+                            'availability_updated_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
                 }
                 $this->logTripEvent($company, (string) $trip->id, 'offer_expired', 'OFFERED', 'REQUESTED');
             });

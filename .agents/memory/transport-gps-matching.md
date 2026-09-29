@@ -3,11 +3,17 @@ name: Rapprochement GPS Taxi
 description: Règles de localisation interne et de sélection du chauffeur pour le module Transport.
 ---
 
-La sélection Taxi utilise uniquement les coordonnées GPS envoyées par l’application et un calcul de distance interne côté serveur. Une position de chauffeur est considérée comme utilisable pendant cinq minutes ; le chauffeur doit aussi être actif, ne pas avoir de course en cours et disposer d’un véhicule disponible.
+La sélection Taxi utilise uniquement les coordonnées GPS envoyées par l’application et un calcul de distance interne côté serveur. Une position de chauffeur est utilisable pendant la durée configurée pour l’entreprise (cinq minutes par défaut) ; le chauffeur doit aussi être actif, ne pas avoir de course en cours et disposer d’un véhicule disponible.
 
 **Why:** La relation client-chauffeur doit rester directe sans faire de MAXIMUS un intermédiaire ni dépendre d’une API cartographique externe.
 
 **How to apply:** Toute nouvelle entrée de course doit recevoir la position du client depuis son appareil, refuser une position absente ou obsolète, et ne retourner au client que les coordonnées de contact du chauffeur effectivement affecté.
+
+Un chauffeur ne peut devenir disponible qu’avec une position acceptée par l’API, dans Dakar et encore fraîche. Les transitions automatiques après annulation, fin de course ou expiration d’offre appliquent la même vérification ; une fiche nouvellement créée commence en pause.
+
+**Why:** Le statut `AVAILABLE` seul peut rendre un chauffeur éligible aux clients malgré une position absente ou périmée. Les transitions automatiques ne doivent pas contourner le contrôle manuel.
+
+**How to apply:** Réutiliser la règle serveur de fraîcheur configurée pour toute transition vers `AVAILABLE`; repasser en `PAUSED` si elle échoue, et n’afficher le GPS comme actif côté client qu’après confirmation de l’API.
 
 Ne jamais republier périodiquement la dernière position GPS connue en la faisant passer pour une nouvelle ; les décimales PostgreSQL doivent aussi être converties en nombres avant de les exposer aux cartes.
 

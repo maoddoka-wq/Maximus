@@ -140,6 +140,13 @@ class TransportTest extends TestCase
             'longitude' => 0,
         ])->assertStatus(422)
             ->assertJsonPath('error', 'La position GPS doit se trouver dans la zone de Dakar.');
+        $request->patchJson('/api/transport/drivers/'.$driver->json('id').'/location?companyId=kora', [
+            'latitude' => 14.7167,
+            'longitude' => -17.4677,
+        ])->assertOk();
+        $request->patchJson('/api/transport/drivers/'.$driver->json('id').'/availability?companyId=kora', [
+            'availability' => 'AVAILABLE',
+        ])->assertOk();
         $vehicle = $request->postJson('/api/transport/vehicles?companyId=kora', [
             'registration' => 'DK-DISPATCH-01',
             'model' => 'Toyota Yaris',
@@ -181,18 +188,79 @@ class TransportTest extends TestCase
             'pickupCode' => $pickupCode,
         ])->assertOk()->assertJsonPath('status', 'IN_PROGRESS');
 
+        DB::table('transport_drivers')->where('id', $driver->json('id'))->update([
+            'location_updated_at' => now()->subMinutes(6),
+        ]);
         $request->patchJson('/api/transport/trips/'.$trip->json('id').'/status?companyId=kora', [
             'status' => 'COMPLETED',
         ])->assertOk();
         $this->assertDatabaseHas('transport_drivers', [
             'id' => $driver->json('id'),
-            'availability' => 'AVAILABLE',
+            'availability' => 'PAUSED',
         ]);
         $this->assertDatabaseHas('transport_trip_events', [
             'trip_id' => $trip->json('id'),
             'event_type' => 'status_changed',
             'to_status' => 'COMPLETED',
         ]);
+    }
+
+    public function test_driver_requires_fresh_gps_before_becoming_available(): void
+    {
+        ModuleCatalog::ensureCompanyAccess('kora');
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'transport')
+            ->update([
+                'feature_ids' => json_encode(['overview', 'trips', 'drivers']),
+                'configuration' => json_encode(['featureScope' => 'explicit']),
+            ]);
+        $admin = $this->asActor();
+        $employeeId = $this->createDriverEmployee('gps-availability-driver');
+        $driver = $admin->postJson('/api/transport/drivers?companyId=kora', [
+            'employeeId' => $employeeId,
+            'licenseNumber' => 'SN-GPS-AVAILABLE-001',
+        ])->assertCreated()
+            ->assertJsonPath('availability', 'PAUSED');
+
+        $driverId = $driver->json('id');
+        $availabilityPath = '/api/transport/drivers/'.$driverId.'/availability?companyId=kora';
+
+        $admin->patchJson($availabilityPath, ['availability' => 'AVAILABLE'])
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'Activez le GPS et partagez une position récente avant de vous rendre disponible.');
+
+        $admin->patchJson('/api/transport/drivers/'.$driverId.'/location?companyId=kora', [
+            'latitude' => 14.7167,
+            'longitude' => -17.4677,
+        ])->assertOk();
+        $admin->patchJson($availabilityPath, ['availability' => 'AVAILABLE'])
+            ->assertOk()
+            ->assertJsonPath('availability', 'AVAILABLE');
+        $admin->patchJson($availabilityPath, ['availability' => 'PAUSED'])
+            ->assertOk()
+            ->assertJsonPath('availability', 'PAUSED');
+
+        DB::table('transport_drivers')->where('id', $driverId)->update([
+            'location_updated_at' => now()->subMinutes(6),
+            'updated_at' => now(),
+        ]);
+        $admin->patchJson($availabilityPath, ['availability' => 'AVAILABLE'])
+            ->assertStatus(422);
+        $this->assertDatabaseHas('transport_drivers', [
+            'id' => $driverId,
+            'availability' => 'PAUSED',
+        ]);
+
+        $admin->patchJson('/api/transport/settings?companyId=kora', [
+            'gpsValidityMinutes' => 8,
+            'trackingIntervalSeconds' => 10,
+            'baseFare' => 500,
+            'pricePerKm' => 300,
+        ])->assertOk();
+        $admin->patchJson($availabilityPath, ['availability' => 'AVAILABLE'])
+            ->assertOk()
+            ->assertJsonPath('availability', 'AVAILABLE');
     }
 
     public function test_transport_ignores_client_company_id_for_tenant_scope(): void
