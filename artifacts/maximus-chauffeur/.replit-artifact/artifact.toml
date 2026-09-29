@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/maximus-chauffeur/"
+title = "MAXIMUS Chauffeur"
+description = "Application Android pour les chauffeurs MAXIMUS : connexion au compte d’entreprise, statut de disponibilité, suivi GPS natif en arrière-plan pendant le service et accès aux courses autorisées."
+version = "1.0.0"
+id = "artifacts/maximus-chauffeur"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/maximus-chauffeur/" ]
+localPort = 23548
+
+[services.development]
+run = "pnpm --filter @workspace/maximus-chauffeur run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/maximus-chauffeur", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/maximus-chauffeur", "run", "serve" ]
+
+[services.env]
+PORT = "23548"
+BASE_PATH = "/maximus-chauffeur/"
