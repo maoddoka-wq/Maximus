@@ -1,11 +1,63 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  createTransportGpsTimeout,
   isNewerTransportGpsSample,
   isRecentTransportGpsSample,
   isTransportGpsAccuracyAcceptable,
   MAX_TRANSPORT_GPS_ACCURACY_METERS,
+  TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS,
 } from './transport-gps-quality';
+
+test('termine la recherche après une minute et ignore un ancien délai réarmé', () => {
+  let nextHandle = 0;
+  const callbacks: Array<() => void> = [];
+  const clearedHandles: unknown[] = [];
+  let expired = 0;
+  const watchdog = createTransportGpsTimeout(
+    () => { expired += 1; },
+    {
+      setTimeout: (callback, delayMs) => {
+        assert.equal(delayMs, TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS);
+        callbacks.push(callback);
+        return ++nextHandle;
+      },
+      clearTimeout: handle => clearedHandles.push(handle),
+    },
+  );
+
+  watchdog.reset();
+  assert.deepEqual(clearedHandles, [1]);
+  callbacks[0]();
+  assert.equal(expired, 0);
+  callbacks[1]();
+  assert.equal(expired, 1);
+
+  watchdog.cancel();
+  assert.equal(expired, 1);
+});
+
+test('annule le délai GPS lorsque le suivi est arrêté', () => {
+  let expired = 0;
+  let scheduledCallback: (() => void) | undefined;
+  let cleared = false;
+  const watchdog = createTransportGpsTimeout(
+    () => { expired += 1; },
+    {
+      setTimeout: callback => {
+        scheduledCallback = callback;
+        return 1;
+      },
+      clearTimeout: () => { cleared = true; },
+    },
+  );
+
+  watchdog.cancel();
+  scheduledCallback?.();
+
+  assert.equal(cleared, true);
+  assert.equal(expired, 0);
+});
 
 test('accepte une position GPS avec une précision au plus égale à 100 mètres', () => {
   assert.equal(isTransportGpsAccuracyAcceptable(0), true);

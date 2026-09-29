@@ -53,6 +53,7 @@ import { TaxiRouteMap } from '@/components/taxi-route-map';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { buildDriverNavigationUrl } from '@/lib/transport-routing';
 import {
+  createTransportGpsTimeout,
   isNewerTransportGpsSample,
   isRecentTransportGpsSample,
   isTransportGpsAccuracyAcceptable,
@@ -338,6 +339,15 @@ export default function TransportModulePage({
     let sendingLocation = false;
     let nextPositionRequestId = 0;
     let activePositionRequestId: number | null = null;
+    const stopLocationTracking = (message: string) => {
+      if (disposed) return;
+      setLocationActive(false);
+      setLocationError(message);
+      setLocationRequested(false);
+    };
+    const gpsTimeout = createTransportGpsTimeout(() => {
+      stopLocationTracking('Aucune position GPS utilisable reçue en une minute. Vérifiez la localisation du téléphone, puis réessayez.');
+    });
     const geolocationOptions: PositionOptions = {
       enableHighAccuracy: true,
       maximumAge: 0,
@@ -355,6 +365,7 @@ export default function TransportModulePage({
             const driver = await api.updateDriverLocation(currentDriverId, sample);
             if (disposed || sample.timestamp !== lastObservedTimestamp) continue;
             lastServerLocationAt = Date.now();
+            gpsTimeout.reset();
             setData(current => current ? {
               ...current,
               drivers: current.drivers.map(item => item.id === driver.id ? driver : item),
@@ -378,19 +389,16 @@ export default function TransportModulePage({
       lastObservedTimestamp = sample.timestamp;
       if (!isRecentTransportGpsSample(sample.timestamp)) {
         if (Date.now() - gpsSearchStartedAt < TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS) return;
-        setLocationActive(false);
-        setLocationError('Le relevé GPS reçu est trop ancien. Attendez une nouvelle position.');
+        stopLocationTracking('Le relevé GPS reçu est trop ancien. Réessayez pour obtenir une nouvelle position.');
         return;
       }
       if (!isTransportGpsAccuracyAcceptable(sample.accuracy)) {
         if (Date.now() - gpsSearchStartedAt < TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS) return;
-        setLocationActive(false);
-        setLocationError(`Signal GPS trop imprécis (${Math.round(sample.accuracy)} m). Attendez une précision de 100 m ou mieux.`);
+        stopLocationTracking(`Signal GPS trop imprécis (${Math.round(sample.accuracy)} m). Réessayez lorsque le signal sera meilleur.`);
         return;
       }
       if (!isWithinDakar(sample.latitude, sample.longitude)) {
-        setLocationActive(false);
-        setLocationError('La position GPS reçue est hors de la zone de Dakar et n’a pas été partagée.');
+        stopLocationTracking('La position GPS reçue est hors de la zone de Dakar et n’a pas été partagée.');
         return;
       }
       pendingSample = sample;
@@ -409,10 +417,9 @@ export default function TransportModulePage({
         Date.now() - gpsSearchStartedAt < TRANSPORT_GPS_ACQUISITION_TIMEOUT_MS
         || Date.now() - lastServerLocationAt < trackingIntervalSeconds * 3_000
       )) return;
-      if (code === 1) setLocationActive(false);
-      setLocationError(code === 1
+      stopLocationTracking(code === 1
         ? 'Autorisez la localisation pour être proposé aux clients proches.'
-        : 'La position GPS n’a pas pu être obtenue. Vérifiez le signal et réessayez.');
+        : 'La position GPS n’a pas pu être obtenue. Vérifiez le signal, puis réessayez.');
     };
     const requestCurrentPosition = (force = false) => {
       if (
@@ -453,6 +460,7 @@ export default function TransportModulePage({
     const refreshId = window.setInterval(requestCurrentPosition, trackingIntervalSeconds * 1000);
     return () => {
       disposed = true;
+      gpsTimeout.cancel();
       navigator.geolocation.clearWatch(watchId);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('pageshow', handleFocus);
