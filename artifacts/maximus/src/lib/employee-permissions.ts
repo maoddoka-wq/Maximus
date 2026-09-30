@@ -10,6 +10,12 @@ import { featureSlug, permissionFeatureKey } from './permission-keys';
 import { getModuleFeatureOptions, normalizeModuleFeatureIds } from './module-features';
 import { modules, stockSubmodules, type Module } from './store';
 import { normalizePermissionLadder } from './permission-ladder';
+import {
+  getPermissionModuleId,
+  getRolePermissionFeatureId,
+  restrictRoleToUnitScope,
+  unitAllowsRolePermissionFeature,
+} from './organization-role-scope';
 
 export type ModulePermission = 'voir' | 'créer' | 'modifier';
 export type PresencePermission = 'view' | 'create' | 'edit' | 'delete' | 'correct' | 'validate' | 'manage' | 'export' | 'reports';
@@ -81,6 +87,9 @@ const presenceOperationalPermissions = new Set<PresencePermission>([
 
 function permissionModuleId(key: string): ModuleId | null {
   if (key.startsWith('presence.')) return 'presences';
+  if (commerceTabDefinitions.some(tab => commerceTabPermissionKeys(tab.id).includes(key))) {
+    return 'commerce';
+  }
   const [moduleId] = key.split(':');
   return moduleId as ModuleId;
 }
@@ -137,6 +146,90 @@ export function restrictRoleToCompany(role: Role | null | undefined, company: Co
   const modulePermissions = Object.fromEntries(boundedEntries);
 
   return { ...role, modulePermissions };
+}
+
+function permissionMapsEqual(
+  left: Record<string, string[]>,
+  right: Record<string, string[]>,
+) {
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  if (leftKeys.length !== rightKeys.length
+    || leftKeys.some((key, index) => key !== rightKeys[index])) {
+    return false;
+  }
+
+  return leftKeys.every(key => {
+    const leftActions = left[key];
+    const rightActions = right[key];
+    if (!Array.isArray(leftActions) || !Array.isArray(rightActions)) return false;
+
+    return [...new Set(leftActions.map(String))].sort().join('\0')
+      === [...new Set(rightActions.map(String))].sort().join('\0');
+  });
+}
+
+/** Mirrors the account endpoint's role, company, unit, and action checks before submit. */
+export function isRoleAssignableToUnit(
+  role: Role,
+  company: Company,
+  sectorId: string,
+  nodes: OrgNode[],
+  moduleDefinitions: Module[],
+): boolean {
+  const unit = nodes.find(node => node.id === sectorId && node.companyId === company.id);
+  if (!unit || role.companyId !== company.id || !role.sectorId) return false;
+
+  const visited = new Set<string>();
+  let current: OrgNode | undefined = unit;
+  let roleIsAncestor = false;
+  while (current) {
+    if (visited.has(current.id)) return false;
+    visited.add(current.id);
+    if (current.id === role.sectorId) roleIsAncestor = true;
+    current = current.parentId
+      ? nodes.find(node => node.id === current?.parentId && node.companyId === company.id)
+      : undefined;
+  }
+  if (!roleIsAncestor) return false;
+
+  const companyAndUnitBoundRole = restrictRoleToCompany(
+    restrictRoleToUnitScope(role, unit, nodes, moduleDefinitions),
+    company,
+  );
+  if (!companyAndUnitBoundRole
+    || !permissionMapsEqual(role.modulePermissions, companyAndUnitBoundRole.modulePermissions)) {
+    return false;
+  }
+
+  const activeModules = new Set(company.allowedModules);
+  const moduleById = new Map(moduleDefinitions.map(module => [module.id, module]));
+  const allowedActions = new Set(['voir', 'créer', 'modifier']);
+  for (const [key, rawActions] of Object.entries(role.modulePermissions)) {
+    const moduleId = getPermissionModuleId(key, moduleDefinitions);
+    const module = moduleId ? moduleById.get(moduleId) : undefined;
+    const featureId = module ? getRolePermissionFeatureId(key, module) : undefined;
+    const actions = Array.isArray(rawActions)
+      ? [...new Set(rawActions.map(String))]
+      : [];
+
+    if (!moduleId
+      || !activeModules.has(moduleId as ModuleId)
+      || !module
+      || !featureId
+      || !unitAllowsRolePermissionFeature(unit, module, featureId, nodes)
+      || actions.length === 0
+      || actions.some(action => !allowedActions.has(action))) {
+      return false;
+    }
+    if (actions.includes('créer') && !actions.includes('voir')) return false;
+    if (actions.includes('modifier')
+      && (!actions.includes('voir') || !actions.includes('créer'))) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function getEmployeeAncestry(nodes: OrgNode[], employeeNode: OrgNode | null) {

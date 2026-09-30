@@ -818,6 +818,174 @@ class AppStateRecoveryTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_sector_manager_can_clear_an_existing_manager_assignment_in_scope_without_rh_permissions(): void
+    {
+        $company = Company::query()->create([
+            'id' => 'manager-clear-company',
+            'name' => 'Entreprise retrait du manager',
+            'manager' => 'Direction',
+            'email' => 'manager.clear@example.test',
+            'status' => 'ACTIF',
+        ]);
+        $manager = AuthUser::query()->create([
+            'id' => 'manager-clear-actor',
+            'email' => 'manager.clear.actor@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Manager secteur',
+            'role' => 'sector_manager',
+            'company_id' => $company->id,
+            'sector_ids' => ['manager-clear-root'],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+        $state = [
+            'companies' => [['id' => $company->id, 'name' => $company->name]],
+            'employees' => [
+                [
+                    'id' => 'manager-clear-employee',
+                    'companyId' => $company->id,
+                    'sectorId' => 'manager-clear-root',
+                ],
+                [
+                    'id' => 'outside-manager-employee',
+                    'companyId' => $company->id,
+                    'sectorId' => 'manager-clear-outside',
+                ],
+            ],
+            'roles' => [],
+            'orgNodes' => [
+                [
+                    'id' => 'manager-clear-root',
+                    'companyId' => $company->id,
+                    'parentId' => null,
+                    'moduleIds' => [],
+                    'moduleFeatures' => [],
+                    'managerEmployeeId' => 'manager-clear-employee',
+                ],
+                [
+                    'id' => 'manager-clear-outside',
+                    'companyId' => $company->id,
+                    'parentId' => null,
+                    'moduleIds' => [],
+                    'moduleFeatures' => [],
+                    'managerEmployeeId' => 'outside-manager-employee',
+                ],
+            ],
+        ];
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'payload' => json_encode($state, JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $clearedNodes = array_map(static function (array $node): array {
+            if ($node['id'] === 'manager-clear-root') {
+                unset($node['managerEmployeeId']);
+            }
+
+            return $node;
+        }, $state['orgNodes']);
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($manager))
+            ->putJson('/api/app-state', [
+                'version' => 1,
+                'data' => [...$state, 'orgNodes' => $clearedNodes],
+            ])
+            ->assertOk();
+
+        $savedState = json_decode(
+            (string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'),
+            true,
+        );
+        $savedNodes = collect($savedState['orgNodes'])->keyBy('id');
+        $this->assertArrayNotHasKey('managerEmployeeId', $savedNodes['manager-clear-root']);
+        $this->assertSame(
+            'outside-manager-employee',
+            $savedNodes['manager-clear-outside']['managerEmployeeId'],
+        );
+
+        $outsideClearedNodes = array_map(static function (array $node): array {
+            if ($node['id'] === 'manager-clear-outside') {
+                unset($node['managerEmployeeId']);
+            }
+
+            return $node;
+        }, $savedState['orgNodes']);
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($manager))
+            ->putJson('/api/app-state', [
+                'version' => 2,
+                'data' => [...$savedState, 'orgNodes' => $outsideClearedNodes],
+            ])
+            ->assertForbidden();
+
+        $persistedNodes = collect(json_decode(
+            (string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'),
+            true,
+        )['orgNodes'])->keyBy('id');
+        $this->assertSame(
+            'outside-manager-employee',
+            $persistedNodes['manager-clear-outside']['managerEmployeeId'],
+        );
+    }
+
+    public function test_sector_manager_cannot_assign_a_manager_without_rh_permissions(): void
+    {
+        $company = Company::query()->create([
+            'id' => 'manager-assign-company',
+            'name' => 'Entreprise attribution du manager',
+            'manager' => 'Direction',
+            'email' => 'manager.assign@example.test',
+            'status' => 'ACTIF',
+        ]);
+        $manager = AuthUser::query()->create([
+            'id' => 'manager-assign-actor',
+            'email' => 'manager.assign.actor@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Manager secteur',
+            'role' => 'sector_manager',
+            'company_id' => $company->id,
+            'sector_ids' => ['manager-assign-root'],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+        $state = [
+            'companies' => [['id' => $company->id, 'name' => $company->name]],
+            'employees' => [[
+                'id' => 'manager-assign-employee',
+                'companyId' => $company->id,
+                'sectorId' => 'manager-assign-root',
+            ]],
+            'roles' => [],
+            'orgNodes' => [[
+                'id' => 'manager-assign-root',
+                'companyId' => $company->id,
+                'parentId' => null,
+                'moduleIds' => [],
+                'moduleFeatures' => [],
+            ]],
+        ];
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'payload' => json_encode($state, JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $assignedNodes = $state['orgNodes'];
+        $assignedNodes[0]['managerEmployeeId'] = 'manager-assign-employee';
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($manager))
+            ->putJson('/api/app-state', [
+                'version' => 1,
+                'data' => [...$state, 'orgNodes' => $assignedNodes],
+            ])
+            ->assertForbidden();
+    }
+
     public function test_sector_manager_can_save_bootstrapped_state_without_writing_company_metadata(): void
     {
         $company = Company::query()->create([

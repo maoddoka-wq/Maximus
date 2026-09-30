@@ -8,7 +8,10 @@ export function getPermissionModuleId(key: string, moduleDefinitions: Module[]) 
   return moduleDefinitions.find(module =>
     key === module.id
     || key.startsWith(`${module.id}:`)
-    || (module.id === 'presences' && key.startsWith('presence.')),
+    || (module.id === 'presences' && key.startsWith('presence.'))
+    || (module.id === 'commerce' && getModuleFeatureOptions(module).some(feature =>
+      commerceTabPermissionKeys(feature.id as CommerceTabId).includes(key),
+    )),
   )?.id;
 }
 
@@ -19,7 +22,7 @@ export function getUnitFeatureIds(node: OrgNode | undefined, module: Module): Se
   return new Set(normalizeModuleFeatureIds(module, selectedFeatureIds));
 }
 
-function getPermissionFeatureId(key: string, module: Module) {
+export function getRolePermissionFeatureId(key: string, module: Module) {
   return getModuleFeatureOptions(module).find(feature => {
     if (module.id === 'commerce') {
       return commerceTabPermissionKeys(feature.id as CommerceTabId).includes(key);
@@ -32,6 +35,59 @@ function getPermissionFeatureId(key: string, module: Module) {
     }
     return key === permissionFeatureKey(module.id, feature.id);
   })?.id;
+}
+
+function unitHasExplicitFeatureScope(node: OrgNode | undefined, module: Module, nodes: OrgNode[]) {
+  const visited = new Set<string>();
+  let current = node;
+
+  while (current) {
+    if (visited.has(current.id)) return true;
+    visited.add(current.id);
+    if (Object.prototype.hasOwnProperty.call(current.moduleFeatures ?? {}, module.id)) return true;
+    current = current.parentId
+      ? nodes.find(candidate =>
+          candidate.id === current?.parentId
+          && candidate.companyId === current?.companyId,
+        )
+      : undefined;
+  }
+
+  return false;
+}
+
+/** Checks an explicit feature restriction at every unit in the ancestry. */
+export function unitAllowsRolePermissionFeature(
+  node: OrgNode | undefined,
+  module: Module,
+  featureId: string,
+  nodes: OrgNode[],
+) {
+  const visited = new Set<string>();
+  let current = node;
+
+  while (current) {
+    if (visited.has(current.id)) return false;
+    visited.add(current.id);
+
+    const moduleFeatures = current.moduleFeatures ?? {};
+    if (Object.prototype.hasOwnProperty.call(moduleFeatures, module.id)) {
+      const selectedFeatureIds = moduleFeatures[module.id];
+      if (!Array.isArray(selectedFeatureIds)
+        || !normalizeModuleFeatureIds(module, selectedFeatureIds).includes(featureId)) {
+        return false;
+      }
+    }
+
+    current = current.parentId
+      ? nodes.find(candidate =>
+          candidate.id === current?.parentId
+          && candidate.companyId === current?.companyId,
+        )
+      : undefined;
+  }
+
+  return true;
 }
 
 export function restrictRoleToUnitScope(
@@ -49,11 +105,13 @@ export function restrictRoleToUnitScope(
       if (allowedModuleIds && !allowedModuleIds.has(moduleId)) return false;
 
       const module = moduleById.get(moduleId);
-      const selectedFeatureIds = module && getUnitFeatureIds(node, module);
-      if (!module || !selectedFeatureIds) return true;
+      if (!module || !unitHasExplicitFeatureScope(node, module, nodes)) return true;
 
-      const featureId = getPermissionFeatureId(key, module);
-      return Boolean(featureId && selectedFeatureIds.has(featureId));
+      const featureId = getRolePermissionFeatureId(key, module);
+      return Boolean(
+        featureId
+        && unitAllowsRolePermissionFeature(node, module, featureId, nodes),
+      );
     }),
   );
 

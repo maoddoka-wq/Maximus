@@ -513,6 +513,9 @@ class AppStateController extends Controller
                     continue;
                 }
                 $needed = $old === null ? 'create' : 'modify';
+                if ($this->isManagerAssignmentRemoval($actor, $key, $old, $new)) {
+                    continue;
+                }
                 if (! $this->allowsCollectionAction($actor, $key, $needed, $new ?? $old)) {
                     return false;
                 }
@@ -536,6 +539,30 @@ class AppStateController extends Controller
             }
         }
         return true;
+    }
+
+    private function isManagerAssignmentRemoval(
+        array $actor,
+        string $collection,
+        ?array $before,
+        ?array $after,
+    ): bool {
+        if (($actor['role'] ?? null) !== 'sector_manager'
+            || $collection !== 'orgNodes'
+            || $before === null
+            || $after === null) {
+            return false;
+        }
+
+        $previousManagerId = trim((string) ($before['managerEmployeeId'] ?? ''));
+        $nextManagerId = trim((string) ($after['managerEmployeeId'] ?? ''));
+        if ($previousManagerId === '' || $nextManagerId !== '') {
+            return false;
+        }
+
+        unset($before['managerEmployeeId'], $after['managerEmployeeId']);
+
+        return $this->sameStateRecord($before, $after);
     }
 
     private function recordsById(mixed $value): array

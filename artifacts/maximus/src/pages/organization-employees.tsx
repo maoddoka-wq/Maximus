@@ -1,15 +1,19 @@
 import { useState } from 'react';
 import { Building2, Settings, Trash2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@workspace/maximus-design-system/components/ui/alert';
 import { useAppDialog } from '@/components/confirm-dialog';
 import {
   uid,
+  getConfiguredModules,
   type Company,
   type Employee,
+  type Module,
   type OrgNode,
   type Role,
   type StoreData,
 } from '@/lib/store';
 import { authApi } from '@/lib/auth-api';
+import { isRoleAssignableToUnit } from '@/lib/employee-permissions';
 import { ActionButton, Field, Modal } from './organization-shared';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
@@ -45,6 +49,7 @@ export function EmployeesTab({
   const companyEmployees = data.employees.filter(employee => employee.companyId === company.id);
   const companyNodes = data.orgNodes.filter(node => node.companyId === company.id);
   const companyRoles = data.roles.filter(role => role.companyId === company.id);
+  const moduleDefinitions = getConfiguredModules(data);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [deletingEmployeeId, setDeletingEmployeeId] = useState('');
@@ -161,10 +166,12 @@ export function EmployeesTab({
       </div>
       {modalOpen && <Modal title={editingEmployee ? 'Modifier un employé' : 'Ajouter un employé'} onClose={() => setModalOpen(false)}>
         <EmployeeFormModal
+          company={company}
           initialData={editingEmployee}
           allNodes={companyNodes}
           allRoles={companyRoles}
           allEmployees={companyEmployees}
+          moduleDefinitions={moduleDefinitions}
           allowSectorAdmin={allowSectorAdmin}
           onClose={() => setModalOpen(false)}
            onSave={async employeeData => {
@@ -219,18 +226,22 @@ export function EmployeesTab({
 }
 
 function EmployeeFormModal({
+  company,
   initialData,
   allNodes,
   allRoles,
   allEmployees,
+  moduleDefinitions,
   allowSectorAdmin = true,
   onClose,
   onSave,
 }: {
+  company: Company;
   initialData: Employee | null;
   allNodes: OrgNode[];
   allRoles: Role[];
   allEmployees: Employee[];
+  moduleDefinitions: Module[];
   allowSectorAdmin?: boolean;
   onClose: () => void;
   onSave: (data: EmployeeFormData) => Promise<void>;
@@ -249,7 +260,7 @@ function EmployeeFormModal({
     password: '',
     passwordConfirm: '',
   });
-  const compatibleRoles = allRoles.filter(role => {
+  const sectorCompatibleRoles = allRoles.filter(role => {
     let currentSectorId: string | null | undefined = formData.sectorId;
     while (currentSectorId) {
       if (role.sectorId === currentSectorId) return true;
@@ -257,10 +268,25 @@ function EmployeeFormModal({
     }
     return false;
   });
+  const compatibleRoles = sectorCompatibleRoles.filter(role =>
+    isRoleAssignableToUnit(role, company, formData.sectorId, allNodes, moduleDefinitions),
+  );
+  const incompatibleRoleCount = sectorCompatibleRoles.length - compatibleRoles.length;
+  const selectedRole = allRoles.find(role => role.id === formData.roleId);
+  const selectedRoleIsCompatible = compatibleRoles.some(role => role.id === formData.roleId);
+  const selectedRoleNeedsCorrection = Boolean(
+    selectedRole
+    && sectorCompatibleRoles.some(role => role.id === selectedRole.id)
+    && !selectedRoleIsCompatible,
+  );
 
   const handleSave = () => {
     const email = formData.email.trim().toLowerCase();
     const role = compatibleRoles.find(item => item.id === formData.roleId);
+    if (selectedRoleNeedsCorrection) {
+      setError('Les permissions de ce rôle dépassent les droits de l’entreprise ou de l’unité. Corrigez le rôle dans « Rôles & permissions », puis réessayez.');
+      return;
+    }
     if (!formData.firstName.trim() || !formData.lastName.trim() || !email || !formData.position.trim() || !formData.sectorId || !role) {
       setError('Prénom, nom, email, poste, appartenance et rôle compatible sont obligatoires.');
       return;
@@ -322,12 +348,25 @@ function EmployeeFormModal({
           <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">Section, département ou service de rattachement. Elle détermine les rôles compatibles.</span>
         </label>
         <label className="block text-sm font-semibold">Rôle *
-          <select value={formData.roleId} onChange={event => setFormData(current => ({ ...current, roleId: event.target.value }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]"><option value="">Sélectionner un rôle...</option>{compatibleRoles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
-          <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Rôles de l’unité sélectionnée et de ses unités parentes.</p>
+          <select value={formData.roleId} onChange={event => setFormData(current => ({ ...current, roleId: event.target.value }))} className="mt-2 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-3 text-sm focus:border-[hsl(var(--primary))]">
+            <option value="">Sélectionner un rôle...</option>
+            {selectedRoleNeedsCorrection && <option value={selectedRole?.id} disabled>{selectedRole?.name} — permissions à corriger</option>}
+            {compatibleRoles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}
+          </select>
+          <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Rôles de l’unité sélectionnée et de ses unités parentes, dans les droits autorisés à l’entreprise.</p>
+          {selectedRoleNeedsCorrection ? (
+            <Alert variant="destructive" className="mt-2">
+              <AlertDescription>Ce rôle ne peut pas être attribué tel quel. Fermez ce formulaire et corrigez ses permissions dans « Rôles & permissions ».</AlertDescription>
+            </Alert>
+          ) : incompatibleRoleCount > 0 ? (
+            <Alert className="mt-2" role="status">
+              <AlertDescription>{incompatibleRoleCount} rôle(s) de cette unité ne sont pas proposés, car certaines permissions dépassent les droits autorisés. Corrigez-les dans « Rôles & permissions ».</AlertDescription>
+            </Alert>
+          ) : null}
         </label>
       </div>
       {allowSectorAdmin && <label className="mt-4 flex items-start gap-2 rounded-lg border p-3 text-xs font-semibold"><input type="checkbox" checked={formData.isSectorAdmin} onChange={event => setFormData(current => ({ ...current, isSectorAdmin: event.target.checked }))} className="mt-0.5" /><span><strong className="block">Manager de cette unité</strong><small className="font-normal text-[hsl(var(--muted-foreground))]">Ce compte pourra gérer les rôles, permissions et employés de son appartenance et de ses unités descendantes. Il sera aussi proposé comme manager dans la structure.</small></span></label>}
-      <div className="mt-6 flex justify-end gap-3 border-t pt-4"><button onClick={onClose} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))] disabled:opacity-50">Annuler</button><ActionButton primary onClick={handleSave} disabled={saving || !formData.firstName || !formData.lastName || !formData.email || !formData.position || !formData.sectorId || !formData.roleId}>{saving ? 'Enregistrement…' : 'Enregistrer'}</ActionButton></div>
+      <div className="mt-6 flex justify-end gap-3 border-t pt-4"><button onClick={onClose} disabled={saving} className="rounded-lg border px-4 py-2 text-sm font-bold hover:bg-[hsl(var(--muted))] disabled:opacity-50">Annuler</button><ActionButton primary onClick={handleSave} disabled={saving || !formData.firstName || !formData.lastName || !formData.email || !formData.position || !formData.sectorId || !formData.roleId || !selectedRoleIsCompatible}>{saving ? 'Enregistrement…' : 'Enregistrer'}</ActionButton></div>
     </div>
   );
 }

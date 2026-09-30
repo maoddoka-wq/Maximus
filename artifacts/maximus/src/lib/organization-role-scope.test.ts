@@ -82,3 +82,23 @@ test('les unités historiques sans liste explicite gardent les fonctionnalités 
   assert.deepEqual(scopedRole.modulePermissions, role.modulePermissions);
   assert.equal(getUnitFeatureIds(unit, transport), undefined);
 });
+
+test('une fonctionnalité refusée par une unité parente reste exclue du rôle', () => {
+  const root = createUnit({ transport: ['trips'] });
+  const child = {
+    ...createUnit({ transport: ['trips', 'vehicles'] }),
+    id: 'transport-child',
+    name: 'Sous-unité Transport',
+    parentId: root.id,
+  };
+  const role = createRole({
+    'transport:menu:trips': ['voir'],
+    'transport:menu:vehicles': ['voir'],
+  });
+
+  const scopedRole = restrictRoleToUnitScope(role, child, [root, child], modules);
+
+  assert.deepEqual(scopedRole.modulePermissions, {
+    'transport:menu:trips': ['voir'],
+  });
+});
