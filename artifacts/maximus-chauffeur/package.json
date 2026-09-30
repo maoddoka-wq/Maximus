@@ -59,7 +59,6 @@
     "@workspace/maximus-design-system": "workspace:*",
     "expo-file-system": "57.0.6",
     "expo-intent-launcher": "57.0.1",
-    "expo-secure-store": "57.0.3",
-    "expo-task-manager": "57.0.20"
+    "expo-secure-store": "57.0.3"
   }
 }
