@@ -1,4 +1,7 @@
-import { ActivityIndicator, Pressable, Text, useColorScheme, View } from 'react-native';
+import { useColorScheme, View } from 'react-native';
+import { Button } from '@workspace/maximus-chauffeur-design-system/components/native/button';
+import { Spinner } from '@workspace/maximus-chauffeur-design-system/components/native/spinner';
+import { Typography } from '@workspace/maximus-chauffeur-design-system/components/native/typography';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { DriverHomeScreen } from '../../src/screens/DriverHomeScreen';
 import { SignInScreen } from '../../src/screens/SignInScreen';
@@ -19,7 +22,7 @@ export default function ChauffeurScreen() {
           backgroundColor: colors.background,
         }}
       >
-        <ActivityIndicator size="large" color={colors.primary} />
+        <Spinner size="large" color={colors.primary} />
       </View>
     );
   }
@@ -52,22 +55,28 @@ function SessionRecoveryScreen({
         backgroundColor: colors.background,
       }}
     >
-      <Text style={{ color: colors.foreground, fontSize: 22, fontFamily: 'DMSans_700Bold', textAlign: 'center' }}>
+      <Typography colors={colors} size="2xl" weight="bold" style={{ textAlign: 'center' }}>
         Connexion momentanément indisponible
-      </Text>
-      <Text style={{ color: colors.mutedForeground, fontSize: 15, textAlign: 'center' }}>
+      </Typography>
+      <Typography colors={colors} tone="muted" style={{ textAlign: 'center' }}>
         Votre session est conservée. Vérifiez votre connexion puis réessayez.
-      </Text>
-      <Pressable
+      </Typography>
+      <Button
+        colors={colors}
         accessibilityRole="button"
         onPress={() => void onRetry()}
-        style={{ backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14 }}
+        style={{ paddingHorizontal: 24, minHeight: 48 }}
       >
-        <Text style={{ color: colors.primaryForeground, fontFamily: 'DMSans_700Bold' }}>Réessayer</Text>
-      </Pressable>
-      <Pressable accessibilityRole="button" onPress={() => void signOut()}>
-        <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>Se déconnecter</Text>
-      </Pressable>
+        Réessayer
+      </Button>
+      <Button
+        colors={colors}
+        variant="link"
+        accessibilityRole="button"
+        onPress={() => void signOut()}
+      >
+        Se déconnecter
+      </Button>
     </View>
   );
 }

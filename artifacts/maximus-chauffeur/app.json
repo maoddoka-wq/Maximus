@@ -3,6 +3,9 @@
     "name": "MAXIMUS Chauffeur",
     "slug": "maximus-chauffeur",
     "version": "1.0.10",
+    "splash": {
+      "backgroundColor": "#f6f4ef"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "maximus-chauffeur",

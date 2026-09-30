@@ -1,31 +1,26 @@
 import { tokens } from '@workspace/maximus-design-system/tokens';
+import {
+  nativeTheme,
+  type ColorScheme,
+  type NativePalette,
+} from '@workspace/maximus-chauffeur-design-system/lib/native-theme';
 
-export type ColorScheme = 'light' | 'dark';
+export type { ColorScheme } from '@workspace/maximus-chauffeur-design-system/lib/native-theme';
 
-const spacingUnit = Number.parseFloat(tokens.spacing) * 16;
+export const space = nativeTheme.light.spacing;
+export const cardRadius = nativeTheme.light.radius.base;
 
-export const space = {
-  xs: spacingUnit,
-  sm: spacingUnit * 2,
-  md: spacingUnit * 4,
-  lg: spacingUnit * 6,
-  xl: spacingUnit * 8,
-  xxl: spacingUnit * 10,
-} as const;
+export function getPalette(
+  scheme: ColorScheme,
+  companyPrimary?: string | null,
+): NativePalette {
+  const palette: NativePalette = { ...tokens.color[scheme] };
 
-export const cardRadius = Number.parseFloat(tokens.radius) * 16;
+  if (companyPrimary && /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(companyPrimary)) {
+    palette.primary = companyPrimary;
+    palette.accent = companyPrimary;
+    palette.ring = companyPrimary;
+  }
 
-export function getPalette(scheme: ColorScheme, companyPrimary?: string | null) {
-  const base = scheme === 'dark' ? tokens.color.dark : tokens.color.light;
-  const brandPrimary =
-    companyPrimary && /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(companyPrimary)
-      ? companyPrimary
-      : base.primary;
-
-  return {
-    ...base,
-    primary: brandPrimary,
-    accent: brandPrimary,
-    ring: brandPrimary,
-  };
+  return palette;
 }
