@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Platform,
   Pressable,
   StyleSheet,
@@ -22,10 +23,56 @@ import { cardRadius, space, type getPalette } from '../theme';
 
 type Palette = ReturnType<typeof getPalette>;
 
+function ReleaseCheckButton({
+  colors,
+  isFetching,
+  onPress,
+}: {
+  colors: Palette;
+  isFetching: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Vérifier les mises à jour"
+      accessibilityState={{ disabled: isFetching, busy: isFetching }}
+      testID="release-check-button"
+      disabled={isFetching}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.checkButton,
+        { opacity: pressed ? 0.72 : 1 },
+        isFetching && styles.disabled,
+      ]}
+    >
+      {isFetching ? (
+        <ActivityIndicator size="small" color={colors.primary} />
+      ) : (
+        <Feather name="refresh-cw" size={14} color={colors.primary} />
+      )}
+      <Text style={[styles.checkText, { color: colors.primary }]}>
+        {isFetching ? 'Vérification…' : 'Vérifier les mises à jour'}
+      </Text>
+    </Pressable>
+  );
+}
+
 function statusFromError(error: unknown): number | undefined {
   if (!error || typeof error !== 'object' || !('status' in error)) return undefined;
   const value = (error as { status?: unknown }).status;
   return typeof value === 'number' ? value : undefined;
+}
+
+function releaseMessageFromStatus(status: number | undefined): string {
+  if (status === 404) return 'Aucune version installable n’a encore été publiée.';
+  if (status === 503) return 'Le téléchargement sera activé après la configuration du serveur.';
+  if (status === 401) return 'Votre session chauffeur a expiré. Reconnectez-vous puis réessayez.';
+  if (status !== undefined && status >= 500) {
+    return 'Le service des versions est temporairement indisponible. Réessayez dans quelques instants.';
+  }
+
+  return 'La version disponible ne peut pas être vérifiée pour le moment.';
 }
 
 function isNewerVersion(candidate: string, installed: string): boolean {
@@ -50,10 +97,35 @@ export function ReleaseCard({ colors }: { colors: Palette }) {
   const releaseQuery = useGetLatestChauffeurRelease({
     query: {
       queryKey: getGetLatestChauffeurReleaseQueryKey(),
-      retry: false,
+      retry: (failureCount, error) => {
+        const status = statusFromError(error);
+        const isTemporaryFailure =
+          status === undefined || status === 429 || (status >= 500 && status !== 503);
+
+        return failureCount < 2 && isTemporaryFailure;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 4000),
+      refetchOnMount: 'always',
       staleTime: 5 * 60_000,
     },
   });
+  const previousAppState = useRef(AppState.currentState);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      const returnedToForeground =
+        previousAppState.current !== null &&
+        previousAppState.current !== 'active' &&
+        nextAppState === 'active';
+
+      previousAppState.current = nextAppState;
+      if (returnedToForeground) {
+        void releaseQuery.refetch();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [releaseQuery.refetch]);
 
   const downloadAndInstall = async () => {
     if (Platform.OS !== 'android') {
@@ -124,12 +196,7 @@ export function ReleaseCard({ colors }: { colors: Palette }) {
     ? isNewerVersion(releaseQuery.data.version, currentVersion)
     : false;
   const httpStatus = statusFromError(releaseQuery.error);
-  const releaseMessage =
-    httpStatus === 404
-      ? 'Aucune version installable n’a encore été publiée.'
-      : httpStatus === 503
-        ? 'Le téléchargement sera activé après la configuration du serveur.'
-        : 'La version disponible ne peut pas être vérifiée pour le moment.';
+  const releaseMessage = releaseMessageFromStatus(httpStatus);
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -164,6 +231,11 @@ export function ReleaseCard({ colors }: { colors: Palette }) {
               </Text>
             ) : null}
           </View>
+          <ReleaseCheckButton
+            colors={colors}
+            isFetching={releaseQuery.isFetching}
+            onPress={() => void releaseQuery.refetch()}
+          />
           {Platform.OS === 'android' && updateAvailable ? (
             <Pressable
               accessibilityRole="button"
@@ -184,7 +256,14 @@ export function ReleaseCard({ colors }: { colors: Palette }) {
           ) : null}
         </>
       ) : (
-        <Text style={[styles.statusText, { color: colors.mutedForeground }]}>{releaseMessage}</Text>
+        <View style={styles.errorState}>
+          <Text style={[styles.statusText, { color: colors.mutedForeground }]}>{releaseMessage}</Text>
+          <ReleaseCheckButton
+            colors={colors}
+            isFetching={releaseQuery.isFetching}
+            onPress={() => void releaseQuery.refetch()}
+          />
+        </View>
       )}
     </View>
   );
@@ -198,6 +277,9 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 12, marginTop: space.xs },
   releaseInfo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: cardRadius / 2, padding: space.sm },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  errorState: { alignItems: 'flex-start', gap: space.xs },
+  checkButton: { minHeight: 40, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingHorizontal: space.sm },
+  checkText: { fontSize: 13, fontFamily: 'DMSans_700Bold' },
   statusText: { fontSize: 13, lineHeight: 19, fontFamily: 'DMSans_500Medium' },
   sizeText: { fontSize: 12, fontFamily: 'DMSans_500Medium' },
   downloadButton: { minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: cardRadius, paddingHorizontal: space.sm },
