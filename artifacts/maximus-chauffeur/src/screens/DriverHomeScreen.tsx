@@ -38,7 +38,7 @@ import { ReleaseCard } from '../components/ReleaseCard';
 import { TripCard } from '../components/TripCard';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../lib/api';
-import { formatApiMessage } from '../lib/api-message';
+import { formatApiMessage as apiMessage } from '../lib/api-message';
 import { hasLocationTrackingConsent } from '../lib/auth-storage';
 import {
   enableDriverLocationTracking,
@@ -508,7 +508,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                 Transport indisponible
               </Typography>
               <Typography colors={colors} size="sm" tone="muted" style={styles.bodyText}>
-                {formatApiMessage(transportQuery.error, 'Vérifiez votre connexion ou contactez votre responsable.')}
+                {apiMessage(transportQuery.error, 'Vérifiez votre connexion ou contactez votre responsable.')}
               </Typography>
               <Button
                 colors={colors}
