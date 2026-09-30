@@ -1,4 +1,6 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Moon, Sun } from 'lucide-react';
+import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { ScrollArea } from '../components/ui/scroll-area';
 import maximusMark from '../../docs/references/logos/maximus-mark.png';
@@ -9,6 +11,9 @@ import {
   OVERVIEW_ENTRY,
   type NavGroup,
 } from './registry';
+
+type Theme = 'light' | 'dark';
+const THEME_STORAGE_KEY = 'maximus-chauffeur-preview-theme';
 
 function readHashId(): string {
   const id = new URLSearchParams(window.location.hash.slice(1)).get('page');
@@ -95,6 +100,14 @@ function NavigationItems({
 
 export function DesignSystemBrowser() {
   const [selectedId, select] = useSelectedId();
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === 'undefined') {
+      return 'light';
+    }
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark'
+      ? 'dark'
+      : 'light';
+  });
   const [query, setQuery] = useState('');
   const mobileNav = useRef<HTMLDetailsElement>(null);
   const mobileNavSummary = useRef<HTMLElement>(null);
@@ -126,6 +139,11 @@ export function DesignSystemBrowser() {
     window.scrollTo({ top: 0 });
   }, [active.id]);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
+
   const showOverview = `${OVERVIEW_ENTRY.name} ${OVERVIEW_ENTRY.description}`
     .toLowerCase()
     .includes(normalizedQuery);
@@ -153,6 +171,24 @@ export function DesignSystemBrowser() {
               <p className="mt-1 text-xs text-muted-foreground">Système de design</p>
             </div>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-pressed={theme === 'dark'}
+            aria-label={`Passer au mode ${theme === 'dark' ? 'clair' : 'sombre'}`}
+            className="mt-4 w-full justify-start gap-2"
+            onClick={() =>
+              setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
+            }
+          >
+            {theme === 'dark' ? (
+              <Sun aria-hidden="true" className="size-4" />
+            ) : (
+              <Moon aria-hidden="true" className="size-4" />
+            )}
+            <span>{theme === 'dark' ? 'Mode clair' : 'Mode sombre'}</span>
+          </Button>
         </div>
         <div className="p-4 pb-2">
           <Input
