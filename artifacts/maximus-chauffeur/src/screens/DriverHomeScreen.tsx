@@ -1,20 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AppState,
-  ActivityIndicator,
   Alert,
   Linking,
-  Pressable,
   RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
-  Text,
   useColorScheme,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Badge } from '@workspace/maximus-chauffeur-design-system/components/native/badge';
+import { Button } from '@workspace/maximus-chauffeur-design-system/components/native/button';
+import { Card } from '@workspace/maximus-chauffeur-design-system/components/native/card';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyTitle,
+} from '@workspace/maximus-chauffeur-design-system/components/native/empty';
+import { Spinner } from '@workspace/maximus-chauffeur-design-system/components/native/spinner';
+import { Typography } from '@workspace/maximus-chauffeur-design-system/components/native/typography';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetTransportBootstrapQueryKey,
@@ -453,68 +460,79 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                 <Image source={{ uri: photoUri }} contentFit="cover" style={styles.logo} />
               ) : (
                 <View style={[styles.logoFallback, { backgroundColor: colors.primary }]}>
-                  <Text style={[styles.logoLetter, { color: colors.primaryForeground }]}>
+                  <Typography colors={colors} weight="bold" style={[styles.logoLetter, { color: colors.primaryForeground }]}>
                     {session.company.name.slice(0, 1).toUpperCase()}
-                  </Text>
+                  </Typography>
                 </View>
               )}
               <View style={{ flex: 1 }}>
-                <Text numberOfLines={1} style={[styles.companyName, { color: colors.foreground }]}>
+                <Typography numberOfLines={1} colors={colors} weight="bold" style={[styles.companyName, { color: colors.foreground }]}>
                   {session.company.name}
-                </Text>
-                <Text style={[styles.driverName, { color: colors.mutedForeground }]}>
+                </Typography>
+                <Typography colors={colors} size="xs" tone="muted" style={styles.driverName}>
                   {session.user.displayName}
-                </Text>
+                </Typography>
               </View>
             </View>
-            <Pressable
+            <Button
+              colors={colors}
+              variant="outline"
+              size="sm"
               accessibilityRole="button"
               accessibilityLabel="Se déconnecter"
               onPress={requestSignOut}
-              style={[styles.logoutButton, { borderColor: colors.border }]}
+              style={styles.logoutButton}
             >
-              <Text style={[styles.logoutText, { color: colors.mutedForeground }]}>Quitter</Text>
-            </Pressable>
+              Quitter
+            </Button>
           </View>
 
           <View style={styles.greeting}>
-            <Text style={[styles.date, { color: colors.mutedForeground }]}>{today}</Text>
-            <Text style={[styles.greetingTitle, { color: colors.foreground }]}>
+            <Typography colors={colors} tone="muted" weight="semibold" style={styles.date}>
+              {today}
+            </Typography>
+            <Typography colors={colors} size="2xl" weight="bold" style={[styles.greetingTitle, { color: colors.foreground }]}>
               Bonjour, {session.user.displayName.split(' ')[0]}
-            </Text>
-            <Text style={[styles.greetingSubtitle, { color: colors.mutedForeground }]}>
+            </Typography>
+            <Typography colors={colors} size="sm" tone="muted" style={styles.greetingSubtitle}>
               Voici votre espace de conduite.
-            </Text>
+            </Typography>
           </View>
 
           {transportQuery.isLoading ? (
-            <View style={[styles.loadingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
+            <Card colors={colors} style={styles.loadingCard}>
+              <Spinner size="small" color={colors.primary} />
+              <Typography colors={colors} size="sm" tone="muted" weight="medium">
                 Chargement de vos courses…
-              </Text>
-            </View>
+              </Typography>
+            </Card>
           ) : transportQuery.error ? (
-            <View style={[styles.errorCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Transport indisponible</Text>
-              <Text style={[styles.bodyText, { color: colors.mutedForeground }]}>
+            <Card colors={colors} style={styles.errorCard}>
+              <Typography colors={colors} size="lg" weight="bold">
+                Transport indisponible
+              </Typography>
+              <Typography colors={colors} size="sm" tone="muted" style={styles.bodyText}>
                 {apiMessage(transportQuery.error, 'Vérifiez votre connexion ou contactez votre responsable.')}
-              </Text>
-              <Pressable
+              </Typography>
+              <Button
+                colors={colors}
+                size="sm"
                 accessibilityRole="button"
                 onPress={() => void transportQuery.refetch()}
-                style={[styles.smallButton, { backgroundColor: colors.primary }]}
+                style={styles.smallButton}
               >
-                <Text style={[styles.smallButtonText, { color: colors.primaryForeground }]}>Réessayer</Text>
-              </Pressable>
-            </View>
+                Réessayer
+              </Button>
+            </Card>
           ) : !driver ? (
-            <View style={[styles.errorCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Profil chauffeur introuvable</Text>
-              <Text style={[styles.bodyText, { color: colors.mutedForeground }]}>
+            <Card colors={colors} style={styles.errorCard}>
+              <Typography colors={colors} size="lg" weight="bold">
+                Profil chauffeur introuvable
+              </Typography>
+              <Typography colors={colors} size="sm" tone="muted" style={styles.bodyText}>
                 Votre compte n’est pas rattaché à un profil chauffeur actif. Demandez à votre administrateur de vérifier votre accès Transport.
-              </Text>
-            </View>
+              </Typography>
+            </Card>
           ) : (
             <>
               <AvailabilityCard
@@ -536,10 +554,12 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
               {session.capabilities?.viewTrips ? (
                 <>
                   <View style={styles.sectionHeading}>
-                    <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Mes courses</Text>
-                    <View style={[styles.countBadge, { backgroundColor: colors.muted }]}>
-                      <Text style={[styles.countText, { color: colors.foreground }]}>{activeTrips.length}</Text>
-                    </View>
+                    <Typography colors={colors} size="lg" weight="bold">
+                      Mes courses
+                    </Typography>
+                    <Badge colors={colors} variant="secondary" style={styles.countBadge}>
+                      {activeTrips.length}
+                    </Badge>
                   </View>
 
                   {activeTrips.length ? (
@@ -561,12 +581,16 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                       ))}
                     </View>
                   ) : (
-                    <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                      <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Aucune course à traiter</Text>
-                      <Text style={[styles.bodyText, { color: colors.mutedForeground }]}>
+                    <Card colors={colors} style={styles.emptyCard}>
+                      <Empty style={styles.emptyContent}>
+                        <EmptyTitle colors={colors}>
+                          Aucune course à traiter
+                        </EmptyTitle>
+                        <EmptyDescription colors={colors} style={styles.bodyText}>
                         Les nouvelles courses attribuées apparaîtront ici.
-                      </Text>
-                    </View>
+                        </EmptyDescription>
+                      </Empty>
+                    </Card>
                   )}
                 </>
               ) : null}
@@ -574,9 +598,9 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
           )}
 
           <ReleaseCard colors={colors} />
-          <Text style={[styles.footer, { color: colors.mutedForeground }]}>
+          <Typography colors={colors} size="xs" tone="muted" style={styles.footer}>
             MAXIMUS Chauffeur · Accès sécurisé par votre entreprise
-          </Text>
+          </Typography>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -591,27 +615,22 @@ const styles = StyleSheet.create({
   company: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm },
   logo: { width: 42, height: 42, borderRadius: cardRadius / 2 },
   logoFallback: { width: 42, height: 42, borderRadius: cardRadius / 2, alignItems: 'center', justifyContent: 'center' },
-  logoLetter: { fontSize: 20, fontFamily: 'DMSans_700Bold' },
-  companyName: { fontSize: 14, fontFamily: 'DMSans_700Bold' },
+  logoLetter: { fontSize: 20 },
+  companyName: { fontSize: 14 },
   driverName: { fontSize: 12, marginTop: 2 },
-  logoutButton: { borderWidth: 1, borderRadius: cardRadius / 2, paddingHorizontal: space.sm, paddingVertical: space.xs },
-  logoutText: { fontSize: 12, fontFamily: 'DMSans_600SemiBold' },
+  logoutButton: { paddingHorizontal: space.sm },
   greeting: { paddingTop: space.sm, paddingBottom: space.xs },
-  date: { fontSize: 12, textTransform: 'capitalize', fontFamily: 'DMSans_600SemiBold' },
-  greetingTitle: { fontSize: 26, lineHeight: 32, fontFamily: 'DMSans_700Bold', marginTop: space.xs },
-  greetingSubtitle: { fontSize: 14, marginTop: space.xs },
-  loadingCard: { minHeight: 90, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: space.sm, borderWidth: 1, borderRadius: cardRadius, padding: space.md },
-  loadingText: { fontSize: 14, fontFamily: 'DMSans_500Medium' },
-  errorCard: { borderWidth: 1, borderRadius: cardRadius, padding: space.md, gap: space.sm },
-  sectionTitle: { fontSize: 18, fontFamily: 'DMSans_700Bold' },
-  bodyText: { fontSize: 13, lineHeight: 20 },
-  smallButton: { alignSelf: 'flex-start', minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.md, borderRadius: cardRadius / 2 },
-  smallButtonText: { fontSize: 13, fontFamily: 'DMSans_700Bold' },
+  date: { textTransform: 'capitalize' },
+  greetingTitle: { lineHeight: 32, marginTop: space.xs },
+  greetingSubtitle: { marginTop: space.xs },
+  loadingCard: { minHeight: 90, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: space.sm, padding: space.md },
+  errorCard: { padding: space.md, gap: space.sm },
+  bodyText: { lineHeight: 20 },
+  smallButton: { alignSelf: 'flex-start', paddingHorizontal: space.md },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.xs },
-  countBadge: { minWidth: 26, height: 26, alignItems: 'center', justifyContent: 'center', borderRadius: 13, paddingHorizontal: space.xs },
-  countText: { fontSize: 12, fontFamily: 'DMSans_700Bold' },
+  countBadge: { minWidth: 26, height: 26, alignItems: 'center', justifyContent: 'center', borderRadius: 13, paddingHorizontal: space.xs, paddingVertical: 0 },
   tripList: { gap: space.sm },
-  emptyCard: { borderWidth: 1, borderRadius: cardRadius, padding: space.md, gap: space.xs },
-  emptyTitle: { fontSize: 15, fontFamily: 'DMSans_700Bold' },
-  footer: { fontSize: 11, textAlign: 'center', paddingTop: space.xs, paddingBottom: space.md },
+  emptyCard: { padding: 0 },
+  emptyContent: { padding: space.md, gap: space.xs },
+  footer: { textAlign: 'center', paddingTop: space.xs, paddingBottom: space.md },
 });

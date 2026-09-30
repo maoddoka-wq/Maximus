@@ -1,5 +1,9 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import type { TransportDriver } from '@workspace/api-client-react';
+import { Button } from '@workspace/maximus-chauffeur-design-system/components/native/button';
+import { Card } from '@workspace/maximus-chauffeur-design-system/components/native/card';
+import { Spinner } from '@workspace/maximus-chauffeur-design-system/components/native/spinner';
+import { Typography } from '@workspace/maximus-chauffeur-design-system/components/native/typography';
 import { isDriverAvailableWithActiveGps } from '../services/driver-availability-policy';
 import { cardRadius, space, type getPalette } from '../theme';
 
@@ -50,23 +54,27 @@ export function AvailabilityCard({
     (isOnTrip || (serverSaysAvailable && !canToggle));
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <Card colors={colors} style={styles.card}>
       <View style={styles.headingRow}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.title, { color: colors.cardForeground }]}>Disponibilité</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+          <Typography colors={colors} size="lg" weight="bold" style={styles.title}>
+            Disponibilité
+          </Typography>
+          <Typography colors={colors} size="xs" tone="muted" style={styles.subtitle}>
             Gérez votre statut et le partage de position.
-          </Text>
+          </Typography>
         </View>
         <View style={[styles.badge, { backgroundColor: statusColor + '1A' }]}>
           <View style={[styles.dot, { backgroundColor: statusColor }]} />
-          <Text style={[styles.badgeText, { color: statusColor }]}>{statusLabel}</Text>
+          <Typography colors={colors} size="xs" weight="bold" style={{ color: statusColor }}>
+            {statusLabel}
+          </Typography>
         </View>
       </View>
 
       <View style={[styles.gpsRow, { backgroundColor: colors.muted }]}>
         {gpsState === 'starting' ? (
-          <ActivityIndicator size="small" color={colors.primary} />
+          <Spinner size="small" color={colors.primary} />
         ) : (
           <View
             style={[
@@ -75,63 +83,57 @@ export function AvailabilityCard({
             ]}
           />
         )}
-        <Text style={[styles.gpsText, { color: colors.foreground }]}>{gpsLabel}</Text>
+        <Typography colors={colors} size="xs" weight="semibold">
+          {gpsLabel}
+        </Typography>
         {gpsMessage ? (
-          <Text style={[styles.gpsMessage, { color: colors.mutedForeground }]}>{gpsMessage}</Text>
+          <Typography colors={colors} size="xs" tone="muted" style={styles.gpsMessage}>
+            {gpsMessage}
+          </Typography>
         ) : null}
       </View>
 
       {canToggle && !isOnTrip ? (
-        <Pressable
+        <Button
+          colors={colors}
+          variant={isAvailable ? 'secondary' : 'default'}
           accessibilityRole="button"
           accessibilityLabel={isAvailable ? 'Me mettre en pause' : 'Passer disponible'}
           disabled={isBusy}
+          loading={isBusy}
           onPress={onToggle}
-          style={({ pressed }) => [
-            styles.button,
-            { backgroundColor: isAvailable ? colors.secondary : colors.primary, opacity: pressed ? 0.86 : 1 },
-            isBusy && styles.busy,
-          ]}
+          style={styles.button}
         >
-          {isBusy ? (
-            <ActivityIndicator color={isAvailable ? colors.secondaryForeground : colors.primaryForeground} />
-          ) : (
-            <Text
-              style={[
-                styles.buttonText,
-                { color: isAvailable ? colors.secondaryForeground : colors.primaryForeground },
-              ]}
-            >
-              {isAvailable ? 'Me mettre en pause' : 'Passer disponible'}
-            </Text>
-          )}
-        </Pressable>
+          {isAvailable ? 'Me mettre en pause' : 'Passer disponible'}
+        </Button>
       ) : null}
 
       {showEnableGpsButton && onEnableGps ? (
-        <Pressable
+        <Button
+          colors={colors}
+          variant="outline"
           accessibilityRole="button"
           onPress={onEnableGps}
-          style={[styles.gpsButton, { borderColor: colors.border }]}
+          style={styles.gpsButton}
         >
-          <Text style={[styles.gpsButtonText, { color: colors.primary }]}>Réactiver le GPS</Text>
-        </Pressable>
+          Réactiver le GPS
+        </Button>
       ) : null}
 
       {isOnTrip ? (
-        <Text style={[styles.tripNote, { color: colors.mutedForeground }]}>
+        <Typography colors={colors} size="xs" tone="muted" style={styles.tripNote}>
           Votre statut sera actualisé à la fin de la course.
-        </Text>
+        </Typography>
       ) : null}
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: cardRadius, padding: space.md, gap: space.md },
+  card: { borderRadius: cardRadius, padding: space.md, gap: space.md },
   headingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
-  title: { fontSize: 18, lineHeight: 24, fontFamily: 'DMSans_700Bold' },
-  subtitle: { fontSize: 13, lineHeight: 19, marginTop: space.xs },
+  title: { lineHeight: 24 },
+  subtitle: { lineHeight: 19, marginTop: space.xs },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -141,15 +143,10 @@ const styles = StyleSheet.create({
     paddingVertical: space.xs,
   },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  badgeText: { fontSize: 12, fontFamily: 'DMSans_700Bold' },
   gpsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.xs, borderRadius: cardRadius / 2, padding: space.sm },
   gpsDot: { width: 8, height: 8, borderRadius: 4 },
-  gpsText: { fontSize: 13, fontFamily: 'DMSans_600SemiBold' },
-  gpsMessage: { width: '100%', fontSize: 12, lineHeight: 18, marginTop: space.xs },
-  button: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.md, borderRadius: cardRadius },
-  buttonText: { fontSize: 15, fontFamily: 'DMSans_700Bold' },
-  busy: { opacity: 0.7 },
-  gpsButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: cardRadius },
-  gpsButtonText: { fontSize: 13, fontFamily: 'DMSans_700Bold' },
-  tripNote: { fontSize: 13, lineHeight: 19 },
+  gpsMessage: { width: '100%', lineHeight: 18, marginTop: space.xs },
+  button: { minHeight: 48, paddingHorizontal: space.md, borderRadius: cardRadius },
+  gpsButton: { minHeight: 42, borderRadius: cardRadius },
+  tripNote: { lineHeight: 19 },
 });

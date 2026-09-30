@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   Linking,
-  Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import type { TransportTrip } from '@workspace/api-client-react';
+import { Badge } from '@workspace/maximus-chauffeur-design-system/components/native/badge';
+import { Button } from '@workspace/maximus-chauffeur-design-system/components/native/button';
+import { Card } from '@workspace/maximus-chauffeur-design-system/components/native/card';
+import { Typography } from '@workspace/maximus-chauffeur-design-system/components/native/typography';
 import { cardRadius, space, type getPalette } from '../theme';
 import { TripRouteMap } from './TripRouteMap';
 
@@ -77,13 +78,19 @@ export function TripCard({
 
   return (
     <>
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Card colors={colors} style={styles.card}>
         <View style={styles.topRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>COURSE {trip.reference}</Text>
-            <Text style={[styles.title, { color: colors.cardForeground }]}>{statusLabel(trip.status)}</Text>
+            <Typography colors={colors} size="xs" weight="bold" tone="muted" style={styles.eyebrow}>
+              COURSE {trip.reference}
+            </Typography>
+            <Badge colors={colors} variant="secondary" style={styles.statusBadge}>
+              {statusLabel(trip.status)}
+            </Badge>
           </View>
-          <Text style={[styles.fare, { color: colors.foreground }]}>{formatFare(trip.fare)}</Text>
+          <Typography colors={colors} weight="bold" style={styles.fare}>
+            {formatFare(trip.fare)}
+          </Typography>
         </View>
 
         <View style={styles.route}>
@@ -93,10 +100,18 @@ export function TripCard({
             <View style={[styles.destinationDot, { borderColor: colors.chart2 }]} />
           </View>
           <View style={styles.locations}>
-            <Text style={[styles.locationLabel, { color: colors.mutedForeground }]}>PRISE EN CHARGE</Text>
-            <Text style={[styles.location, { color: colors.foreground }]}>{trip.pickup}</Text>
-            <Text style={[styles.locationLabel, styles.destinationLabel, { color: colors.mutedForeground }]}>DESTINATION</Text>
-            <Text style={[styles.location, { color: colors.foreground }]}>{trip.destination}</Text>
+            <Typography colors={colors} size="xs" weight="bold" tone="muted" style={styles.locationLabel}>
+              PRISE EN CHARGE
+            </Typography>
+            <Typography colors={colors} size="sm" weight="medium" style={styles.location}>
+              {trip.pickup}
+            </Typography>
+            <Typography colors={colors} size="xs" weight="bold" tone="muted" style={[styles.locationLabel, styles.destinationLabel]}>
+              DESTINATION
+            </Typography>
+            <Typography colors={colors} size="sm" weight="medium" style={styles.location}>
+              {trip.destination}
+            </Typography>
           </View>
         </View>
 
@@ -106,67 +121,70 @@ export function TripCard({
 
         <View style={[styles.passenger, { backgroundColor: colors.muted }]}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.locationLabel, { color: colors.mutedForeground }]}>PASSAGER</Text>
-            <Text style={[styles.passengerName, { color: colors.foreground }]}>{trip.passengerName}</Text>
+            <Typography colors={colors} size="xs" weight="bold" tone="muted" style={styles.locationLabel}>
+              PASSAGER
+            </Typography>
+            <Typography colors={colors} size="sm" weight="semibold" style={styles.passengerName}>
+              {trip.passengerName}
+            </Typography>
           </View>
           {trip.passengerPhone ? (
-            <Pressable
+            <Button
+              colors={colors}
               accessibilityRole="button"
               accessibilityLabel={`Appeler ${trip.passengerName}`}
               onPress={() => void callPassenger()}
-              style={[styles.callButton, { borderColor: colors.border }]}
+              variant="outline"
+              size="sm"
+              style={styles.callButton}
             >
-              <Text style={[styles.callButtonText, { color: colors.primary }]}>Appeler</Text>
-            </Pressable>
+              Appeler
+            </Button>
           ) : null}
         </View>
 
-        {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
+        {error ? (
+          <Typography colors={colors} tone="destructive" size="xs" style={styles.errorText}>
+            {error}
+          </Typography>
+        ) : null}
 
         {action && canUpdate ? (
-          <Pressable
+          <Button
+            colors={colors}
             accessibilityRole="button"
+            accessibilityState={{ disabled: isBusy, busy: isBusy }}
             disabled={isBusy}
+            loading={isBusy}
             onPress={() => void handleAction()}
-            style={({ pressed }) => [
-              styles.actionButton,
-              { backgroundColor: colors.primary, opacity: pressed ? 0.84 : 1 },
-              isBusy && styles.busy,
-            ]}
+            style={styles.actionButton}
           >
-            {isBusy ? (
-              <ActivityIndicator color={colors.primaryForeground} />
-            ) : (
-              <Text style={[styles.actionText, { color: colors.primaryForeground }]}>{action.label}</Text>
-            )}
-          </Pressable>
+            {action.label}
+          </Button>
         ) : null}
-      </View>
+      </Card>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: cardRadius, padding: space.md, gap: space.md },
+  card: { borderRadius: cardRadius, padding: space.md, gap: space.md },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
-  eyebrow: { fontSize: 11, letterSpacing: 0.8, fontFamily: 'DMSans_700Bold' },
-  title: { fontSize: 18, lineHeight: 24, fontFamily: 'DMSans_700Bold', marginTop: space.xs },
-  fare: { fontSize: 15, fontFamily: 'DMSans_700Bold' },
+  eyebrow: { letterSpacing: 0.8 },
+  statusBadge: { marginTop: space.xs },
+  fare: { fontSize: 15 },
   route: { flexDirection: 'row', gap: space.sm },
   routeMarks: { alignItems: 'center', paddingTop: 4, width: 14 },
   pickupDot: { width: 9, height: 9, borderRadius: 5 },
   routeLine: { width: 1, height: 38 },
   destinationDot: { width: 9, height: 9, borderRadius: 2, borderWidth: 2 },
   locations: { flex: 1 },
-  locationLabel: { fontSize: 10, letterSpacing: 0.7, fontFamily: 'DMSans_700Bold' },
+  locationLabel: { letterSpacing: 0.7 },
   destinationLabel: { marginTop: space.md },
-  location: { fontSize: 14, lineHeight: 20, fontFamily: 'DMSans_500Medium', marginTop: space.xs },
+  location: { lineHeight: 20, marginTop: space.xs },
   passenger: { flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.sm, borderRadius: cardRadius / 2 },
-  passengerName: { fontSize: 14, fontFamily: 'DMSans_600SemiBold', marginTop: space.xs },
-  callButton: { borderWidth: 1, borderRadius: cardRadius / 2, paddingHorizontal: space.sm, paddingVertical: space.xs },
-  callButtonText: { fontSize: 13, fontFamily: 'DMSans_700Bold' },
-  errorText: { fontSize: 12, lineHeight: 18 },
-  actionButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.md, borderRadius: cardRadius },
-  actionText: { fontSize: 14, fontFamily: 'DMSans_700Bold' },
-  busy: { opacity: 0.7 },
+  passengerName: { marginTop: space.xs },
+  callButton: { paddingHorizontal: space.sm },
+  errorText: { lineHeight: 18 },
+  actionButton: { minHeight: 48, paddingHorizontal: space.md, borderRadius: cardRadius },
 });

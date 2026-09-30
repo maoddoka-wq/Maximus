@@ -1,7 +1,7 @@
 import { tokens } from "../generated/tokens";
 
 export type NativePalette = {
-  [K in keyof typeof tokens.color.light]: string;
+  -readonly [K in keyof typeof tokens.color.light]: string;
 };
 
 const toNumber = (value: string) =>
@@ -28,10 +28,10 @@ export type ColorScheme = keyof typeof nativeTheme;
 /** Resolves a palette and applies the same company-primary override to all primary roles. */
 export function resolveNativePalette(
   scheme: ColorScheme = "light",
-  companyPrimary?: string,
+  companyPrimary?: string | null,
 ): NativePalette {
-  const palette = { ...nativeTheme[scheme].colors };
-  if (companyPrimary) {
+  const palette: NativePalette = { ...nativeTheme[scheme].colors };
+  if (companyPrimary && /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(companyPrimary)) {
     palette.primary = companyPrimary;
     palette.accent = companyPrimary;
     palette.ring = companyPrimary;

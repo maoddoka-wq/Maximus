@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react';
 import {
   Image,
   Linking,
-  Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Button } from '@workspace/maximus-chauffeur-design-system/components/native/button';
+import { Typography } from '@workspace/maximus-chauffeur-design-system/components/native/typography';
 import Svg, { Circle, Polyline } from 'react-native-svg';
 import type { TransportTrip } from '@workspace/api-client-react';
 import { cardRadius, space, type getPalette } from '../theme';
@@ -182,16 +182,18 @@ export function TripRouteMap({
     <View style={styles.card}>
       <View style={styles.heading}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.kicker, { color: colors.mutedForeground }]}>GUIDAGE DE LA COURSE</Text>
-          <Text style={[styles.title, { color: colors.foreground }]}>
+          <Typography colors={colors} size="xs" weight="bold" tone="muted" style={styles.kicker}>
+            GUIDAGE DE LA COURSE
+          </Typography>
+          <Typography colors={colors} size="base" weight="bold" style={styles.title}>
             {trip.status === 'IN_PROGRESS' ? 'Rejoindre la destination' : 'Rejoindre le client'}
-          </Text>
+          </Typography>
         </View>
         <View style={[styles.liveBadge, { backgroundColor: colors.muted }]}>
           <View style={[styles.liveDot, { backgroundColor: driver ? colors.chart3 : colors.mutedForeground }]} />
-          <Text style={[styles.liveText, { color: colors.mutedForeground }]}>
+          <Typography colors={colors} size="xs" weight="semibold" tone="muted">
             {driver ? 'Position reçue' : 'GPS en attente'}
-          </Text>
+          </Typography>
         </View>
       </View>
 
@@ -308,16 +310,16 @@ export function TripRouteMap({
         {!driver ? (
           <View pointerEvents="none" style={[styles.gpsNotice, { backgroundColor: colors.card }]}>
             <Ionicons name="locate-outline" size={16} color={colors.mutedForeground} />
-            <Text style={[styles.gpsNoticeText, { color: colors.mutedForeground }]}>
+            <Typography colors={colors} size="xs" tone="muted" style={styles.gpsNoticeText}>
               Votre position apparaîtra dès que le GPS sera reçu.
-            </Text>
+            </Typography>
           </View>
         ) : null}
 
         <View pointerEvents="none" style={[styles.attribution, { backgroundColor: colors.card }]}>
-          <Text style={[styles.attributionText, { color: colors.mutedForeground }]}>
+          <Typography colors={colors} size="xs" tone="muted">
             © OpenStreetMap · CARTO
-          </Text>
+          </Typography>
         </View>
       </View>
 
@@ -327,27 +329,24 @@ export function TripRouteMap({
         <LegendItem color={colors.chart3} label="Destination" colors={colors} />
       </View>
 
-      <Pressable
+      <Button
+        colors={colors}
         accessibilityRole="button"
         accessibilityLabel={trip.status === 'IN_PROGRESS' ? 'Ouvrir le guidage vers la destination' : 'Ouvrir le guidage vers le client'}
         disabled={!navigationUrl}
         onPress={() => void openGuidance()}
-        style={({ pressed }) => [
-          styles.navigationButton,
-          {
-            backgroundColor: colors.primary,
-            opacity: !navigationUrl ? 0.5 : pressed ? 0.84 : 1,
-          },
-        ]}
+        style={styles.navigationButton}
         testID="button-open-trip-guidance"
       >
         <Ionicons name="navigate" size={18} color={colors.primaryForeground} />
-        <Text style={[styles.navigationText, { color: colors.primaryForeground }]}>
+        <Typography colors={colors} size="xs" weight="bold">
           Ouvrir le guidage
-        </Text>
-      </Pressable>
+        </Typography>
+      </Button>
       {navigationError ? (
-        <Text style={[styles.errorText, { color: colors.destructive }]}>{navigationError}</Text>
+        <Typography colors={colors} tone="destructive" size="xs" style={styles.errorText}>
+          {navigationError}
+        </Typography>
       ) : null}
     </View>
   );
@@ -365,7 +364,9 @@ function LegendItem({
   return (
     <View style={styles.legendItem}>
       <View style={[styles.legendDot, { backgroundColor: color, borderColor: colors.card }]} />
-      <Text style={[styles.legendText, { color: colors.mutedForeground }]}>{label}</Text>
+      <Typography colors={colors} size="xs" tone="muted">
+        {label}
+      </Typography>
     </View>
   );
 }
@@ -377,22 +378,18 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   heading: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  kicker: { fontSize: 10, letterSpacing: 0.7, fontFamily: 'DMSans_700Bold' },
-  title: { fontSize: 15, fontFamily: 'DMSans_700Bold', marginTop: space.xs },
+  kicker: { letterSpacing: 0.7 },
+  title: { marginTop: space.xs },
   liveBadge: { flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingHorizontal: space.sm, paddingVertical: space.xs, borderRadius: cardRadius },
   liveDot: { width: 7, height: 7, borderRadius: 4 },
-  liveText: { fontSize: 10, fontFamily: 'DMSans_600SemiBold' },
   map: { height: 220, width: '100%', overflow: 'hidden', borderRadius: cardRadius },
   tile: { position: 'absolute', width: TILE_SIZE, height: TILE_SIZE },
   gpsNotice: { position: 'absolute', top: space.sm, left: space.sm, right: space.sm, flexDirection: 'row', alignItems: 'center', gap: space.xs, padding: space.sm, borderRadius: cardRadius / 2 },
-  gpsNoticeText: { flex: 1, fontSize: 11, fontFamily: 'DMSans_500Medium' },
+  gpsNoticeText: { flex: 1 },
   attribution: { position: 'absolute', right: space.xs, bottom: space.xs, paddingHorizontal: space.xs, paddingVertical: 2, borderRadius: cardRadius / 3 },
-  attributionText: { fontSize: 9, fontFamily: 'DMSans_500Medium' },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   legendDot: { width: 11, height: 11, borderRadius: 6, borderWidth: 2 },
-  legendText: { fontSize: 10, fontFamily: 'DMSans_500Medium' },
-  navigationButton: { minHeight: 46, borderRadius: cardRadius, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: space.xs, paddingHorizontal: space.md },
-  navigationText: { fontSize: 13, fontFamily: 'DMSans_700Bold' },
-  errorText: { fontSize: 12, lineHeight: 18 },
+  navigationButton: { minHeight: 46, borderRadius: cardRadius, flexDirection: 'row', gap: space.xs, paddingHorizontal: space.md },
+  errorText: { lineHeight: 18 },
 });

@@ -1,6 +1,7 @@
 import { Link, Stack } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
-import { useColors } from '@/hooks/useColors';
+import { StyleSheet, View } from 'react-native';
+import { useColors } from '@workspace/maximus-chauffeur-design-system/hooks/use-colors';
+import { Typography } from '@workspace/maximus-chauffeur-design-system/components/native/typography';
 
 export default function NotFoundScreen() {
   const colors = useColors();
@@ -9,14 +10,14 @@ export default function NotFoundScreen() {
     <>
       <Stack.Screen options={{ title: 'Oops!' }} />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.title, { color: colors.foreground }]}>
+        <Typography colors={colors} size="xl" weight="bold" style={styles.title}>
           This screen doesn&apos;t exist.
-        </Text>
+        </Typography>
 
         <Link href="/" style={styles.link}>
-          <Text style={[styles.linkText, { color: colors.primary }]}>
+          <Typography colors={colors} tone="primary" style={styles.linkText}>
             Go to home screen!
-          </Text>
+          </Typography>
         </Link>
       </View>
     </>
@@ -30,15 +31,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
+  title: {},
   link: {
     marginTop: 15,
     paddingVertical: 15,
   },
-  linkText: {
-    fontSize: 14,
-  },
+  linkText: {},
 });

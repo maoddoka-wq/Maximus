@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import {
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColors } from '@/hooks/useColors';
+import { Button } from '@workspace/maximus-chauffeur-design-system/components/native/button';
+import { Typography } from '@workspace/maximus-chauffeur-design-system/components/native/typography';
+import { useColors } from '@workspace/maximus-chauffeur-design-system/hooks/use-colors';
+import { nativeTheme } from '@workspace/maximus-chauffeur-design-system/lib/native-theme';
 import { Feather } from '@expo/vector-icons';
 import { reloadAppAsync } from 'expo';
 
@@ -50,49 +51,39 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {__DEV__ ? (
-        <Pressable
+        <Button
+          colors={colors}
+          variant="ghost"
+          size="icon"
           onPress={() => setIsModalVisible(true)}
           accessibilityLabel="View error details"
           accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.topButton,
-            {
-              top: insets.top + 16,
-              backgroundColor: colors.card,
-              opacity: pressed ? 0.8 : 1,
-            },
-          ]}
+          style={[styles.topButton, { top: insets.top + nativeTheme.light.spacing.md, backgroundColor: colors.card }]}
         >
           <Feather name="alert-circle" size={20} color={colors.foreground} />
-        </Pressable>
+        </Button>
       ) : null}
 
       <View style={styles.content}>
-        <Text style={[styles.title, { color: colors.foreground }]}>
+        <Typography colors={colors} size="2xl" weight="bold" style={styles.title}>
           Something went wrong
-        </Text>
+        </Typography>
 
-        <Text style={[styles.message, { color: colors.mutedForeground }]}>
+        <Typography colors={colors} tone="muted" style={styles.message}>
           Please reload the app to continue.
-        </Text>
+        </Typography>
 
-        <Pressable
+        <Button
+          colors={colors}
+          size="lg"
           onPress={handleRestart}
           style={({ pressed }) => [
             styles.button,
-            {
-              backgroundColor: colors.primary,
-              opacity: pressed ? 0.9 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
-            },
+            { transform: [{ scale: pressed ? 0.98 : 1 }] },
           ]}
         >
-          <Text
-            style={[styles.buttonText, { color: colors.primaryForeground }]}
-          >
-            Try Again
-          </Text>
-        </Pressable>
+          Try Again
+        </Button>
       </View>
 
       {__DEV__ ? (
@@ -115,20 +106,20 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
                   { borderBottomColor: colors.border },
                 ]}
               >
-                <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+                <Typography colors={colors} size="lg" weight="semibold">
                   Error Details
-                </Text>
-                <Pressable
+                </Typography>
+                <Button
+                  colors={colors}
+                  variant="ghost"
+                  size="icon"
                   onPress={() => setIsModalVisible(false)}
                   accessibilityLabel="Close error details"
                   accessibilityRole="button"
-                  style={({ pressed }) => [
-                    styles.closeButton,
-                    { opacity: pressed ? 0.6 : 1 },
-                  ]}
+                  style={styles.closeButton}
                 >
                   <Feather name="x" size={24} color={colors.foreground} />
-                </Pressable>
+                </Button>
               </View>
 
               <ScrollView
@@ -145,18 +136,14 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
                     { backgroundColor: colors.card },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.errorText,
-                      {
-                        color: colors.foreground,
-                        fontFamily: monoFont,
-                      },
-                    ]}
+                  <Typography
+                    colors={colors}
+                    size="xs"
+                    style={[styles.errorText, { fontFamily: monoFont }]}
                     selectable
                   >
                     {formatErrorDetails()}
-                  </Text>
+                  </Typography>
                 </View>
               </ScrollView>
             </View>
@@ -174,55 +161,30 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: nativeTheme.light.spacing.md,
   },
   content: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
+    gap: nativeTheme.light.spacing.md,
     width: '100%',
     maxWidth: 600,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
     textAlign: 'center',
     lineHeight: 40,
   },
   message: {
-    fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
   },
   topButton: {
     position: 'absolute',
-    right: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    right: nativeTheme.light.spacing.md,
     zIndex: 10,
   },
   button: {
-    paddingVertical: 16,
-    borderRadius: 8,
-    paddingHorizontal: 24,
     minWidth: 200,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  buttonText: {
-    fontWeight: '600',
-    textAlign: 'center',
-    fontSize: 16,
   },
   modalOverlay: {
     flex: 1,
@@ -232,39 +194,32 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: '100%',
     height: '90%',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderTopLeftRadius: nativeTheme.light.radius.lg,
+    borderTopRightRadius: nativeTheme.light.radius.lg,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingHorizontal: nativeTheme.light.spacing.md,
+    paddingTop: nativeTheme.light.spacing.md,
+    paddingBottom: nativeTheme.light.spacing.sm,
     borderBottomWidth: 1,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
   closeButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: nativeTheme.light.radius.sm,
   },
   modalScrollView: {
     flex: 1,
   },
   modalScrollContent: {
-    padding: 16,
+    padding: nativeTheme.light.spacing.md,
   },
   errorContainer: {
     width: '100%',
-    borderRadius: 8,
+    borderRadius: nativeTheme.light.radius.base,
     overflow: 'hidden',
-    padding: 16,
+    padding: nativeTheme.light.spacing.md,
   },
   errorText: {
     fontSize: 12,

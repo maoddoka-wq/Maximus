@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   AppState,
   Platform,
-  Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { Feather } from '@expo/vector-icons';
+import { Button } from '@workspace/maximus-chauffeur-design-system/components/native/button';
+import { Card } from '@workspace/maximus-chauffeur-design-system/components/native/card';
+import { Spinner } from '@workspace/maximus-chauffeur-design-system/components/native/spinner';
+import { Typography } from '@workspace/maximus-chauffeur-design-system/components/native/typography';
 import {
   getGetLatestChauffeurReleaseQueryKey,
   useGetLatestChauffeurRelease,
@@ -33,28 +34,29 @@ function ReleaseCheckButton({
   onPress: () => void;
 }) {
   return (
-    <Pressable
+    <Button
+      colors={colors}
+      variant="ghost"
+      size="sm"
       accessibilityRole="button"
       accessibilityLabel="Vérifier les mises à jour"
       accessibilityState={{ disabled: isFetching, busy: isFetching }}
       testID="release-check-button"
       disabled={isFetching}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.checkButton,
-        { opacity: pressed ? 0.72 : 1 },
-        isFetching && styles.disabled,
-      ]}
+      style={styles.checkButton}
     >
-      {isFetching ? (
-        <ActivityIndicator size="small" color={colors.primary} />
-      ) : (
-        <Feather name="refresh-cw" size={14} color={colors.primary} />
-      )}
-      <Text style={[styles.checkText, { color: colors.primary }]}>
-        {isFetching ? 'Vérification…' : 'Vérifier les mises à jour'}
-      </Text>
-    </Pressable>
+      <View style={styles.checkContent}>
+        {isFetching ? (
+          <Spinner size="small" color={colors.primary} />
+        ) : (
+          <Feather name="refresh-cw" size={14} color={colors.primary} />
+        )}
+        <Typography colors={colors} size="xs" weight="bold" tone="primary">
+          {isFetching ? 'Vérification…' : 'Vérifier les mises à jour'}
+        </Typography>
+      </View>
+    </Button>
   );
 }
 
@@ -199,36 +201,40 @@ export function ReleaseCard({ colors }: { colors: Palette }) {
   const releaseMessage = releaseMessageFromStatus(httpStatus);
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <Card colors={colors} style={styles.card}>
       <View style={styles.heading}>
         <View style={[styles.iconBox, { backgroundColor: colors.muted }]}>
           <Feather name="download-cloud" size={20} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.title, { color: colors.cardForeground }]}>Application</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+          <Typography colors={colors} weight="bold" style={styles.title}>
+            Application
+          </Typography>
+          <Typography colors={colors} size="xs" tone="muted" style={styles.subtitle}>
             Version installée {currentVersion}
-          </Text>
+          </Typography>
         </View>
       </View>
 
       {releaseQuery.isLoading ? (
         <View style={styles.statusRow}>
-          <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={[styles.statusText, { color: colors.mutedForeground }]}>Vérification des mises à jour…</Text>
+          <Spinner size="small" color={colors.primary} />
+          <Typography colors={colors} size="xs" tone="muted" style={styles.statusText}>
+            Vérification des mises à jour…
+          </Typography>
         </View>
       ) : releaseQuery.data ? (
         <>
           <View style={[styles.releaseInfo, { backgroundColor: colors.muted }]}>
-            <Text style={[styles.statusText, { color: colors.foreground }]}>
+            <Typography colors={colors} size="xs" weight="medium" style={styles.statusText}>
               {updateAvailable
                 ? `Version disponible : ${releaseQuery.data.version}`
                 : `Votre application est à jour (${currentVersion}).`}
-            </Text>
+            </Typography>
             {updateAvailable && releaseQuery.data.sizeBytes > 0 ? (
-              <Text style={[styles.sizeText, { color: colors.mutedForeground }]}>
+              <Typography colors={colors} size="xs" tone="muted">
                 {(releaseQuery.data.sizeBytes / (1024 * 1024)).toFixed(1)} Mo
-              </Text>
+              </Typography>
             ) : null}
           </View>
           <ReleaseCheckButton
@@ -237,27 +243,23 @@ export function ReleaseCard({ colors }: { colors: Palette }) {
             onPress={() => void releaseQuery.refetch()}
           />
           {Platform.OS === 'android' && updateAvailable ? (
-            <Pressable
+            <Button
+              colors={colors}
               accessibilityRole="button"
               disabled={downloading}
+              loading={downloading}
               onPress={() => void downloadAndInstall()}
-              style={({ pressed }) => [
-                styles.downloadButton,
-                { backgroundColor: colors.primary, opacity: pressed ? 0.84 : 1 },
-                downloading && styles.disabled,
-              ]}
+              style={styles.downloadButton}
             >
-              {downloading ? (
-                <ActivityIndicator color={colors.primaryForeground} />
-              ) : (
-                <Text style={[styles.downloadText, { color: colors.primaryForeground }]}>Télécharger et installer</Text>
-              )}
-            </Pressable>
+              Télécharger et installer
+            </Button>
           ) : null}
         </>
       ) : (
         <View style={styles.errorState}>
-          <Text style={[styles.statusText, { color: colors.mutedForeground }]}>{releaseMessage}</Text>
+          <Typography colors={colors} size="xs" tone="muted" style={styles.statusText}>
+            {releaseMessage}
+          </Typography>
           <ReleaseCheckButton
             colors={colors}
             isFetching={releaseQuery.isFetching}
@@ -265,24 +267,21 @@ export function ReleaseCard({ colors }: { colors: Palette }) {
           />
         </View>
       )}
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: cardRadius, padding: space.md, gap: space.md },
+  card: { borderRadius: cardRadius, padding: space.md, gap: space.md },
   heading: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   iconBox: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: cardRadius / 2 },
-  title: { fontSize: 16, fontFamily: 'DMSans_700Bold' },
-  subtitle: { fontSize: 12, marginTop: space.xs },
+  title: { fontSize: 16 },
+  subtitle: { marginTop: space.xs },
   releaseInfo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: cardRadius / 2, padding: space.sm },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   errorState: { alignItems: 'flex-start', gap: space.xs },
-  checkButton: { minHeight: 40, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingHorizontal: space.sm },
-  checkText: { fontSize: 13, fontFamily: 'DMSans_700Bold' },
-  statusText: { fontSize: 13, lineHeight: 19, fontFamily: 'DMSans_500Medium' },
-  sizeText: { fontSize: 12, fontFamily: 'DMSans_500Medium' },
-  downloadButton: { minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: cardRadius, paddingHorizontal: space.sm },
-  downloadText: { fontSize: 14, fontFamily: 'DMSans_700Bold' },
-  disabled: { opacity: 0.65 },
+  checkButton: { minHeight: 40, alignSelf: 'flex-start', paddingHorizontal: space.sm },
+  checkContent: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  statusText: { lineHeight: 19, flexShrink: 1 },
+  downloadButton: { minHeight: 46, borderRadius: cardRadius, paddingHorizontal: space.sm },
 });
