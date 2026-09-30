@@ -38,6 +38,7 @@ import { ReleaseCard } from '../components/ReleaseCard';
 import { TripCard } from '../components/TripCard';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../lib/api';
+import { formatApiMessage } from '../lib/api-message';
 import { hasLocationTrackingConsent } from '../lib/auth-storage';
 import {
   enableDriverLocationTracking,
@@ -54,11 +55,6 @@ import {
   shouldPauseAvailableDriver,
 } from '../services/driver-availability-policy';
 import { cardRadius, getPalette, space } from '../theme';
-
-function apiMessage(error: unknown, fallback: string): string {
-  if (!(error instanceof Error)) return fallback;
-  return error.message.replace(/^HTTP \d+ [^:]*:\s*/, '') || fallback;
-}
 
 function showLocationSetupFailure(failure: LocationSetupFailure): void {
   const openSettings = shouldOpenLocationAppSettings(failure);
@@ -512,7 +508,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                 Transport indisponible
               </Typography>
               <Typography colors={colors} size="sm" tone="muted" style={styles.bodyText}>
-                {apiMessage(transportQuery.error, 'Vérifiez votre connexion ou contactez votre responsable.')}
+                {formatApiMessage(transportQuery.error, 'Vérifiez votre connexion ou contactez votre responsable.')}
               </Typography>
               <Button
                 colors={colors}

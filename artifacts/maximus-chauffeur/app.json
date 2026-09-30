@@ -16,6 +16,10 @@
     "android": {
       "package": "com.maximus.chauffeur",
       "versionCode": 1000010,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#0b1b2b"
+      },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
