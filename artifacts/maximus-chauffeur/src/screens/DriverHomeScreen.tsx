@@ -226,13 +226,12 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
   const updateTripStatus = async (
     tripId: string,
     status: TransportTrip['status'],
-    pickupCode?: string,
   ) => {
     setTripBusyId(tripId);
     try {
       await tripStatusMutation.mutateAsync({
         id: tripId,
-        data: { status, ...(pickupCode ? { pickupCode } : {}) },
+        data: { status },
       });
       await queryClient.invalidateQueries({ queryKey: transportQuery.queryKey });
     } finally {
@@ -391,9 +390,12 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                           colors={colors}
                           canUpdate={canUpdateTrips}
                           isBusy={tripBusyId === trip.id}
-                          onUpdateStatus={(status, pickupCode) =>
-                            updateTripStatus(trip.id, status, pickupCode)
+                          driverPosition={
+                            typeof driver.latitude === 'number' && typeof driver.longitude === 'number'
+                              ? { latitude: driver.latitude, longitude: driver.longitude }
+                              : null
                           }
+                          onUpdateStatus={(status) => updateTripStatus(trip.id, status)}
                         />
                       ))}
                     </View>

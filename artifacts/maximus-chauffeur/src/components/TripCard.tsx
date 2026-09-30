@@ -2,18 +2,18 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import type { TransportTrip } from '@workspace/api-client-react';
 import { cardRadius, space, type getPalette } from '../theme';
+import { TripRouteMap } from './TripRouteMap';
 
 type Palette = ReturnType<typeof getPalette>;
 type TripStatus = TransportTrip['status'];
+type DriverPosition = { latitude: number | null; longitude: number | null } | null;
 
 function formatFare(fare: number): string {
   return new Intl.NumberFormat('fr-SN', {
@@ -35,16 +35,16 @@ export function TripCard({
   colors,
   canUpdate,
   isBusy,
+  driverPosition,
   onUpdateStatus,
 }: {
   trip: TransportTrip;
   colors: Palette;
   canUpdate: boolean;
   isBusy: boolean;
-  onUpdateStatus: (status: TripStatus, pickupCode?: string) => Promise<void>;
+  driverPosition: DriverPosition;
+  onUpdateStatus: (status: TripStatus) => Promise<void>;
 }) {
-  const [codeModalOpen, setCodeModalOpen] = useState(false);
-  const [pickupCode, setPickupCode] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const callPassenger = async () => {
@@ -53,22 +53,6 @@ export function TripCard({
       await Linking.openURL(`tel:${trip.passengerPhone}`);
     } catch {
       setError('Impossible d’ouvrir l’application Téléphone.');
-    }
-  };
-
-  const beginTrip = async () => {
-    const code = pickupCode.replace(/\D/g, '');
-    if (code.length !== 4) {
-      setError('Saisissez le code de prise en charge à quatre chiffres fourni par le passager.');
-      return;
-    }
-    try {
-      setError(null);
-      await onUpdateStatus('IN_PROGRESS', code);
-      setPickupCode('');
-      setCodeModalOpen(false);
-    } catch (mutationError) {
-      setError(mutationError instanceof Error ? mutationError.message : 'Impossible de démarrer cette course.');
     }
   };
 
@@ -82,11 +66,6 @@ export function TripCard({
           : null;
 
   const handleAction = async () => {
-    if (trip.status === 'ASSIGNED') {
-      setError(null);
-      setCodeModalOpen(true);
-      return;
-    }
     if (!action) return;
     setError(null);
     try {
@@ -120,6 +99,10 @@ export function TripCard({
             <Text style={[styles.location, { color: colors.foreground }]}>{trip.destination}</Text>
           </View>
         </View>
+
+        {trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS' ? (
+          <TripRouteMap trip={trip} driverPosition={driverPosition} colors={colors} />
+        ) : null}
 
         <View style={[styles.passenger, { backgroundColor: colors.muted }]}>
           <View style={{ flex: 1 }}>
@@ -159,65 +142,6 @@ export function TripCard({
           </Pressable>
         ) : null}
       </View>
-
-      <Modal
-        visible={codeModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCodeModalOpen(false)}
-      >
-        <View style={[styles.modalBackdrop, { backgroundColor: colors.sidebar + 'CC' }]}>
-          <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Confirmer la prise en charge</Text>
-            <Text style={[styles.modalCopy, { color: colors.mutedForeground }]}>
-              Demandez au passager son code à quatre chiffres avant de démarrer la course.
-            </Text>
-            <TextInput
-              value={pickupCode}
-              onChangeText={(value) => setPickupCode(value.replace(/\D/g, '').slice(0, 4))}
-              placeholder="0000"
-              placeholderTextColor={colors.mutedForeground}
-              keyboardType="number-pad"
-              textContentType="oneTimeCode"
-              maxLength={4}
-              accessibilityLabel="Code de prise en charge"
-              style={[
-                styles.codeInput,
-                { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border },
-              ]}
-            />
-            {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
-            <View style={styles.modalActions}>
-              <Pressable
-                accessibilityRole="button"
-                disabled={isBusy}
-                onPress={() => {
-                  setError(null);
-                  setCodeModalOpen(false);
-                }}
-                style={[styles.cancelButton, { borderColor: colors.border }]}
-              >
-                <Text style={[styles.cancelText, { color: colors.foreground }]}>Annuler</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                disabled={isBusy || pickupCode.length !== 4}
-                onPress={() => void beginTrip()}
-                style={[
-                  styles.confirmButton,
-                  { backgroundColor: colors.primary, opacity: isBusy || pickupCode.length !== 4 ? 0.5 : 1 },
-                ]}
-              >
-                {isBusy ? (
-                  <ActivityIndicator color={colors.primaryForeground} />
-                ) : (
-                  <Text style={[styles.actionText, { color: colors.primaryForeground }]}>Confirmer</Text>
-                )}
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </>
   );
 }
@@ -245,13 +169,4 @@ const styles = StyleSheet.create({
   actionButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.md, borderRadius: cardRadius },
   actionText: { fontSize: 14, fontFamily: 'DMSans_700Bold' },
   busy: { opacity: 0.7 },
-  modalBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.md },
-  modalCard: { width: '100%', maxWidth: 420, padding: space.md, borderRadius: cardRadius, gap: space.sm },
-  modalTitle: { fontSize: 19, fontFamily: 'DMSans_700Bold' },
-  modalCopy: { fontSize: 14, lineHeight: 20 },
-  codeInput: { minHeight: 54, borderWidth: 1, borderRadius: cardRadius, textAlign: 'center', fontSize: 24, letterSpacing: 8, fontFamily: 'DMSans_700Bold' },
-  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: space.sm, marginTop: space.xs },
-  cancelButton: { minHeight: 46, justifyContent: 'center', paddingHorizontal: space.md, borderWidth: 1, borderRadius: cardRadius },
-  cancelText: { fontSize: 14, fontFamily: 'DMSans_600SemiBold' },
-  confirmButton: { minHeight: 46, minWidth: 120, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.md, borderRadius: cardRadius },
 });

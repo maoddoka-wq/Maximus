@@ -1014,8 +1014,9 @@ class TransportController extends Controller
                 return response()->json(['error' => 'Vous ne pouvez modifier que vos propres courses.'], 403);
             }
         }
+        $actorRole = $actor['role'] ?? null;
         $failure = null;
-        DB::transaction(function () use ($trip, $input, &$failure): void {
+        DB::transaction(function () use ($trip, $input, $actorRole, &$failure): void {
             $allowedTransitions = [
                 'REQUESTED' => ['REQUESTED', 'ASSIGNED', 'CANCELLED'],
                 'OFFERED' => ['OFFERED', 'ASSIGNED', 'REQUESTED', 'CANCELLED'],
@@ -1028,7 +1029,10 @@ class TransportController extends Controller
                 $failure = 'Cette transition de course n’est pas autorisée.';
                 return;
             }
-            if ($input['status'] === 'IN_PROGRESS' && $trip->pickup_code !== null && ($input['pickupCode'] ?? '') !== $trip->pickup_code) {
+            if ($input['status'] === 'IN_PROGRESS'
+                && $actorRole !== 'employee'
+                && $trip->pickup_code !== null
+                && ($input['pickupCode'] ?? '') !== $trip->pickup_code) {
                 $failure = 'Le code de prise en charge est incorrect.';
                 return;
             }

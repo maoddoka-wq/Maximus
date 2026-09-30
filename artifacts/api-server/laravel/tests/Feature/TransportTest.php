@@ -128,11 +128,12 @@ class TransportTest extends TestCase
         $this->assertDatabaseMissing('transport_vehicles', ['id' => $vehicle->json('id')]);
     }
 
-    public function test_dispatch_assigns_a_trip_and_requires_the_pickup_code_to_start(): void
+    public function test_driver_can_start_own_trip_without_pickup_code_while_other_actors_still_need_it(): void
     {
         $request = $this->asActor();
+        $driverEmployeeId = $this->createDriverEmployee('dispatch-driver');
         $driver = $request->postJson('/api/transport/drivers?companyId=kora', [
-            'employeeId' => $this->createDriverEmployee('dispatch-driver'),
+            'employeeId' => $driverEmployeeId,
             'licenseNumber' => 'SN-DISPATCH-001',
         ])->assertCreated();
         $request->patchJson('/api/transport/drivers/'.$driver->json('id').'/location?companyId=kora', [
@@ -182,6 +183,15 @@ class TransportTest extends TestCase
             'status' => 'IN_PROGRESS',
             'pickupCode' => '0000',
         ])->assertStatus(422)->assertJsonPath('error', 'Le code de prise en charge est incorrect.');
+
+        $driverRequest = $this->asActor(
+            'employee',
+            ['transport:menu:trips' => ['voir', 'créer', 'modifier']],
+            $driverEmployeeId,
+        );
+        $driverRequest->patchJson('/api/transport/trips/'.$trip->json('id').'/status?companyId=kora', [
+            'status' => 'IN_PROGRESS',
+        ])->assertOk()->assertJsonPath('status', 'IN_PROGRESS');
 
         $request->patchJson('/api/transport/trips/'.$trip->json('id').'/status?companyId=kora', [
             'status' => 'IN_PROGRESS',
