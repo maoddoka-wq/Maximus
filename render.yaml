@@ -65,6 +65,6 @@ services:
 
 databases:
   - name: maximus-postgres
-    plan: free
+    plan: 0.1c-256mb
     databaseName: maximus
     user: maximus

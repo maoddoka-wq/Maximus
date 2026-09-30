@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 const TOKEN_KEY = 'maximus-chauffeur-token';
 const DRIVER_ID_KEY = 'maximus-chauffeur-driver-id';
 const TRACKING_ENABLED_KEY = 'maximus-chauffeur-tracking-enabled';
+const TRACKING_CONSENT_KEY = 'maximus-chauffeur-gps-consent-v1';
 
 const secureOptions: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
@@ -47,15 +48,8 @@ export async function clearMobileCredentials(): Promise<void> {
     deleteItem(TOKEN_KEY),
     deleteItem(DRIVER_ID_KEY),
     deleteItem(TRACKING_ENABLED_KEY),
+    deleteItem(TRACKING_CONSENT_KEY),
   ]);
-}
-
-export async function saveTrackedDriverId(driverId: string): Promise<void> {
-  await setItem(DRIVER_ID_KEY, driverId);
-}
-
-export async function readTrackedDriverId(): Promise<string | null> {
-  return getItem(DRIVER_ID_KEY);
 }
 
 export async function setLocationTrackingEnabled(enabled: boolean): Promise<void> {
@@ -64,4 +58,12 @@ export async function setLocationTrackingEnabled(enabled: boolean): Promise<void
 
 export async function isLocationTrackingEnabled(): Promise<boolean> {
   return (await getItem(TRACKING_ENABLED_KEY)) === 'true';
+}
+
+export async function setLocationTrackingConsent(consented: boolean): Promise<void> {
+  await setItem(TRACKING_CONSENT_KEY, String(consented));
+}
+
+export async function hasLocationTrackingConsent(): Promise<boolean> {
+  return (await getItem(TRACKING_CONSENT_KEY)) === 'true';
 }
