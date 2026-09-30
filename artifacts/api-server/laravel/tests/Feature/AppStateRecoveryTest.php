@@ -718,6 +718,9 @@ class AppStateRecoveryTest extends TestCase
                     'moduleFeatures' => ['stocks' => ['products']],
                 ],
             ],
+            // Shared maps are sent back in snapshots but remain non-writable by staff.
+            'moduleStatuses' => ['commerce' => ['status' => 'ACTIVE']],
+            'moduleOverrides' => ['commerce' => ['featurePacks' => []]],
         ];
         DB::table('maximus_app_states')->insert([
             'scope' => 'workspace',
@@ -757,6 +760,14 @@ class AppStateRecoveryTest extends TestCase
         );
         $this->assertContains('manager-created-role', array_column($savedState['roles'], 'id'));
         $this->assertSame('manager-created-employee', $savedState['employees'][0]['id']);
+
+        $request->putJson('/api/app-state', [
+            'version' => 2,
+            'data' => [
+                ...$state,
+                'moduleStatuses' => ['commerce' => ['status' => 'SUSPENDED']],
+            ],
+        ])->assertForbidden();
 
         $request->putJson('/api/app-state', [
             'version' => 2,
