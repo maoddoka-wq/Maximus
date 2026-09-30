@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   CircleDollarSign,
   Clock3,
+  Download,
   FilePlus2,
   Gauge,
   History,
@@ -21,6 +22,7 @@ import {
   RotateCcw,
   ShieldCheck,
   Settings,
+  Smartphone,
   Trash2,
   UserRound,
   UsersRound,
@@ -34,6 +36,7 @@ import {
   type CreateVehicleInput,
   type Driver,
   type DriverAvailability,
+  type DriverMobileRelease,
   type DriverModeEvent,
   type DriverPricingMode,
   type DriverStatus,
@@ -44,6 +47,7 @@ import {
   type UpdateVehicleInput,
   type Vehicle,
   type VehicleStatus,
+  transportMobileReleaseDownloadPath,
 } from '@/lib/transport-api';
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { Badge } from '@workspace/maximus-design-system/components/ui/badge';
@@ -670,6 +674,9 @@ export default function TransportModulePage({
         onActivate={activateDriverGps}
         onAvailabilityChange={updateAvailability}
       />}
+      {currentEmployeeId && currentDriver && !preview && (
+        <DriverMobileAppCard loadRelease={api.latestMobileRelease} />
+      )}
 
        {!singleModuleNavigation && <WorkspaceTabs
          items={visibleTabs}
@@ -732,6 +739,107 @@ function Overview({ data, onTab }: { data: TransportBootstrap; onTab: (tab: Tran
       </section>
     </div>
   </div>;
+}
+
+function DriverMobileAppCard({
+  loadRelease,
+}: {
+  loadRelease: () => Promise<DriverMobileRelease>;
+}) {
+  const [release, setRelease] = useState<DriverMobileRelease | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+
+    void loadRelease()
+      .then(result => {
+        if (!cancelled) setRelease(result);
+      })
+      .catch(cause => {
+        if (!cancelled) {
+          setRelease(null);
+          setError(cause instanceof Error ? cause.message : 'Impossible de charger la dernière version.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attempt, loadRelease]);
+
+  const sizeLabel = release && Number.isFinite(release.sizeBytes) && release.sizeBytes > 0
+    ? `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(release.sizeBytes / 1_000_000)} Mo`
+    : null;
+
+  return (
+    <section
+      className="card-surface border border-[hsl(var(--border))] p-4 sm:p-5"
+      data-testid="driver-mobile-download"
+      aria-busy={loading}
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.08)] text-[hsl(var(--primary))]">
+            <Smartphone size={21} aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">
+              Application mobile
+            </p>
+            <h2 className="mt-1 text-base font-bold">MAXIMUS Chauffeur</h2>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+              Installez l’application Android pour recevoir les courses et partager votre position GPS.
+            </p>
+            {loading && (
+              <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]" role="status">
+                Recherche de la dernière version…
+              </p>
+            )}
+            {release && !loading && (
+              <p className="mt-2 text-xs font-semibold text-[hsl(var(--muted-foreground))]">
+                Version {release.version}{sizeLabel ? ` · ${sizeLabel}` : ''}
+              </p>
+            )}
+            {error && !loading && (
+              <p className="mt-2 text-sm text-[hsl(var(--destructive))]" role="alert">
+                {error}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+          {release && !loading && (
+            <Button asChild size="lg" className="w-full sm:w-auto">
+              <a
+                href={transportMobileReleaseDownloadPath}
+                download="maximus-chauffeur.apk"
+                data-testid="download-driver-app"
+              >
+                <Download size={17} aria-hidden="true" />
+                Télécharger l’APK
+              </a>
+            </Button>
+          )}
+          {error && !loading && (
+            <Button type="button" variant="outline" onClick={() => setAttempt(value => value + 1)}>
+              Réessayer
+            </Button>
+          )}
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">
+        Le téléchargement utilise votre session MAXIMUS. Android peut demander l’autorisation d’installer l’application.
+      </p>
+    </section>
+  );
 }
 
 function DriverRequestCard({ trip, vehicle, driver, pending, onAccept, onDecline }: { trip: Trip | null; vehicle: Vehicle | null; driver: Driver | null; pending: boolean; onAccept: (trip: Trip) => void; onDecline: (trip: Trip) => void }) {
