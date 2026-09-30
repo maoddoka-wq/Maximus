@@ -68,14 +68,32 @@ class TransportController extends Controller
         $canViewTrips = $this->allowed($request, 'view', 'trips');
         $canViewHistory = $this->allowed($request, 'view', 'historique');
         $this->expireOffers($company);
-        $drivers = $canViewDrivers
-            ? DB::table('transport_drivers')->where('company_id', $company)->orderBy('name')->get()
-            : collect();
+        $isEmployee = ($actor['role'] ?? null) === 'employee';
+        $employeeId = trim((string) ($actor['employeeId'] ?? ''));
+        $driver = $isEmployee && $employeeId !== ''
+            ? DB::table('transport_drivers')
+                ->where('company_id', $company)
+                ->where('employee_id', $employeeId)
+                ->first()
+            : null;
+        $drivers = $isEmployee
+            ? ($driver ? collect([$driver]) : collect())
+            : ($canViewDrivers
+                ? DB::table('transport_drivers')->where('company_id', $company)->orderBy('name')->get()
+                : collect());
         $vehicles = $canViewVehicles
             ? DB::table('transport_vehicles')->where('company_id', $company)->orderBy('registration')->get()
             : collect();
+        $tripsQuery = DB::table('transport_trips')->where('company_id', $company);
+        if ($isEmployee) {
+            if ($driver) {
+                $tripsQuery->where('driver_id', $driver->id);
+            } else {
+                $tripsQuery->whereRaw('1 = 0');
+            }
+        }
         $trips = $canViewTrips
-            ? DB::table('transport_trips')->where('company_id', $company)->orderByDesc('requested_at')->limit(250)->get()
+            ? $tripsQuery->orderByDesc('requested_at')->limit(250)->get()
             : collect();
         $modeEvents = $canViewHistory && DB::getSchemaBuilder()->hasTable('transport_driver_mode_events')
             ? DB::table('transport_driver_mode_events')
@@ -84,14 +102,9 @@ class TransportController extends Controller
                 ->limit(100)
                 ->get()
             : collect();
-        if (($actor['role'] ?? null) === 'employee') {
-            $driver = $drivers->firstWhere('employee_id', $actor['employeeId'] ?? null);
-            $drivers = $driver ? collect([$driver]) : collect();
+        if ($isEmployee) {
             $vehicles = $driver
                 ? $vehicles->where('driver_id', $driver->id)->values()
-                : collect();
-            $trips = $driver
-                ? $trips->where('driver_id', $driver->id)->values()
                 : collect();
         }
         $driverIds = $trips->pluck('driver_id')->filter()->unique()->values()->all();

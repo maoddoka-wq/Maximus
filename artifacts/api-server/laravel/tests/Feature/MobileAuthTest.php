@@ -208,6 +208,89 @@ class MobileAuthTest extends TestCase
         $this->getJson('/api/transport/bootstrap', $headers)->assertForbidden();
     }
 
+    public function test_mobile_chauffeur_sees_own_active_trip_after_company_trip_limit(): void
+    {
+        $this->enableTransport();
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'transport')
+            ->update(['feature_ids' => json_encode(['overview', 'trips', 'drivers', 'vehicles'])]);
+        $employee = $this->createUser(
+            id: 'mobile-driver-active-trip',
+            role: 'employee',
+            permissions: [
+                'transport:menu:drivers' => ['voir', 'créer', 'modifier'],
+                'transport:menu:trips' => ['voir', 'créer', 'modifier'],
+            ],
+        );
+        $adminRequest = $this->companyAdminRequest();
+        $driver = $adminRequest->postJson('/api/transport/drivers?companyId=kora', [
+            'employeeId' => $employee->employee_id,
+            'licenseNumber' => 'SN-MOBILE-TRIPS-001',
+        ])->assertCreated();
+        $vehicle = $adminRequest->postJson('/api/transport/vehicles?companyId=kora', [
+            'registration' => 'DK-MOBILE-TRIPS-001',
+            'model' => 'Toyota Yaris',
+            'vehicleType' => 'TAXI',
+            'driverId' => $driver->json('id'),
+            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ])->assertCreated();
+        $trip = $adminRequest->postJson('/api/transport/trips?companyId=kora', [
+            'pickup' => 'Plateau',
+            'destination' => 'Almadies',
+            'passengerName' => 'Passager Mobile',
+            'passengerPhone' => '+221770000001',
+            'fare' => 3500,
+            'driverId' => $driver->json('id'),
+            'vehicleId' => $vehicle->json('id'),
+        ])->assertCreated()->assertJsonPath('status', 'ASSIGNED');
+
+        $login = $this->postJson('/api/auth/mobile/login', [
+            'email' => $employee->email,
+            'password' => 'correct-horse-battery',
+        ])->assertOk()
+            ->assertJsonPath('capabilities.viewTrips', true);
+        $headers = ['Authorization' => 'Bearer '.$login->json('token')];
+
+        $this->getJson('/api/transport/bootstrap', $headers)
+            ->assertOk()
+            ->assertJsonCount(1, 'drivers')
+            ->assertJsonPath('drivers.0.id', $driver->json('id'))
+            ->assertJsonCount(1, 'trips')
+            ->assertJsonPath('trips.0.id', $trip->json('id'))
+            ->assertJsonPath('trips.0.status', 'ASSIGNED');
+
+        $this->patchJson('/api/transport/trips/'.$trip->json('id').'/status', [
+            'status' => 'IN_PROGRESS',
+        ], $headers)->assertOk()->assertJsonPath('status', 'IN_PROGRESS');
+
+        $newerCompanyTrips = [];
+        for ($index = 0; $index < 250; $index += 1) {
+            $newerCompanyTrips[] = [
+                'id' => 'mobile-noise-trip-'.$index,
+                'company_id' => 'kora',
+                'reference' => 'MOBILE-NOISE-'.$index,
+                'pickup' => 'Plateau',
+                'destination' => 'Almadies',
+                'passenger_name' => 'Autre passager',
+                'passenger_phone' => '+221770000002',
+                'fare' => 1000,
+                'driver_id' => null,
+                'vehicle_id' => null,
+                'status' => 'COMPLETED',
+                'requested_at' => now()->addSeconds($index + 1),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+        DB::table('transport_trips')->insert($newerCompanyTrips);
+
+        $this->getJson('/api/transport/bootstrap', $headers)
+            ->assertOk()
+            ->assertJsonPath('trips.0.id', $trip->json('id'))
+            ->assertJsonPath('trips.0.status', 'IN_PROGRESS');
+    }
+
     private function enableTransport(): void
     {
         CompanyRegistry::ensureActive('kora', 'Kora Transport');
