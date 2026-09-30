@@ -5,13 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuthUser;
 use App\Models\Company;
-use App\Support\ModuleCatalog;
 use App\Services\PublicRegistrationPolicy;
 use App\Support\ModuleAuthorization;
+use App\Support\ModuleCatalog;
+use App\Support\RolePermissionAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class AppStateController extends Controller
 {
@@ -396,7 +396,7 @@ class AppStateController extends Controller
                         $currentPayload,
                         $incomingState,
                         $companyId,
-                        is_array($actor['sectorIds'] ?? null) ? $actor['sectorIds'] : [],
+                        $actor,
                         $deleted,
                     )) {
                     return response()->json([
@@ -544,6 +544,11 @@ class AppStateController extends Controller
 
     private function allowsCollectionAction(array $actor, string $collection, string $action, mixed $record = null): bool
     {
+        if (($actor['role'] ?? null) === 'sector_manager'
+            && in_array($collection, ['employees', 'roles'], true)) {
+            return true;
+        }
+
         if (in_array($collection, ['products', 'sales', 'purchaseOrders', 'supplierRecords'], true)) {
             $owners = match ($collection) {
                 'products' => [['stocks', 'products'], ['commerce', 'products']],
@@ -621,34 +626,23 @@ class AppStateController extends Controller
         array $current,
         array $incoming,
         string $companyId,
-        array $sectorIds,
+        array $actor,
         array $deleted = [],
     ): bool {
         $currentNodes = collect($current['orgNodes'] ?? [])
             ->filter(fn (mixed $item): bool => is_array($item) && ($item['companyId'] ?? null) === $companyId)
             ->values()
             ->all();
-        $incomingNodes = collect($incoming['orgNodes'] ?? [])
-            ->filter(fn (mixed $item): bool => is_array($item) && ($item['companyId'] ?? null) === $companyId)
-            ->values()
-            ->all();
-        $nodes = [...$currentNodes, ...$incomingNodes];
-        $allowedNodes = [];
-        foreach ($sectorIds as $sectorId) {
-            $allowedNodes[(string) $sectorId] = true;
+        // Derive the manager's scope from the persisted hierarchy only. A
+        // submitted parent change or newly attached child must not expand it.
+        $nodes = $currentNodes;
+        $allowedNodes = array_fill_keys(
+            RolePermissionAuthorization::managerScopeNodeIds($actor, $companyId, ['orgNodes' => $nodes]),
+            true,
+        );
+        if ($allowedNodes === []) {
+            return false;
         }
-        do {
-            $added = false;
-            foreach ($nodes as $node) {
-                if (!is_array($node) || isset($allowedNodes[(string) ($node['id'] ?? '')])) {
-                    continue;
-                }
-                if (isset($allowedNodes[(string) ($node['parentId'] ?? '')])) {
-                    $allowedNodes[(string) ($node['id'] ?? '')] = true;
-                    $added = true;
-                }
-            }
-        } while ($added);
 
         $currentByCollection = [];
         foreach (array_keys(self::COLLECTION_PERMISSION_MODULES) as $collection) {
@@ -657,6 +651,18 @@ class AppStateController extends Controller
                 ->keyBy(fn (array $item): string => (string) $item['id'])
                 ->all();
         }
+
+        $authorizationState = $current;
+        foreach (['companies', 'orgNodes', 'roles', 'employees'] as $stateCollection) {
+            $records = $this->recordsById($current[$stateCollection] ?? []);
+            foreach (($incoming[$stateCollection] ?? []) as $record) {
+                if (is_array($record) && isset($record['id'])) {
+                    $records[(string) $record['id']] = $record;
+                }
+            }
+            $authorizationState[$stateCollection] = array_values($records);
+        }
+        $authorizationState['orgNodes'] = $currentNodes;
 
         foreach (array_keys(self::COLLECTION_PERMISSION_MODULES) as $collection) {
             foreach (($incoming[$collection] ?? []) as $item) {
@@ -668,28 +674,112 @@ class AppStateController extends Controller
                 $recordCompanyId = $collection === 'companies'
                     ? $id
                     : ($item['companyId'] ?? $item['company_id'] ?? null);
-                if ($collection !== 'companies' && $recordCompanyId !== null && (string) $recordCompanyId !== $companyId) {
+                if ($this->sameStateRecord($existing, $item)) {
+                    continue;
+                }
+                if (is_array($existing) && $collection !== 'companies') {
+                    $existingCompanyId = $existing['companyId'] ?? $existing['company_id'] ?? null;
+                    if ((string) $existingCompanyId !== $companyId) {
+                        return false;
+                    }
+                }
+                if ($collection !== 'companies' && (string) $recordCompanyId !== $companyId) {
                     return false;
                 }
 
                 $sectorId = $collection === 'orgNodes'
                     ? $id
                     : ($item['sectorId'] ?? $item['sector_id'] ?? null);
-                $oldSectorId = is_array($existing)
-                    ? ($existing['sectorId'] ?? $existing['sector_id'] ?? null)
-                    : null;
-                $inside = $collection === 'companies'
-                    ? false
-                    : isset($allowedNodes[(string) $sectorId]) || isset($allowedNodes[(string) $oldSectorId]);
-                if (!$inside && !$this->sameStateRecord($existing, $item)) {
+                $oldSectorId = $collection === 'orgNodes'
+                    ? $id
+                    : (is_array($existing)
+                        ? ($existing['sectorId'] ?? $existing['sector_id'] ?? null)
+                        : null);
+                $newInside = $collection !== 'companies'
+                    && isset($allowedNodes[(string) $sectorId]);
+                $oldInside = $existing === null
+                    || isset($allowedNodes[(string) $oldSectorId]);
+                if (! $newInside || ! $oldInside) {
                     return false;
+                }
+
+                if ($collection === 'orgNodes' && is_array($existing)) {
+                    foreach (['parentId', 'moduleIds', 'modulePackIds', 'moduleFeatures'] as $field) {
+                        if (($existing[$field] ?? null) !== ($item[$field] ?? null)) {
+                            return false;
+                        }
+                    }
+                }
+
+                if ($collection === 'roles') {
+                    $oldPermissions = is_array($existing['modulePermissions'] ?? null)
+                        ? $existing['modulePermissions']
+                        : [];
+                    $newPermissions = is_array($item['modulePermissions'] ?? null)
+                        ? $item['modulePermissions']
+                        : [];
+                    $permissionsChanged = $existing === null
+                        || $oldPermissions !== $newPermissions
+                        || (string) ($existing['sectorId'] ?? $existing['sector_id'] ?? '') !== (string) $sectorId;
+                    if ($permissionsChanged
+                        && ! RolePermissionAuthorization::allowsForSector(
+                            $authorizationState,
+                            $companyId,
+                            (string) $sectorId,
+                            $newPermissions,
+                        )) {
+                        return false;
+                    }
+                }
+
+                if ($collection === 'employees') {
+                    $wasSectorManager = (bool) ($existing['isSectorAdmin'] ?? $existing['is_sector_admin'] ?? false);
+                    $isSectorManager = (bool) ($item['isSectorAdmin'] ?? $item['is_sector_admin'] ?? false);
+                    if ($isSectorManager && ! $wasSectorManager) {
+                        return false;
+                    }
+                    $oldRoleId = (string) ($existing['roleId'] ?? $existing['role_id'] ?? '');
+                    $roleId = (string) ($item['roleId'] ?? $item['role_id'] ?? '');
+                    $roleAssignmentChanged = $existing === null
+                        || $oldRoleId !== $roleId
+                        || (string) ($existing['sectorId'] ?? $existing['sector_id'] ?? '') !== (string) $sectorId;
+                    if ($roleAssignmentChanged) {
+                        if (! RolePermissionAuthorization::roleMatchesEmployeeSector(
+                            $authorizationState,
+                            $companyId,
+                            (string) $sectorId,
+                            $roleId,
+                        )) {
+                            return false;
+                        }
+
+                        $assignedRole = null;
+                        foreach (($authorizationState['roles'] ?? []) as $candidate) {
+                            if (is_array($candidate) && (string) ($candidate['id'] ?? '') === $roleId) {
+                                $assignedRole = $candidate;
+                                break;
+                            }
+                        }
+                        $rolePermissions = $assignedRole['modulePermissions']
+                            ?? $assignedRole['module_permissions']
+                            ?? null;
+                        if (! is_array($rolePermissions)
+                            || ! RolePermissionAuthorization::allowsForSector(
+                                $authorizationState,
+                                $companyId,
+                                (string) $sectorId,
+                                $rolePermissions,
+                            )) {
+                            return false;
+                        }
+                    }
                 }
             }
         }
 
         foreach ($deleted as $request) {
             $collection = is_array($request) ? (string) ($request['collection'] ?? '') : '';
-            if (! isset(self::COLLECTION_PERMISSION_MODULES[$collection])) {
+            if (! isset(self::COLLECTION_PERMISSION_MODULES[$collection]) || $collection === 'orgNodes') {
                 return false;
             }
             foreach ((array) ($request['ids'] ?? []) as $id) {

@@ -45,6 +45,7 @@ export const authApi = {
     phone?: string;
     companyId: string;
     employeeId: string;
+    sectorId: string;
     sectorIds: string[];
     role: 'sector_manager' | 'employee';
     permissions?: Record<string, string[]>;

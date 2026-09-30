@@ -184,6 +184,7 @@ class AuthController extends Controller
             'phone' => ['nullable', 'string', 'max:40'],
             'companyId' => ['required', 'string', 'min:1'],
             'employeeId' => ['required', 'string', 'min:1'],
+            'sectorId' => ['nullable', 'string', 'min:1'],
             'sectorIds' => ['required', 'array', 'min:1'],
             'sectorIds.*' => ['string', 'min:1'],
             'role' => ['required', 'in:sector_manager,employee'],
@@ -193,27 +194,68 @@ class AuthController extends Controller
             'permissions.*.*' => ['string', 'min:1'],
         ]);
         $actor = $request->attributes->get('authActor');
-        if (! CompanyAuthorization::canManageAccount($actor, $data['companyId'], $data['sectorIds'])) {
-            return response()->json(['error' => 'Provisionnement du compte hors périmètre autorisé.'], 403);
-        }
-        if (! CompanyAuthorization::canAssignPermissions($actor, $data['permissions'] ?? [])) {
-            return response()->json(['error' => 'Permissions du compte hors périmètre autorisé.'], 403);
-        }
-
+        $actorRole = $actor['role'] ?? null;
         $existingQuery = AuthUser::query()->where('employee_id', $data['employeeId']);
-        if (($actor['role'] ?? null) !== 'maximus_admin') {
+        if ($actorRole !== 'maximus_admin') {
             $existingQuery->where('company_id', $data['companyId']);
         }
         $existing = $existingQuery->first();
+
+        $workspaceState = null;
+        if ($actorRole === 'sector_manager') {
+            $stateRow = DB::table('maximus_app_states')->where('scope', 'workspace')->first(['payload']);
+            $workspaceState = is_string($stateRow?->payload)
+                ? json_decode($stateRow->payload, true)
+                : ($stateRow?->payload ?? []);
+            if (! is_array($workspaceState)) {
+                $workspaceState = [];
+            }
+        }
+
+        if (! CompanyAuthorization::canManageAccount(
+            $actor,
+            $data['companyId'],
+            $data['sectorIds'],
+            $workspaceState,
+        )) {
+            return response()->json(['error' => 'Provisionnement du compte hors périmètre autorisé.'], 403);
+        }
+
         if ($existing
-            && ($actor['role'] ?? null) === 'sector_manager'
+            && $actorRole === 'sector_manager'
             && ! CompanyAuthorization::canManageAccount(
                 $actor,
                 (string) $existing->company_id,
                 is_array($existing->sector_ids) ? $existing->sector_ids : [],
+                $workspaceState,
             )) {
             return response()->json(['error' => 'Le compte existant est hors périmètre administrable.'], 403);
         }
+
+        if ($actorRole === 'sector_manager') {
+            $sectorId = trim((string) ($data['sectorId'] ?? ''));
+            $targetSectorIds = array_values(array_unique(array_map('strval', $data['sectorIds'])));
+            if ($sectorId === ''
+                || ! in_array($sectorId, $targetSectorIds, true)
+                || ($data['role'] === 'employee' && $targetSectorIds !== [$sectorId])
+                || ($data['role'] === 'sector_manager'
+                    && (! $existing || $existing->role !== 'sector_manager'))) {
+                return response()->json(['error' => 'Le secteur ou le rôle demandé dépasse le périmètre administrable.'], 403);
+            }
+            if (! CompanyAuthorization::canAssignPermissions(
+                $actor,
+                $data['permissions'] ?? [],
+                $workspaceState,
+                $sectorId,
+            )) {
+                return response()->json([
+                    'error' => 'Les permissions dépassent les modules, fonctionnalités ou actions autorisés pour cette unité.',
+                ], 403);
+            }
+        } elseif (! CompanyAuthorization::canAssignPermissions($actor, $data['permissions'] ?? [])) {
+            return response()->json(['error' => 'Permissions du compte hors périmètre autorisé.'], 403);
+        }
+
         if (! $existing && empty($data['password'])) {
             return response()->json(['error' => 'Un mot de passe initial est requis pour ce compte.'], 400);
         }

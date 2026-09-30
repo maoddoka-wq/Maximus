@@ -149,6 +149,7 @@ export function RolesTab({
                   phone: employee.phone,
                   companyId: company.id,
                   employeeId: employee.id,
+                  sectorId: employee.sectorId,
                   sectorIds: employee.isSectorAdmin
                     ? getSectorDescendantIds(companyNodes, employee.sectorId)
                     : [employee.sectorId],

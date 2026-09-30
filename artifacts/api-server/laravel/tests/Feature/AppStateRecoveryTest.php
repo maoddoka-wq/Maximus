@@ -143,8 +143,7 @@ class AppStateRecoveryTest extends TestCase
         ]);
 
         $request = $this->withCredentials()
-            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user))
-        ;
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
         $bootstrap = $request
             ->getJson('/api/app-state/bootstrap')
             ->assertOk()
@@ -650,6 +649,173 @@ class AppStateRecoveryTest extends TestCase
             'Autre',
             (string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'),
         );
+    }
+
+    public function test_sector_manager_can_create_in_scope_roles_and_employees_without_rh_permissions(): void
+    {
+        $company = Company::query()->create([
+            'id' => 'manager-role-company',
+            'name' => 'Entreprise gestion des rôles',
+            'manager' => 'Direction',
+            'email' => 'manager-role@example.test',
+            'status' => 'ACTIF',
+        ]);
+        ModuleCatalog::ensureCompanyAccess($company->id, ['stocks']);
+        DB::table('maximus_company_modules')
+            ->where('company_id', $company->id)
+            ->where('module_id', 'stocks')
+            ->update([
+                'status' => 'ACTIF',
+                'feature_ids' => json_encode(['products'], JSON_THROW_ON_ERROR),
+                'configuration' => json_encode([
+                    'featureScope' => 'explicit',
+                    'featurePermissions' => ['products' => ['voir', 'créer']],
+                ], JSON_THROW_ON_ERROR),
+            ]);
+
+        $manager = AuthUser::query()->create([
+            'id' => 'manager-role-creator',
+            'email' => 'manager.role.creator@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Manager secteur',
+            'role' => 'sector_manager',
+            'company_id' => $company->id,
+            'sector_ids' => ['manager-role-root'],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+        $parentRole = [
+            'id' => 'manager-parent-role',
+            'companyId' => $company->id,
+            'name' => 'Gestion produits',
+            'sectorId' => 'manager-role-root',
+            'modulePermissions' => ['stocks:products' => ['voir', 'créer']],
+        ];
+        $state = [
+            'companies' => [['id' => $company->id, 'name' => $company->name]],
+            'employees' => [],
+            'roles' => [$parentRole],
+            'orgNodes' => [
+                [
+                    'id' => 'manager-role-root',
+                    'companyId' => $company->id,
+                    'parentId' => null,
+                    'moduleIds' => ['stocks'],
+                    'moduleFeatures' => ['stocks' => ['products']],
+                ],
+                [
+                    'id' => 'manager-role-child',
+                    'companyId' => $company->id,
+                    'parentId' => 'manager-role-root',
+                    'moduleIds' => ['stocks'],
+                    'moduleFeatures' => ['stocks' => []],
+                ],
+                [
+                    'id' => 'manager-role-sibling',
+                    'companyId' => $company->id,
+                    'parentId' => null,
+                    'moduleIds' => ['stocks'],
+                    'moduleFeatures' => ['stocks' => ['products']],
+                ],
+            ],
+        ];
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'payload' => json_encode($state, JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($manager));
+        $request->putJson('/api/app-state', [
+                'version' => 1,
+                'data' => [
+                    ...$state,
+                    'roles' => [$parentRole, [
+                        'id' => 'manager-created-role',
+                        'companyId' => $company->id,
+                        'name' => 'Rôle enfant sans fonctionnalité',
+                        'sectorId' => 'manager-role-child',
+                        'modulePermissions' => [],
+                    ]],
+                    'employees' => [[
+                        'id' => 'manager-created-employee',
+                        'companyId' => $company->id,
+                        'sectorId' => 'manager-role-child',
+                        'roleId' => 'manager-created-role',
+                        'isSectorAdmin' => false,
+                    ]],
+                ],
+            ])
+            ->assertOk();
+
+        $savedState = json_decode(
+            (string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'),
+            true,
+        );
+        $this->assertContains('manager-created-role', array_column($savedState['roles'], 'id'));
+        $this->assertSame('manager-created-employee', $savedState['employees'][0]['id']);
+
+        $request->putJson('/api/app-state', [
+            'version' => 2,
+            'data' => [
+                ...$state,
+                'roles' => [$parentRole, [
+                    'id' => 'manager-created-role',
+                    'companyId' => $company->id,
+                    'name' => 'Rôle enfant sans fonctionnalité',
+                    'sectorId' => 'manager-role-child',
+                    'modulePermissions' => [],
+                ]],
+                'employees' => [
+                    [
+                        'id' => 'manager-created-employee',
+                        'companyId' => $company->id,
+                        'sectorId' => 'manager-role-child',
+                        'roleId' => 'manager-created-role',
+                        'isSectorAdmin' => false,
+                    ],
+                    [
+                        'id' => 'manager-assigned-parent-role',
+                        'companyId' => $company->id,
+                        'sectorId' => 'manager-role-child',
+                        'roleId' => 'manager-parent-role',
+                        'isSectorAdmin' => false,
+                    ],
+                ],
+            ],
+        ])->assertForbidden();
+
+        $reconfiguredNodes = array_map(static function (array $node): array {
+            if ($node['id'] === 'manager-role-child') {
+                $node['moduleFeatures']['stocks'] = ['products'];
+            }
+
+            return $node;
+        }, $state['orgNodes']);
+        $request->putJson('/api/app-state', [
+            'version' => 2,
+            'data' => [
+                ...$state,
+                'roles' => [$parentRole, [
+                    'id' => 'manager-created-role',
+                    'companyId' => $company->id,
+                    'name' => 'Rôle enfant sans fonctionnalité',
+                    'sectorId' => 'manager-role-child',
+                    'modulePermissions' => [],
+                ]],
+                'employees' => [[
+                    'id' => 'manager-created-employee',
+                    'companyId' => $company->id,
+                    'sectorId' => 'manager-role-child',
+                    'roleId' => 'manager-created-role',
+                    'isSectorAdmin' => false,
+                ]],
+                'orgNodes' => $reconfiguredNodes,
+            ],
+        ])->assertForbidden();
     }
 
     public function test_app_state_rejects_a_stale_write_without_overwriting_the_latest_data(): void

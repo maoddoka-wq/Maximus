@@ -269,8 +269,9 @@ class MaximusAuthTest extends TestCase
         $this->assertDatabaseMissing('auth_sessions', ['id' => 'scope-change-session']);
     }
 
-    public function test_sector_manager_cannot_grant_permissions_they_do_not_hold(): void
+    public function test_sector_manager_can_assign_permissions_allowed_for_the_company_and_managed_unit(): void
     {
+        $state = $this->seedManagerRolePermissionState(['voir', 'créer'], ['products']);
         $manager = AuthUser::query()->create([
             'id' => 'sector-manager-permissions',
             'email' => 'sector-manager-permissions@kora.demo',
@@ -278,7 +279,7 @@ class MaximusAuthTest extends TestCase
             'display_name' => 'Manager permissions',
             'role' => 'sector_manager',
             'company_id' => 'kora',
-            'sector_ids' => ['secteur-a'],
+            'sector_ids' => ['sector-root'],
             'permissions' => ['stocks:products' => ['voir']],
             'status' => 'ACTIF',
         ]);
@@ -292,12 +293,87 @@ class MaximusAuthTest extends TestCase
                 'displayName' => 'Employé escalade',
                 'companyId' => 'kora',
                 'employeeId' => 'employee-permission-escalation',
-                'sectorIds' => ['secteur-a'],
+                'sectorId' => 'sector-child',
+                'sectorIds' => ['sector-child'],
                 'role' => 'employee',
                 'permissions' => ['stocks:products' => ['voir', 'créer']],
                 'password' => 'CreatedNow2026!',
             ])
-            ->assertForbidden();
+            ->assertCreated();
+
+        $created = AuthUser::query()->where('employee_id', 'employee-permission-escalation')->firstOrFail();
+        $this->assertSame(['stocks:products' => ['voir', 'créer']], $created->permissions);
+    }
+
+    public function test_sector_manager_cannot_assign_features_or_actions_outside_company_and_unit_scope(): void
+    {
+        $state = $this->seedManagerRolePermissionState(['voir'], []);
+        $manager = AuthUser::query()->create([
+            'id' => 'sector-manager-permissions-capped',
+            'email' => 'sector-manager-permissions-capped@kora.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!', '00112233445566778899aabbccddeeff'),
+            'display_name' => 'Manager permissions',
+            'role' => 'sector_manager',
+            'company_id' => 'kora',
+            'sector_ids' => ['sector-root'],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+        $token = MaximusAuth::issueSession($manager);
+        $request = fn () => $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $token);
+
+        $request()->postJson('/api/auth/accounts', [
+            'id' => 'employee-unit-feature-denied',
+            'email' => 'unit-feature-denied@kora.demo',
+            'displayName' => 'Employé sans fonctionnalité',
+            'companyId' => 'kora',
+            'employeeId' => 'employee-unit-feature-denied',
+            'sectorId' => 'sector-child',
+            'sectorIds' => ['sector-child'],
+            'role' => 'employee',
+            'permissions' => ['stocks:products' => ['voir']],
+            'password' => 'CreatedNow2026!',
+        ])->assertForbidden();
+
+        $state['orgNodes'][1]['moduleFeatures']['stocks'] = ['products'];
+        DB::table('maximus_app_states')->where('scope', 'workspace')->update([
+            'payload' => json_encode($state, JSON_THROW_ON_ERROR),
+            'updated_at' => now(),
+        ]);
+        $request()->postJson('/api/auth/accounts', [
+            'id' => 'employee-unit-action-denied',
+            'email' => 'unit-action-denied@kora.demo',
+            'displayName' => 'Employé sans action',
+            'companyId' => 'kora',
+            'employeeId' => 'employee-unit-action-denied',
+            'sectorId' => 'sector-child',
+            'sectorIds' => ['sector-child'],
+            'role' => 'employee',
+            'permissions' => ['stocks:products' => ['voir', 'créer']],
+            'password' => 'CreatedNow2026!',
+        ])->assertForbidden();
+
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'stocks')
+            ->update(['status' => 'INACTIF', 'updated_at' => now()]);
+        $request()->postJson('/api/auth/accounts', [
+            'id' => 'employee-company-module-denied',
+            'email' => 'company-module-denied@kora.demo',
+            'displayName' => 'Employé sans module',
+            'companyId' => 'kora',
+            'employeeId' => 'employee-company-module-denied',
+            'sectorId' => 'sector-child',
+            'sectorIds' => ['sector-child'],
+            'role' => 'employee',
+            'permissions' => ['stocks:products' => ['voir']],
+            'password' => 'CreatedNow2026!',
+        ])->assertForbidden();
+
+        $this->assertDatabaseMissing('auth_users', ['employee_id' => 'employee-unit-feature-denied']);
+        $this->assertDatabaseMissing('auth_users', ['employee_id' => 'employee-unit-action-denied']);
+        $this->assertDatabaseMissing('auth_users', ['employee_id' => 'employee-company-module-denied']);
     }
 
     public function test_company_admin_cannot_reassign_an_employee_account_from_another_company(): void
@@ -597,5 +673,55 @@ class MaximusAuthTest extends TestCase
             ->assertOk();
         $this->assertFalse(collect($adminState->json('data.companies'))->contains('id', 'deleted-company'));
         $this->assertFalse(collect($adminState->json('data.employees'))->contains('companyId', 'deleted-company'));
+    }
+
+    private function seedManagerRolePermissionState(array $companyActions, array $childFeatures): array
+    {
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'stocks')
+            ->update([
+                'status' => 'ACTIF',
+                'feature_ids' => json_encode(['products'], JSON_THROW_ON_ERROR),
+                'configuration' => json_encode([
+                    'featureScope' => 'explicit',
+                    'featurePermissions' => ['products' => $companyActions],
+                ], JSON_THROW_ON_ERROR),
+                'updated_at' => now(),
+            ]);
+
+        $state = [
+            'companies' => [['id' => 'kora', 'allowedModules' => ['stocks']]],
+            'employees' => [],
+            'roles' => [],
+            'orgNodes' => [
+                [
+                    'id' => 'sector-root',
+                    'companyId' => 'kora',
+                    'parentId' => null,
+                    'moduleIds' => ['stocks'],
+                    'moduleFeatures' => ['stocks' => ['products']],
+                ],
+                [
+                    'id' => 'sector-child',
+                    'companyId' => 'kora',
+                    'parentId' => 'sector-root',
+                    'moduleIds' => ['stocks'],
+                    'moduleFeatures' => ['stocks' => $childFeatures],
+                ],
+            ],
+        ];
+        DB::table('maximus_app_states')->updateOrInsert(
+            ['scope' => 'workspace'],
+            [
+                'company_id' => null,
+                'payload' => json_encode($state, JSON_THROW_ON_ERROR),
+                'version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        return $state;
     }
 }

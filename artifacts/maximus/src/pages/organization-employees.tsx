@@ -183,6 +183,7 @@ export function EmployeesTab({
                phone: employeeData.phone,
                companyId: company.id,
                employeeId,
+               sectorId,
                sectorIds,
                role: employeeData.isSectorAdmin ? 'sector_manager' : 'employee',
                permissions: assignedRole.modulePermissions,
