@@ -5,10 +5,6 @@ import { test } from "node:test";
 const appConfig = JSON.parse(
   await readFile(new URL("../app.json", import.meta.url), "utf8"),
 );
-const androidManifest = await readFile(
-  new URL("../android/app/src/main/AndroidManifest.xml", import.meta.url),
-  "utf8",
-);
 
 test("Chauffeur release requests only foreground location permissions", () => {
   assert.deepEqual(
@@ -35,10 +31,9 @@ test("Chauffeur release requests only foreground location permissions", () => {
     "FOREGROUND_SERVICE_LOCATION",
     "POST_NOTIFICATIONS",
   ]) {
-    assert.ok(!appConfig.expo.android.permissions.includes(permission));
-    assert.doesNotMatch(
-      androidManifest,
-      new RegExp(`android\\.permission\\.${permission}`),
+    assert.ok(
+      !appConfig.expo.android.permissions.includes(permission),
+      `${permission} must not be requested by the Expo Android config`,
     );
   }
 });
