@@ -1,5 +1,5 @@
 - [GPS et annulation Taxi publics](public-taxi-gps-cancellation.md) — agréger plusieurs relevés GPS et annuler avec un jeton chiffré lié à la course, jamais avec le seul identifiant.
-- [Sérialisation GPS Chauffeur](chauffeur-gps-lifecycle.md) — sérialiser permissions et transitions GPS, car le retour Android Settings peut chevaucher AppState et démarrer deux services natifs.
+- [Sérialisation GPS Chauffeur](chauffeur-gps-lifecycle.md) — sérialiser les transitions et distinguer le consentement explicite de l’ancien indicateur GPS activé automatiquement.
 - [Navigation Gestion de stock](stock-navigation.md) — reprendre exactement les dix rubriques de la référence, dans une barre horizontale et sans rubrique supplémentaire.
 - [Champs vides des mouvements Stock](stock-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel les convertit en null alors que référence et commentaire sont non nullables.
 - [Gouvernance par unité](sector-governance.md) — les managers de secteur définissent les droits de leurs employés, sans accès aux autres unités.

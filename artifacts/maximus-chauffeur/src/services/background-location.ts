@@ -3,13 +3,16 @@ import * as TaskManager from 'expo-task-manager';
 import { AppState, Platform } from 'react-native';
 import { customFetch } from '../lib/api';
 import {
+  hasLocationTrackingConsent,
   isLocationTrackingEnabled,
   readTrackedDriverId,
   readMobileToken,
   saveTrackedDriverId,
+  setLocationTrackingConsent,
   setLocationTrackingEnabled,
 } from '../lib/auth-storage';
 import type { TransportDriver } from '@workspace/api-client-react';
+import { canResumeLocationTracking } from './location-resume-policy';
 import { createSerializedLocationOperations } from './serialized-location-operation-queue';
 
 export const DRIVER_LOCATION_TASK = 'maximus-driver-background-location';
@@ -26,12 +29,13 @@ if (Platform.OS !== 'web') {
     }
 
     try {
-      const [enabled, driverId, token] = await Promise.all([
+      const [enabled, consented, driverId, token] = await Promise.all([
         isLocationTrackingEnabled(),
+        hasLocationTrackingConsent(),
         readTrackedDriverId(),
         readMobileToken(),
       ]);
-      if (!enabled || !driverId || !token) return;
+      if (!enabled || !consented || !driverId || !token) return;
 
       const locations = (data as { locations?: Location.LocationObject[] }).locations;
       const latest = locations?.at(-1);
@@ -238,11 +242,29 @@ async function resumeDriverLocationTrackingUnlocked(
 ): Promise<boolean> {
   if (Platform.OS === 'web') return false;
 
-  const [foreground, background] = await Promise.all([
+  const [
+    explicitConsent,
+    locationServicesEnabled,
+    foreground,
+    background,
+  ] = await Promise.all([
+    hasLocationTrackingConsent(),
+    Location.hasServicesEnabledAsync(),
     Location.getForegroundPermissionsAsync(),
     Location.getBackgroundPermissionsAsync(),
   ]);
-  if (!foreground.granted || !background.granted) return false;
+  if (
+    !canResumeLocationTracking(
+      explicitConsent,
+      locationServicesEnabled,
+      foreground.granted,
+      background.granted,
+    )
+  ) {
+    await setLocationTrackingEnabled(false);
+    await stopNativeLocationTaskUnlocked();
+    return false;
+  }
 
   const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK);
   await saveTrackedDriverId(driverId);
@@ -255,17 +277,35 @@ async function resumeDriverLocationTrackingUnlocked(
   return result.ok;
 }
 
-async function stopDriverLocationTrackingUnlocked(): Promise<void> {
-  await setLocationTrackingEnabled(false);
+async function stopNativeLocationTaskUnlocked(): Promise<void> {
   if (Platform.OS === 'web') return;
   if (await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK)) {
     await Location.stopLocationUpdatesAsync(DRIVER_LOCATION_TASK);
   }
 }
 
+async function stopDriverLocationTrackingUnlocked(): Promise<void> {
+  await setLocationTrackingEnabled(false);
+  await setLocationTrackingConsent(false);
+  await stopNativeLocationTaskUnlocked();
+}
+
 // AppState resume can overlap manual actions; production entry points share this queue.
-const locationOperations = createSerializedLocationOperations({
-  enable: enableDriverLocationTrackingUnlocked,
+const locationOperations = createSerializedLocationOperations<
+  [driverId: string, requestPermissions?: boolean],
+  LocationSetupResult,
+  [driverId: string],
+  boolean,
+  void
+>({
+  enable: async (driverId: string, requestPermissions = true) => {
+    const result = await enableDriverLocationTrackingUnlocked(
+      driverId,
+      requestPermissions,
+    );
+    if (result.ok) await setLocationTrackingConsent(true);
+    return result;
+  },
   resume: resumeDriverLocationTrackingUnlocked,
   stop: stopDriverLocationTrackingUnlocked,
 });
@@ -276,5 +316,29 @@ export const stopDriverLocationTracking = locationOperations.stop;
 
 export async function isDriverLocationTrackingActive(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
-  return Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK);
+  const [
+    explicitConsent,
+    locationServicesEnabled,
+    foreground,
+    background,
+    enabled,
+    taskStarted,
+  ] = await Promise.all([
+    hasLocationTrackingConsent(),
+    Location.hasServicesEnabledAsync(),
+    Location.getForegroundPermissionsAsync(),
+    Location.getBackgroundPermissionsAsync(),
+    isLocationTrackingEnabled(),
+    Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK),
+  ]);
+  return (
+    enabled &&
+    taskStarted &&
+    canResumeLocationTracking(
+      explicitConsent,
+      locationServicesEnabled,
+      foreground.granted,
+      background.granted,
+    )
+  );
 }

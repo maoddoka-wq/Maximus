@@ -31,12 +31,16 @@ import { ReleaseCard } from '../components/ReleaseCard';
 import { TripCard } from '../components/TripCard';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../lib/api';
-import { saveTrackedDriverId } from '../lib/auth-storage';
+import {
+  hasLocationTrackingConsent,
+  saveTrackedDriverId,
+} from '../lib/auth-storage';
 import {
   enableDriverLocationTracking,
   resumeDriverLocationTracking,
   stopDriverLocationTracking,
 } from '../services/background-location';
+import { isDriverAvailableWithActiveGps } from '../services/driver-availability-policy';
 import { cardRadius, getPalette, space } from '../theme';
 
 function apiMessage(error: unknown, fallback: string): string {
@@ -81,6 +85,9 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
   const canUpdateAvailability = Boolean(session.capabilities?.updateAvailability);
   const canUpdateTrips = Boolean(session.capabilities?.updateTrips);
   const canToggleAvailability = canUpdateLocation && canUpdateAvailability;
+  const hasAssignedOrInProgressTrip = activeTrips.some(
+    (trip) => trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS',
+  );
   const photoUri = companyLogoUri(session.company.profilePhoto);
 
   useEffect(() => {
@@ -99,25 +106,79 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
     }
 
     if (driver.availability === 'AVAILABLE' || driver.availability === 'ON_TRIP') {
+      const pauseAvailableDriverWithoutGps = async (): Promise<string | null> => {
+        if (
+          driver.availability !== 'AVAILABLE' ||
+          !canUpdateAvailability ||
+          hasAssignedOrInProgressTrip
+        ) {
+          return null;
+        }
+
+        try {
+          await availabilityMutation.mutateAsync({
+            id: driver.id,
+            data: { availability: 'PAUSED' },
+          });
+          await queryClient.invalidateQueries({
+            queryKey: getGetTransportBootstrapQueryKey(),
+          });
+          return null;
+        } catch (error) {
+          return apiMessage(
+            error,
+            'Impossible de mettre la disponibilité en pause sans GPS actif.',
+          );
+        }
+      };
+
       const syncLocation = () => {
         if (!mounted || syncInFlight) return;
         syncInFlight = true;
         setGpsState('starting');
         setGpsMessage(null);
-        void resumeDriverLocationTracking(driver.id)
-          .then((resumed) => {
+        void hasLocationTrackingConsent()
+          .then(async (explicitConsent) => {
             if (!mounted) return;
-            setGpsState(resumed ? 'active' : 'attention');
-            setGpsMessage(
-              resumed
-                ? null
-                : 'Autorisez la localisation « Tout le temps » pour partager votre position écran verrouillé.',
-            );
+            if (!explicitConsent) {
+              await stopDriverLocationTracking();
+              const pauseError = await pauseAvailableDriverWithoutGps();
+              if (!mounted) return;
+              setGpsState('attention');
+              setGpsMessage(
+                pauseError ??
+                  (driver.availability === 'ON_TRIP'
+                    ? 'Activez le GPS pour reprendre le suivi de votre course.'
+                    : 'Activez le GPS avant de vous rendre disponible.'),
+              );
+              return;
+            }
+
+            const resumed = await resumeDriverLocationTracking(driver.id);
+            if (!resumed) {
+              const pauseError = await pauseAvailableDriverWithoutGps();
+              if (!mounted) return;
+              setGpsState('attention');
+              setGpsMessage(
+                pauseError ??
+                  'Activez la localisation et autorisez l’accès « Tout le temps » pour partager votre position écran verrouillé.',
+              );
+              return;
+            }
+
+            if (!mounted) return;
+            setGpsState('active');
+            setGpsMessage(null);
           })
-          .catch(() => {
+          .catch((error) => {
             if (!mounted) return;
             setGpsState('attention');
-            setGpsMessage('Le service GPS n’a pas pu redémarrer. Réactivez-le pour rester visible.');
+            setGpsMessage(
+              apiMessage(
+                error,
+                'Le service GPS n’a pas pu redémarrer. Réactivez-le pour rester visible.',
+              ),
+            );
           })
           .finally(() => {
             syncInFlight = false;
@@ -147,7 +208,15 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
     return () => {
       mounted = false;
     };
-  }, [driver?.id, driver?.availability, canUpdateLocation]);
+  }, [
+    driver?.id,
+    driver?.availability,
+    canUpdateLocation,
+    canUpdateAvailability,
+    hasAssignedOrInProgressTrip,
+    availabilityMutation.mutateAsync,
+    queryClient,
+  ]);
 
   const updateAvailability = async () => {
     if (!driver || !canToggleAvailability) return;
@@ -155,7 +224,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
     setGpsMessage(null);
 
     try {
-      if (driver.availability === 'AVAILABLE') {
+      if (isDriverAvailableWithActiveGps(driver.availability, gpsState === 'active')) {
         await availabilityMutation.mutateAsync({
           id: driver.id,
           data: { availability: 'PAUSED' },
@@ -367,7 +436,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                 driver={driver}
                 colors={colors}
                 canToggle={canToggleAvailability}
-                isBusy={availabilityBusy}
+                isBusy={availabilityBusy || gpsState === 'starting'}
                 gpsState={gpsState}
                 gpsMessage={
                   gpsMessage ??
@@ -376,7 +445,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                     : null)
                 }
                 onToggle={() => void updateAvailability()}
-                onEnableGps={enableGpsAgain}
+                onEnableGps={canUpdateLocation ? enableGpsAgain : undefined}
               />
 
               {session.capabilities?.viewTrips ? (

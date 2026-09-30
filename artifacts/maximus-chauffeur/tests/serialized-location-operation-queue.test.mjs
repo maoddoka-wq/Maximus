@@ -1,6 +1,25 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { isDriverAvailableWithActiveGps } from "../src/services/driver-availability-policy.ts";
+import { canResumeLocationTracking } from "../src/services/location-resume-policy.ts";
 import { createSerializedLocationOperations } from "../src/services/serialized-location-operation-queue.ts";
+
+test("does not show a driver as available unless GPS tracking is active", () => {
+  assert.equal(isDriverAvailableWithActiveGps("AVAILABLE", false), false);
+  assert.equal(isDriverAvailableWithActiveGps("AVAILABLE", true), true);
+  assert.equal(isDriverAvailableWithActiveGps("PAUSED", true), false);
+});
+
+test("does not resume GPS until the driver has explicitly opted in", () => {
+  assert.equal(canResumeLocationTracking(false, true, true, true), false);
+  assert.equal(canResumeLocationTracking(true, true, true, true), true);
+});
+
+test("does not resume GPS when phone location services or permissions are off", () => {
+  assert.equal(canResumeLocationTracking(true, false, true, true), false);
+  assert.equal(canResumeLocationTracking(true, true, false, true), false);
+  assert.equal(canResumeLocationTracking(true, true, true, false), false);
+});
 
 test("serializes manual GPS activation and app-resume requests", async () => {
   let taskStarted = false;
