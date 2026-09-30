@@ -109,3 +109,4 @@
 - [Aperçu Expo dans le navigateur](expo-web-preview.md) — garder les jetons web en mémoire uniquement et ne pas lancer TaskManager ou expo-location sur web.
 - [Formatage des contrôleurs Laravel](laravel-pint-legacy-style.md) — limiter les corrections Pint au code touché pour éviter un reformatage massif des contrôleurs historiques.
 - [Métadonnées société dans l’état partagé](staff-appstate-company-metadata.md) — le bootstrap enrichit les sociétés; les comptes staff ne doivent ni écrire ces métadonnées ni être bloqués par leur version.
+- [Snapshots des comptes staff](staff-appstate-snapshots.md) — comparer d’abord les cartes partagées non modifiables à l’état courant; leur forme n’est pas celle des collections de records.
