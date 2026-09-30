@@ -10,16 +10,13 @@ import {
   setLocationTrackingEnabled,
 } from '../lib/auth-storage';
 import type { TransportDriver } from '@workspace/api-client-react';
-import { createSerializedLocationOperationQueue } from './serialized-location-operation-queue';
+import { createSerializedLocationOperations } from './serialized-location-operation-queue';
 
 export const DRIVER_LOCATION_TASK = 'maximus-driver-background-location';
 
 const ANDROID_FOREGROUND_SETTLE_MS = 800;
 const ANDROID_FOREGROUND_TIMEOUT_MS = 30_000;
 const FOREGROUND_START_ATTEMPTS = 3;
-
-// Settings-return AppState events can overlap manual GPS actions; serialize native task transitions.
-const serializeLocationOperation = createSerializedLocationOperationQueue();
 
 if (Platform.OS !== 'web') {
   TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
@@ -236,15 +233,6 @@ async function enableDriverLocationTrackingUnlocked(
   }
 }
 
-export function enableDriverLocationTracking(
-  driverId: string,
-  requestPermissions = true,
-): Promise<LocationSetupResult> {
-  return serializeLocationOperation(() =>
-    enableDriverLocationTrackingUnlocked(driverId, requestPermissions),
-  );
-}
-
 async function resumeDriverLocationTrackingUnlocked(
   driverId: string,
 ): Promise<boolean> {
@@ -267,23 +255,24 @@ async function resumeDriverLocationTrackingUnlocked(
   return result.ok;
 }
 
-export function resumeDriverLocationTracking(
-  driverId: string,
-): Promise<boolean> {
-  return serializeLocationOperation(() =>
-    resumeDriverLocationTrackingUnlocked(driverId),
-  );
+async function stopDriverLocationTrackingUnlocked(): Promise<void> {
+  await setLocationTrackingEnabled(false);
+  if (Platform.OS === 'web') return;
+  if (await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK)) {
+    await Location.stopLocationUpdatesAsync(DRIVER_LOCATION_TASK);
+  }
 }
 
-export function stopDriverLocationTracking(): Promise<void> {
-  return serializeLocationOperation(async () => {
-    await setLocationTrackingEnabled(false);
-    if (Platform.OS === 'web') return;
-    if (await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK)) {
-      await Location.stopLocationUpdatesAsync(DRIVER_LOCATION_TASK);
-    }
-  });
-}
+// AppState resume can overlap manual actions; production entry points share this queue.
+const locationOperations = createSerializedLocationOperations({
+  enable: enableDriverLocationTrackingUnlocked,
+  resume: resumeDriverLocationTrackingUnlocked,
+  stop: stopDriverLocationTrackingUnlocked,
+});
+
+export const enableDriverLocationTracking = locationOperations.enable;
+export const resumeDriverLocationTracking = locationOperations.resume;
+export const stopDriverLocationTracking = locationOperations.stop;
 
 export async function isDriverLocationTrackingActive(): Promise<boolean> {
   if (Platform.OS === 'web') return false;

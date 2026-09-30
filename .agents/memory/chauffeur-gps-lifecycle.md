@@ -7,4 +7,4 @@ Les demandes de permission peuvent ouvrir les réglages Android puis ramener l�
 
 **Why:** Un démarrage concurrent du foreground service peut provoquer une erreur native qui ferme l’application et échappe aux `catch` JavaScript.
 
-**How to apply:** Garder la sérialisation dans le service de localisation, pas uniquement dans un écran. Tester l’activation depuis MAXIMUS, le retour des réglages Android et les événements AppState rapprochés sur un appareil réel; les journaux Metro ne valident pas un crash natif.
+**How to apply:** Garder la sérialisation dans le service de localisation, pas uniquement dans un écran. Les tests de concurrence doivent utiliser la même fabrique que les entrées de production, sinon ils peuvent passer sans valider leur câblage. Tester aussi le retour des réglages Android et les événements AppState rapprochés sur un appareil réel; les journaux Metro ne valident pas un crash natif.

@@ -1,9 +1,8 @@
-import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { createSerializedLocationOperationQueue } from '../src/services/serialized-location-operation-queue.ts';
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { createSerializedLocationOperations } from "../src/services/serialized-location-operation-queue.ts";
 
-test('serializes manual GPS activation and app-resume requests', async () => {
-  const serialize = createSerializedLocationOperationQueue();
+test("serializes manual GPS activation and app-resume requests", async () => {
   let taskStarted = false;
   let nativeStartCalls = 0;
   let activeNativeStarts = 0;
@@ -13,47 +12,52 @@ test('serializes manual GPS activation and app-resume requests', async () => {
     releaseNativeStart = resolve;
   });
 
-  const ensureTaskStarted = () =>
-    serialize(async () => {
-      if (taskStarted) return 'already-running';
+  const ensureTaskStarted = async () => {
+    if (taskStarted) return "already-running";
 
-      nativeStartCalls += 1;
-      activeNativeStarts += 1;
-      maxActiveNativeStarts = Math.max(
-        maxActiveNativeStarts,
-        activeNativeStarts,
-      );
-      await nativeStartGate;
-      taskStarted = true;
-      activeNativeStarts -= 1;
-      return 'started';
-    });
+    nativeStartCalls += 1;
+    activeNativeStarts += 1;
+    maxActiveNativeStarts = Math.max(maxActiveNativeStarts, activeNativeStarts);
+    await nativeStartGate;
+    taskStarted = true;
+    activeNativeStarts -= 1;
+    return "started";
+  };
+  const operations = createSerializedLocationOperations({
+    enable: ensureTaskStarted,
+    resume: ensureTaskStarted,
+    stop: async () => undefined,
+  });
 
-  const manualActivation = ensureTaskStarted();
-  const appResume = ensureTaskStarted();
+  const manualActivation = operations.enable();
+  const appResume = operations.resume();
 
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(nativeStartCalls, 1);
   assert.equal(activeNativeStarts, 1);
-  assert.equal(typeof releaseNativeStart, 'function');
+  assert.equal(typeof releaseNativeStart, "function");
 
   releaseNativeStart();
 
   assert.deepEqual(await Promise.all([manualActivation, appResume]), [
-    'started',
-    'already-running',
+    "started",
+    "already-running",
   ]);
   assert.equal(nativeStartCalls, 1);
   assert.equal(maxActiveNativeStarts, 1);
 });
 
-test('continues processing GPS operations after one operation rejects', async () => {
-  const serialize = createSerializedLocationOperationQueue();
-  const failedOperation = serialize(async () => {
-    throw new Error('simulated native transition failure');
+test("continues processing GPS operations after one operation rejects", async () => {
+  const operations = createSerializedLocationOperations({
+    enable: async () => {
+      throw new Error("simulated native transition failure");
+    },
+    resume: async () => "next operation ran",
+    stop: async () => undefined,
   });
-  const nextOperation = serialize(async () => 'next operation ran');
+  const failedOperation = operations.enable();
+  const nextOperation = operations.resume();
 
   await assert.rejects(failedOperation, /simulated native transition failure/);
-  assert.equal(await nextOperation, 'next operation ran');
+  assert.equal(await nextOperation, "next operation ran");
 });
