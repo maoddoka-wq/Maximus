@@ -31,15 +31,13 @@ import { ReleaseCard } from '../components/ReleaseCard';
 import { TripCard } from '../components/TripCard';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../lib/api';
-import {
-  hasLocationTrackingConsent,
-  saveTrackedDriverId,
-} from '../lib/auth-storage';
+import { hasLocationTrackingConsent } from '../lib/auth-storage';
 import {
   enableDriverLocationTracking,
   resumeDriverLocationTracking,
+  suspendDriverLocationTracking,
   stopDriverLocationTracking,
-} from '../services/background-location';
+} from '../services/location-tracking';
 import { isDriverAvailableWithActiveGps } from '../services/driver-availability-policy';
 import { cardRadius, getPalette, space } from '../theme';
 
@@ -94,7 +92,6 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
     if (!driver) return;
     let mounted = true;
     let syncInFlight = false;
-    void saveTrackedDriverId(driver.id);
 
     if (!canUpdateLocation) {
       void stopDriverLocationTracking().catch(() => undefined);
@@ -161,7 +158,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
               setGpsState('attention');
               setGpsMessage(
                 pauseError ??
-                  'Activez la localisation et autorisez l’accès « Tout le temps » pour partager votre position écran verrouillé.',
+                  'Activez la localisation et autorisez l’accès à la position pendant l’utilisation de l’application.',
               );
               return;
             }
@@ -188,6 +185,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
       syncLocation();
       const subscription = AppState.addEventListener('change', (nextState) => {
         if (nextState === 'active') syncLocation();
+        else void suspendDriverLocationTracking().catch(() => undefined);
       });
 
       return () => {

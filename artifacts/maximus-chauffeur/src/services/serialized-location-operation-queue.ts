@@ -7,10 +7,12 @@ export function createSerializedLocationOperations<
   TEnableResult,
   TResumeArgs extends unknown[],
   TResumeResult,
+  TSuspendResult,
   TStopResult,
 >(operations: {
   enable: AsyncOperation<TEnableArgs, TEnableResult>;
   resume: AsyncOperation<TResumeArgs, TResumeResult>;
+  suspend: () => Promise<TSuspendResult>;
   stop: () => Promise<TStopResult>;
 }) {
   let queue: Promise<void> = Promise.resolve();
@@ -29,6 +31,7 @@ export function createSerializedLocationOperations<
       serialize(() => operations.enable(...args)),
     resume: (...args: TResumeArgs) =>
       serialize(() => operations.resume(...args)),
+    suspend: () => serialize(operations.suspend),
     stop: () => serialize(operations.stop),
   };
 }

@@ -11,14 +11,13 @@ test("does not show a driver as available unless GPS tracking is active", () => 
 });
 
 test("does not resume GPS until the driver has explicitly opted in", () => {
-  assert.equal(canResumeLocationTracking(false, true, true, true), false);
-  assert.equal(canResumeLocationTracking(true, true, true, true), true);
+  assert.equal(canResumeLocationTracking(false, true, true), false);
+  assert.equal(canResumeLocationTracking(true, true, true), true);
 });
 
-test("does not resume GPS when phone location services or permissions are off", () => {
-  assert.equal(canResumeLocationTracking(true, false, true, true), false);
-  assert.equal(canResumeLocationTracking(true, true, false, true), false);
-  assert.equal(canResumeLocationTracking(true, true, true, false), false);
+test("does not resume GPS when phone location services or foreground permission are off", () => {
+  assert.equal(canResumeLocationTracking(true, false, true), false);
+  assert.equal(canResumeLocationTracking(true, true, false), false);
 });
 
 test("serializes manual GPS activation and app-resume requests", async () => {
@@ -45,6 +44,7 @@ test("serializes manual GPS activation and app-resume requests", async () => {
   const operations = createSerializedLocationOperations({
     enable: ensureTaskStarted,
     resume: ensureTaskStarted,
+    suspend: async () => undefined,
     stop: async () => undefined,
   });
 
@@ -66,12 +66,46 @@ test("serializes manual GPS activation and app-resume requests", async () => {
   assert.equal(maxActiveNativeStarts, 1);
 });
 
+test("serializes foreground suspension before GPS resumes", async () => {
+  const events = [];
+  let releaseSuspension;
+  const suspensionGate = new Promise((resolve) => {
+    releaseSuspension = resolve;
+  });
+  const operations = createSerializedLocationOperations({
+    enable: async () => undefined,
+    resume: async () => {
+      events.push("resumed");
+    },
+    suspend: async () => {
+      events.push("suspend-started");
+      await suspensionGate;
+      events.push("suspend-finished");
+    },
+    stop: async () => undefined,
+  });
+
+  const suspension = operations.suspend();
+  const resume = operations.resume("driver-1");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(events, ["suspend-started"]);
+  releaseSuspension();
+  await Promise.all([suspension, resume]);
+  assert.deepEqual(events, [
+    "suspend-started",
+    "suspend-finished",
+    "resumed",
+  ]);
+});
+
 test("continues processing GPS operations after one operation rejects", async () => {
   const operations = createSerializedLocationOperations({
     enable: async () => {
       throw new Error("simulated native transition failure");
     },
     resume: async () => "next operation ran",
+    suspend: async () => undefined,
     stop: async () => undefined,
   });
   const failedOperation = operations.enable();

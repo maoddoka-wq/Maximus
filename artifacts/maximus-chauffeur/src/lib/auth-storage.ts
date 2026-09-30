@@ -52,14 +52,6 @@ export async function clearMobileCredentials(): Promise<void> {
   ]);
 }
 
-export async function saveTrackedDriverId(driverId: string): Promise<void> {
-  await setItem(DRIVER_ID_KEY, driverId);
-}
-
-export async function readTrackedDriverId(): Promise<string | null> {
-  return getItem(DRIVER_ID_KEY);
-}
-
 export async function setLocationTrackingEnabled(enabled: boolean): Promise<void> {
   await setItem(TRACKING_ENABLED_KEY, String(enabled));
 }

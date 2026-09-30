@@ -2,7 +2,7 @@
   "expo": {
     "name": "MAXIMUS Chauffeur",
     "slug": "maximus-chauffeur",
-    "version": "1.0.0",
+    "version": "1.0.10",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "maximus-chauffeur",
@@ -12,14 +12,10 @@
     },
     "android": {
       "package": "com.maximus.chauffeur",
-      "versionCode": 1,
+      "versionCode": 1000010,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION",
-        "POST_NOTIFICATIONS"
+        "ACCESS_FINE_LOCATION"
       ],
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
@@ -36,11 +32,9 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "MAXIMUS Chauffeur utilise votre position pour la transmettre à votre entreprise.",
-          "locationAlwaysPermission": "MAXIMUS Chauffeur partage votre position pendant votre disponibilité, même lorsque l’écran est verrouillé.",
-          "locationAlwaysAndWhenInUsePermission": "MAXIMUS Chauffeur partage votre position pendant votre disponibilité, y compris écran verrouillé.",
-          "isAndroidBackgroundLocationEnabled": true,
-          "isAndroidForegroundServiceEnabled": true
+          "locationWhenInUsePermission": "MAXIMUS Chauffeur utilise votre position uniquement lorsque l’application est ouverte, pour la transmettre à votre entreprise.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
         }
       ]
     ],
