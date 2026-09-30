@@ -65,6 +65,8 @@ jobs:
         run: php artisan migrate --force
       - name: Typecheck
         run: pnpm run typecheck
+      - name: Chauffeur GPS lifecycle regression tests
+        run: pnpm --filter @workspace/maximus-chauffeur test
       - name: MAXIMUS tests
         run: pnpm --filter @workspace/maximus test
       - name: API authorization and authentication tests

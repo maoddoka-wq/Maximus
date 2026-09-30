@@ -10,6 +10,7 @@ import {
   setLocationTrackingEnabled,
 } from '../lib/auth-storage';
 import type { TransportDriver } from '@workspace/api-client-react';
+import { createSerializedLocationOperationQueue } from './serialized-location-operation-queue';
 
 export const DRIVER_LOCATION_TASK = 'maximus-driver-background-location';
 
@@ -18,18 +19,7 @@ const ANDROID_FOREGROUND_TIMEOUT_MS = 30_000;
 const FOREGROUND_START_ATTEMPTS = 3;
 
 // Settings-return AppState events can overlap manual GPS actions; serialize native task transitions.
-let locationOperationQueue: Promise<void> = Promise.resolve();
-
-function serializeLocationOperation<T>(
-  operation: () => Promise<T>,
-): Promise<T> {
-  const result = locationOperationQueue.then(operation, operation);
-  locationOperationQueue = result.then(
-    () => undefined,
-    () => undefined,
-  );
-  return result;
-}
+const serializeLocationOperation = createSerializedLocationOperationQueue();
 
 if (Platform.OS !== 'web') {
   TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
