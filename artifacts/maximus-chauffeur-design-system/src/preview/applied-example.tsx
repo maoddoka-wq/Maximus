@@ -17,7 +17,7 @@ export function ChauffeurExamplePage() {
         ou de localisation n’est simulé.
       </p>
 
-      <div className="mx-auto w-full max-w-[390px] overflow-hidden rounded-xl border bg-background text-foreground shadow-lg">
+      <div className="mx-auto w-full max-w-sm overflow-hidden rounded-xl border bg-background text-foreground shadow-lg">
         <header className="flex items-center justify-between gap-3 border-b bg-card px-5 py-4">
           <div>
             <p className="text-sm font-semibold tracking-wide">MAXIMUS</p>
@@ -63,7 +63,7 @@ export function ChauffeurExamplePage() {
                     <p className="text-sm font-medium">Plateau, Dakar</p>
                   </div>
                 </div>
-                <div className="ml-[7px] h-4 border-l border-dashed" />
+                <div className="ml-2 h-4 border-l border-dashed" />
                 <div className="flex items-center gap-3">
                   <MapPin
                     className="size-4 shrink-0 text-primary"
