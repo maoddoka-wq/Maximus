@@ -195,7 +195,7 @@ export type NavGroup = {
 export const DESIGN_SYSTEM = {
   title: 'MAXIMUS Chauffeur',
   description:
-    'Les fondations visuelles de l’application Chauffeur. Les composants Expo natifs vivent dans ce package; les exemples web de cette documentation ne sont pas importables dans React Native.',
+    'Tokens, composants et repères visuels partagés pour les écrans natifs de disponibilité et de course.',
 } as const;
 
 export const OVERVIEW_ENTRY: PreviewEntry = {
@@ -603,7 +603,7 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         id: 'content-guidelines',
         name: 'Repères Chauffeur',
-        description: 'Règles extraites des tokens et de l’interface existante.',
+        description: 'Repères visuels dérivés des tokens et de l’application Chauffeur.',
         Page: ChauffeurGuidelinesPage,
       },
     ],
@@ -613,20 +613,19 @@ export const NAV_GROUPS: NavGroup[] = [
     entries: [
       {
         id: 'chart',
-        name: 'Chart',
-        description: 'Configured data visualization, tooltip, and legend.',
+        name: 'Graphique',
+        description: 'Visualisation, info-bulle et légende configurées.',
         Page: ChartDemo,
       },
     ],
   },
-  { name: 'Mouvement', entries: [] },
   {
     name: 'Exemples d’application',
     entries: [
       {
         id: 'chauffeur-mobile-example',
         name: 'Accueil Chauffeur',
-        description: 'Un exemple de composition mobile à partir des tokens MAXIMUS.',
+        description: 'Une composition mobile illustrative basée sur les tokens MAXIMUS.',
         Page: ChauffeurExamplePage,
       },
     ],

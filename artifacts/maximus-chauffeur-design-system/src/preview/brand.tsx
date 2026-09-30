@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import maximusMark from '../../docs/references/logos/maximus-mark.png';
+import { tokens } from '../generated/tokens';
 
 export function BrandPage() {
   return (
@@ -55,14 +56,16 @@ export function BrandPage() {
             <span
               className="size-14 shrink-0 rounded-lg border"
               style={{
-                backgroundColor: '#ebab0a',
+                backgroundColor: tokens.color.light.primary,
                 borderColor: 'var(--border)',
               }}
               aria-hidden="true"
             />
             <div>
               <p className="font-medium">Or MAXIMUS</p>
-              <p className="font-mono text-sm text-muted-foreground">#ebab0a</p>
+              <p className="font-mono text-sm text-muted-foreground">
+                {tokens.color.light.primary}
+              </p>
             </div>
           </CardContent>
         </Card>
