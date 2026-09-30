@@ -17,6 +17,13 @@ on it and import its theme and components directly.
 - `src/components/ui/` — the initial shadcn scaffold, exported as
   `./components/*`. Generated systems keep and theme it; Figma imports prune and
   restyle it; code imports replace it with the source component library.
+- `src/components/native/` — React Native primitives for Expo consumers:
+  Button, Card (and sections), Badge, Input, Label, Typography, Empty, and
+  Spinner. Native components use the same family variants and semantic tokens
+  as their web counterparts, but expose `style` rather than `className`,
+  use RN `Text`/`View`/`Pressable` primitives, and do not support DOM-only
+  props such as `asChild`. Button `icon` size is a fixed square touch target;
+  native shadows and pressed/disabled states are platform styles.
 - `src/lib/` (`cn`) and `src/hooks/` — exported as `./lib/*` and `./hooks/*`.
 - `src/App.tsx` — the entry point for the living style guide.
 - `src/preview/DesignSystemBrowser.tsx` — the persistent grouped navigation,

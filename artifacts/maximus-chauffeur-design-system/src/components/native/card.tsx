@@ -1,0 +1,11 @@
+import * as React from "react";
+import { View, type ViewProps } from "react-native";
+import { useColors } from "../../hooks/use-colors";
+import { Typography, type TypographyProps } from "./typography";
+const section = (padding: number) => ({ padding, });
+export const Card = React.forwardRef<View, ViewProps>(({ style, ...p }, ref) => { const c = useColors(); return <View ref={ref} style={[{ borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 3 }, style]} {...p} />; });
+export const CardHeader = (p: ViewProps) => <View {...p} style={[section(24), p.style]} />;
+export const CardContent = (p: ViewProps) => <View {...p} style={[section(24), { paddingTop: 0 }, p.style]} />;
+export const CardFooter = (p: ViewProps) => <View {...p} style={[section(24), { paddingTop: 0, flexDirection: "row", alignItems: "center" }, p.style]} />;
+export const CardTitle = (p: TypographyProps) => <Typography weight="bold" {...p} />;
+export const CardDescription = (p: TypographyProps) => <Typography tone="muted" size="sm" {...p} />;
