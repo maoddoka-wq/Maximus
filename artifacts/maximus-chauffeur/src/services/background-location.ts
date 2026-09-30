@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { customFetch } from '../lib/api';
 import {
   isLocationTrackingEnabled,
@@ -12,6 +12,10 @@ import {
 import type { TransportDriver } from '@workspace/api-client-react';
 
 export const DRIVER_LOCATION_TASK = 'maximus-driver-background-location';
+
+const ANDROID_FOREGROUND_SETTLE_MS = 800;
+const ANDROID_FOREGROUND_TIMEOUT_MS = 30_000;
+const FOREGROUND_START_ATTEMPTS = 3;
 
 if (Platform.OS !== 'web') {
   TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
@@ -37,6 +41,102 @@ if (Platform.OS !== 'web') {
       console.error('MAXIMUS Chauffeur could not send a background location.', taskError);
     }
   });
+}
+
+function waitForAndroidForeground(): Promise<void> {
+  if (Platform.OS !== 'android') return Promise.resolve();
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let stableTimer: ReturnType<typeof setTimeout> | undefined;
+    let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+    let subscription: ReturnType<typeof AppState.addEventListener> | undefined;
+
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      if (stableTimer) clearTimeout(stableTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      subscription?.remove();
+      if (error) reject(error);
+      else resolve();
+    };
+
+    const checkStableForeground = () => {
+      if (AppState.currentState !== 'active') return;
+      if (stableTimer) clearTimeout(stableTimer);
+      stableTimer = setTimeout(() => {
+        if (AppState.currentState === 'active') {
+          finish();
+        } else {
+          checkStableForeground();
+        }
+      }, ANDROID_FOREGROUND_SETTLE_MS);
+    };
+
+    subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        checkStableForeground();
+      } else if (stableTimer) {
+        clearTimeout(stableTimer);
+        stableTimer = undefined;
+      }
+    });
+
+    timeoutTimer = setTimeout(() => {
+      finish(
+        new Error(
+          'Rouvrez MAXIMUS Chauffeur pour terminer le démarrage du GPS.',
+        ),
+      );
+    }, ANDROID_FOREGROUND_TIMEOUT_MS);
+
+    checkStableForeground();
+  });
+}
+
+function isForegroundStartRace(error: unknown): boolean {
+  const message =
+    error && typeof error === 'object' && 'message' in error
+      ? String(error.message)
+      : String(error);
+  return /foreground service.*(?:background|not allowed)|cannot be started when the application is in the background/i.test(
+    message,
+  );
+}
+
+async function startDriverLocationTask(): Promise<void> {
+  for (let attempt = 0; attempt < FOREGROUND_START_ATTEMPTS; attempt += 1) {
+    await waitForAndroidForeground();
+
+    if (await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK)) {
+      return;
+    }
+
+    try {
+      await Location.startLocationUpdatesAsync(DRIVER_LOCATION_TASK, {
+        accuracy: Location.Accuracy.High,
+        timeInterval: 15_000,
+        distanceInterval: 30,
+        pausesUpdatesAutomatically: false,
+        showsBackgroundLocationIndicator: true,
+        foregroundService: {
+          notificationTitle: 'MAXIMUS Chauffeur',
+          notificationBody:
+            'Votre position est partagée pendant votre disponibilité.',
+          killServiceOnDestroy: false,
+        },
+      });
+      return;
+    } catch (error) {
+      const canRetry =
+        Platform.OS === 'android' &&
+        attempt < FOREGROUND_START_ATTEMPTS - 1 &&
+        isForegroundStartRace(error);
+      if (!canRetry) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
 }
 
 export async function updateDriverPosition(
@@ -123,21 +223,7 @@ export async function enableDriverLocationTracking(
     );
 
     await setLocationTrackingEnabled(true);
-    const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK);
-    if (!alreadyStarted) {
-      await Location.startLocationUpdatesAsync(DRIVER_LOCATION_TASK, {
-        accuracy: Location.Accuracy.High,
-        timeInterval: 15_000,
-        distanceInterval: 30,
-        pausesUpdatesAutomatically: false,
-        showsBackgroundLocationIndicator: true,
-        foregroundService: {
-          notificationTitle: 'MAXIMUS Chauffeur',
-          notificationBody: 'Votre position est partagée pendant votre disponibilité.',
-          killServiceOnDestroy: false,
-        },
-      });
-    }
+    await startDriverLocationTask();
 
     return { ok: true };
   } catch (error) {
