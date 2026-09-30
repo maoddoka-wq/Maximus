@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isDriverAvailableWithActiveGps } from "../src/services/driver-availability-policy.ts";
+import {
+  isDriverAvailableWithActiveGps,
+  shouldPauseAvailableDriver,
+} from "../src/services/driver-availability-policy.ts";
 import { canResumeLocationTracking } from "../src/services/location-resume-policy.ts";
 import { createSerializedLocationOperations } from "../src/services/serialized-location-operation-queue.ts";
 
@@ -8,6 +11,13 @@ test("does not show a driver as available unless GPS tracking is active", () => 
   assert.equal(isDriverAvailableWithActiveGps("AVAILABLE", false), false);
   assert.equal(isDriverAvailableWithActiveGps("AVAILABLE", true), true);
   assert.equal(isDriverAvailableWithActiveGps("PAUSED", true), false);
+});
+
+test("pauses available drivers in the background without disrupting assigned trips", () => {
+  assert.equal(shouldPauseAvailableDriver("AVAILABLE", true, false), true);
+  assert.equal(shouldPauseAvailableDriver("AVAILABLE", false, false), false);
+  assert.equal(shouldPauseAvailableDriver("AVAILABLE", true, true), false);
+  assert.equal(shouldPauseAvailableDriver("PAUSED", true, false), false);
 });
 
 test("does not resume GPS until the driver has explicitly opted in", () => {

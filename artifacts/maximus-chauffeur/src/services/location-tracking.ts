@@ -202,8 +202,11 @@ async function resumeDriverLocationTrackingUnlocked(
 }
 
 async function suspendDriverLocationTrackingUnlocked(): Promise<void> {
-  await setLocationTrackingEnabled(false);
-  await stopForegroundLocationUpdates();
+  try {
+    await setLocationTrackingEnabled(false);
+  } finally {
+    await stopForegroundLocationUpdates();
+  }
 }
 
 async function stopDriverLocationTrackingUnlocked(): Promise<void> {

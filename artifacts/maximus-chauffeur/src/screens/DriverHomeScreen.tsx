@@ -38,7 +38,10 @@ import {
   suspendDriverLocationTracking,
   stopDriverLocationTracking,
 } from '../services/location-tracking';
-import { isDriverAvailableWithActiveGps } from '../services/driver-availability-policy';
+import {
+  isDriverAvailableWithActiveGps,
+  shouldPauseAvailableDriver,
+} from '../services/driver-availability-policy';
 import { cardRadius, getPalette, space } from '../theme';
 
 function apiMessage(error: unknown, fallback: string): string {
@@ -92,6 +95,9 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
     if (!driver) return;
     let mounted = true;
     let syncInFlight = false;
+    let automaticallyPausedInBackground = false;
+    let appIsActive = AppState.currentState === 'active';
+    let backgroundPausePromise: Promise<boolean> | null = null;
 
     if (!canUpdateLocation) {
       void stopDriverLocationTracking().catch(() => undefined);
@@ -104,11 +110,11 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
 
     if (driver.availability === 'AVAILABLE' || driver.availability === 'ON_TRIP') {
       const pauseAvailableDriverWithoutGps = async (): Promise<string | null> => {
-        if (
-          driver.availability !== 'AVAILABLE' ||
-          !canUpdateAvailability ||
-          hasAssignedOrInProgressTrip
-        ) {
+        if (!shouldPauseAvailableDriver(
+          driver.availability,
+          canUpdateAvailability,
+          hasAssignedOrInProgressTrip,
+        )) {
           return null;
         }
 
@@ -129,8 +135,52 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
         }
       };
 
+      const pauseForBackground = (): Promise<boolean> => {
+        if (backgroundPausePromise) return backgroundPausePromise;
+
+        const operation = (async () => {
+          try {
+            await suspendDriverLocationTracking();
+          } catch (error) {
+            console.error('Could not stop foreground GPS after app backgrounding.', error);
+          }
+
+          if (
+            !shouldPauseAvailableDriver(
+              driver.availability,
+              canUpdateAvailability,
+              hasAssignedOrInProgressTrip,
+            )
+          ) {
+            return false;
+          }
+
+          const pauseError = await pauseAvailableDriverWithoutGps();
+          if (pauseError) {
+            console.error('Could not pause driver availability after app backgrounding.', pauseError);
+            if (mounted) {
+              setGpsState('attention');
+              setGpsMessage(pauseError);
+            }
+            return false;
+          }
+
+          automaticallyPausedInBackground = true;
+          if (mounted) {
+            setGpsState('inactive');
+            setGpsMessage(null);
+          }
+          return true;
+        })().finally(() => {
+          backgroundPausePromise = null;
+        });
+
+        backgroundPausePromise = operation;
+        return operation;
+      };
+
       const syncLocation = () => {
-        if (!mounted || syncInFlight) return;
+        if (!mounted || syncInFlight || automaticallyPausedInBackground) return;
         syncInFlight = true;
         setGpsState('starting');
         setGpsMessage(null);
@@ -184,8 +234,33 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
 
       syncLocation();
       const subscription = AppState.addEventListener('change', (nextState) => {
-        if (nextState === 'active') syncLocation();
-        else void suspendDriverLocationTracking().catch(() => undefined);
+        appIsActive = nextState === 'active';
+        if (appIsActive) {
+          if (automaticallyPausedInBackground) return;
+          if (backgroundPausePromise) {
+            void backgroundPausePromise
+              .then((wasAutomaticallyPaused) => {
+                if (!wasAutomaticallyPaused && mounted) syncLocation();
+              })
+              .catch((error) => {
+                console.error('Could not finish chauffeur foreground resume.', error);
+              });
+          } else {
+            syncLocation();
+          }
+          return;
+        }
+
+        void pauseForBackground()
+          .then((wasAutomaticallyPaused) => {
+            if (!wasAutomaticallyPaused && appIsActive && mounted) syncLocation();
+          })
+          .catch((error) => {
+            console.error('Could not pause chauffeur after app backgrounding.', error);
+            if (appIsActive && mounted && !automaticallyPausedInBackground) {
+              syncLocation();
+            }
+          });
       });
 
       return () => {
@@ -193,7 +268,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
         subscription.remove();
       };
     } else {
-      void stopDriverLocationTracking()
+      void suspendDriverLocationTracking()
         .catch(() => undefined)
         .finally(() => {
           if (mounted) {
