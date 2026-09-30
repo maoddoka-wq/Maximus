@@ -1,5 +1,6 @@
 - [GPS et annulation Taxi publics](public-taxi-gps-cancellation.md) — agréger plusieurs relevés GPS et annuler avec un jeton chiffré lié à la course, jamais avec le seul identifiant.
 - [Isolation des releases APK Chauffeur](chauffeur-release-isolation.md) — repartir du dernier APK publié si la branche de travail contient des changements GPS non approuvés.
+- [Sérialisation GPS Chauffeur](chauffeur-gps-lifecycle.md) — GPS au premier plan, disponibilité mise en pause à l’arrière-plan, consentement conservé à la suspension.
 - [Navigation Gestion de stock](stock-navigation.md) — reprendre exactement les dix rubriques de la référence, dans une barre horizontale et sans rubrique supplémentaire.
 - [Champs vides des mouvements Stock](stock-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel les convertit en null alors que référence et commentaire sont non nullables.
 - [Gouvernance par unité](sector-governance.md) — les managers de secteur définissent les droits de leurs employés, sans accès aux autres unités.
@@ -69,6 +70,7 @@
 - [Publication GitHub de secours](github-push-fallback.md) — distinguer les scopes OAuth/PAT; les fichiers workflow exigent `repo` + `workflow`, et la lecture API n’implique pas l’écriture.
 - [Diagnostics GitHub Actions](github-actions-diagnostics.md) — si l’API de logs 403 faute de droits admin, consulter les annotations du check run.
 - [Liaison PostgreSQL Render](render-database-binding.md) — la production doit utiliser la base Render gérée, pas une ancienne URL Neon fixe.
+- [Branche des Blueprints Render](render-blueprint-branch.md) — le PATCH API peut répondre 200 sans changer la branche; la définir dans le Dashboard puis vérifier l’état réel.
 - [Routage des domaines](custom-domain-routing.md) — distinguer ERP, boutique autorisée et hôte inconnu côté serveur, sans détection approximative par suffixe.
 - [Visibilité de l’espace entreprise](company-workspace-visibility.md) — Contrôle, Organisation et Guide sont masquables séparément par entreprise, avec blocage des routes directes.
 - [Frontière Transport Taxi](transport-module-boundary.md) — le cycle Taxi reste séparé de la Location e-commerce, avec ses propres ressources, permissions et données tenant-scoped.

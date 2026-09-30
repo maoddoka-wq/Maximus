@@ -26,3 +26,9 @@ Les migrations lancées depuis le shell doivent elles aussi recevoir expliciteme
 **Why:** Une migration considérée comme terminée en CLI a laissé les tables absentes de la base réellement interrogée par l’API.
 
 **How to apply:** Vérifier `DB_CONNECTION=pgsql php artisan migrate:status` avant toute validation d’une nouvelle route Laravel.
+
+Pour une base PostgreSQL temporaire, définir explicitement `DATABASE_URL` vers cette base et vider `DB_URL`. Les variables d’URL Laravel peuvent prendre priorité sur `DB_HOST`, `DB_PORT` et `DB_DATABASE`, y compris lorsque ces valeurs semblent correctement définies.
+
+**Why:** Une commande de migration avec seulement `DB_*` peut viser une URL chargée depuis l’environnement Laravel au lieu de la base temporaire prévue.
+
+**How to apply:** Avant les tests ou migrations locales, passer une URL explicite vers PostgreSQL isolé, définir `DB_URL=''` et isoler `APP_CONFIG_CACHE`; ne jamais déduire la cible de `DB_CONNECTION` seul.

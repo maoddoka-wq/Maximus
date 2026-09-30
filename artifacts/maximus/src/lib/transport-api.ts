@@ -20,6 +20,16 @@ export interface TransportSettings {
   heroImageReplace?: boolean;
 }
 
+export interface DriverMobileRelease {
+  version: string;
+  name: string;
+  publishedAt: string;
+  sizeBytes: number;
+  sha256: string | null;
+}
+
+export const transportMobileReleaseDownloadPath = '/api/transport/mobile/releases/latest/download';
+
 export interface Driver {
   id: string;
   companyId: string;
@@ -253,6 +263,8 @@ export const createTransportApi = (companyId: string) => {
 
   return {
     bootstrap: () => request<TransportBootstrap>(withCompany('/transport/bootstrap')),
+    // The server derives the chauffeur and company from the authenticated session.
+    latestMobileRelease: () => request<DriverMobileRelease>('/transport/mobile/releases/latest'),
     updateSettings: (body: TransportSettings) => request<TransportSettings>(withCompany('/transport/settings'), {
       method: 'PATCH',
       body: JSON.stringify(body),

@@ -22,7 +22,7 @@ import {
   readMobileToken,
   saveMobileToken,
 } from '../lib/auth-storage';
-import { stopDriverLocationTracking } from '../services/background-location';
+import { stopDriverLocationTracking } from '../services/location-tracking';
 
 type AuthStatus = 'restoring' | 'signed-out' | 'signed-in' | 'offline';
 

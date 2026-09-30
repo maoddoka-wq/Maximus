@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { TransportDriver } from '@workspace/api-client-react';
+import { isDriverAvailableWithActiveGps } from '../services/driver-availability-policy';
 import { cardRadius, space, type getPalette } from '../theme';
 
 type Palette = ReturnType<typeof getPalette>;
@@ -25,14 +26,28 @@ export function AvailabilityCard({
   onEnableGps?: () => void;
 }) {
   const isOnTrip = driver.availability === 'ON_TRIP';
-  const isAvailable = driver.availability === 'AVAILABLE';
-  const statusLabel = isOnTrip ? 'En course' : isAvailable ? 'Disponible' : 'En pause';
+  const serverSaysAvailable = driver.availability === 'AVAILABLE';
+  const isAvailable = isDriverAvailableWithActiveGps(
+    driver.availability,
+    gpsState === 'active',
+  );
+  const statusLabel = isOnTrip
+    ? 'En course'
+    : isAvailable
+      ? 'Disponible'
+      : serverSaysAvailable && gpsState === 'starting'
+        ? 'Vérification GPS'
+        : 'En pause';
   const statusColor = isOnTrip || isAvailable ? colors.chart3 : colors.mutedForeground;
   const gpsLabel =
     gpsState === 'active' ? 'GPS actif' :
     gpsState === 'starting' ? 'Activation du GPS…' :
-    gpsState === 'attention' ? 'Autorisation nécessaire' :
+    gpsState === 'attention' ? 'GPS à activer' :
     'GPS en attente';
+  const showEnableGpsButton =
+    gpsState === 'attention' &&
+    Boolean(onEnableGps) &&
+    (isOnTrip || (serverSaysAvailable && !canToggle));
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -93,7 +108,7 @@ export function AvailabilityCard({
         </Pressable>
       ) : null}
 
-      {gpsState === 'attention' && onEnableGps && driver.availability !== 'PAUSED' ? (
+      {showEnableGpsButton && onEnableGps ? (
         <Pressable
           accessibilityRole="button"
           onPress={onEnableGps}

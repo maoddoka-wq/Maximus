@@ -31,17 +31,55 @@ import { ReleaseCard } from '../components/ReleaseCard';
 import { TripCard } from '../components/TripCard';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../lib/api';
-import { saveTrackedDriverId } from '../lib/auth-storage';
+import { hasLocationTrackingConsent } from '../lib/auth-storage';
 import {
   enableDriverLocationTracking,
   resumeDriverLocationTracking,
+  suspendDriverLocationTracking,
   stopDriverLocationTracking,
-} from '../services/background-location';
+} from '../services/location-tracking';
+import {
+  shouldOpenLocationAppSettings,
+  type LocationSetupFailure,
+} from '../services/location-setup-policy';
+import {
+  isDriverAvailableWithActiveGps,
+  shouldPauseAvailableDriver,
+} from '../services/driver-availability-policy';
 import { cardRadius, getPalette, space } from '../theme';
 
 function apiMessage(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
   return error.message.replace(/^HTTP \d+ [^:]*:\s*/, '') || fallback;
+}
+
+function showLocationSetupFailure(failure: LocationSetupFailure): void {
+  const openSettings = shouldOpenLocationAppSettings(failure);
+
+  Alert.alert(
+    failure.reason === 'services-disabled'
+      ? 'Localisation désactivée'
+      : 'Autorisation GPS nécessaire',
+    failure.message,
+    [
+      { text: 'Fermer', style: 'cancel' },
+      ...(openSettings
+        ? [
+            {
+              text: 'Paramètres',
+              onPress: () => {
+                void Linking.openSettings().catch(() => {
+                  Alert.alert(
+                    'Réglages indisponibles',
+                    'Ouvrez les paramètres de l’application et autorisez la position.',
+                  );
+                });
+              },
+            },
+          ]
+        : []),
+    ],
+  );
 }
 
 function companyLogoUri(photo: string | null | undefined): string | null {
@@ -81,12 +119,18 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
   const canUpdateAvailability = Boolean(session.capabilities?.updateAvailability);
   const canUpdateTrips = Boolean(session.capabilities?.updateTrips);
   const canToggleAvailability = canUpdateLocation && canUpdateAvailability;
+  const hasAssignedOrInProgressTrip = activeTrips.some(
+    (trip) => trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS',
+  );
   const photoUri = companyLogoUri(session.company.profilePhoto);
 
   useEffect(() => {
     if (!driver) return;
     let mounted = true;
-    void saveTrackedDriverId(driver.id);
+    let syncInFlight = false;
+    let automaticallyPausedInBackground = false;
+    let appIsActive = AppState.currentState === 'active';
+    let backgroundPausePromise: Promise<boolean> | null = null;
 
     if (!canUpdateLocation) {
       void stopDriverLocationTracking().catch(() => undefined);
@@ -98,29 +142,158 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
     }
 
     if (driver.availability === 'AVAILABLE' || driver.availability === 'ON_TRIP') {
+      const pauseAvailableDriverWithoutGps = async (): Promise<string | null> => {
+        if (!shouldPauseAvailableDriver(
+          driver.availability,
+          canUpdateAvailability,
+          hasAssignedOrInProgressTrip,
+        )) {
+          return null;
+        }
+
+        try {
+          await availabilityMutation.mutateAsync({
+            id: driver.id,
+            data: { availability: 'PAUSED' },
+          });
+          await queryClient.invalidateQueries({
+            queryKey: getGetTransportBootstrapQueryKey(),
+          });
+          return null;
+        } catch (error) {
+          return apiMessage(
+            error,
+            'Impossible de mettre la disponibilité en pause sans GPS actif.',
+          );
+        }
+      };
+
+      const pauseForBackground = (): Promise<boolean> => {
+        if (backgroundPausePromise) return backgroundPausePromise;
+
+        const operation = (async () => {
+          try {
+            await suspendDriverLocationTracking();
+          } catch (error) {
+            console.error('Could not stop foreground GPS after app backgrounding.', error);
+          }
+
+          if (
+            !shouldPauseAvailableDriver(
+              driver.availability,
+              canUpdateAvailability,
+              hasAssignedOrInProgressTrip,
+            )
+          ) {
+            return false;
+          }
+
+          const pauseError = await pauseAvailableDriverWithoutGps();
+          if (pauseError) {
+            console.error('Could not pause driver availability after app backgrounding.', pauseError);
+            if (mounted) {
+              setGpsState('attention');
+              setGpsMessage(pauseError);
+            }
+            return false;
+          }
+
+          automaticallyPausedInBackground = true;
+          if (mounted) {
+            setGpsState('inactive');
+            setGpsMessage(null);
+          }
+          return true;
+        })().finally(() => {
+          backgroundPausePromise = null;
+        });
+
+        backgroundPausePromise = operation;
+        return operation;
+      };
+
       const syncLocation = () => {
+        if (!mounted || syncInFlight || automaticallyPausedInBackground) return;
+        syncInFlight = true;
         setGpsState('starting');
         setGpsMessage(null);
-        void resumeDriverLocationTracking(driver.id)
-          .then((resumed) => {
+        void hasLocationTrackingConsent()
+          .then(async (explicitConsent) => {
             if (!mounted) return;
-            setGpsState(resumed ? 'active' : 'attention');
-            setGpsMessage(
-              resumed
-                ? null
-                : 'Autorisez la localisation « Tout le temps » pour partager votre position écran verrouillé.',
-            );
+            if (!explicitConsent) {
+              await stopDriverLocationTracking();
+              const pauseError = await pauseAvailableDriverWithoutGps();
+              if (!mounted) return;
+              setGpsState('attention');
+              setGpsMessage(
+                pauseError ??
+                  (driver.availability === 'ON_TRIP'
+                    ? 'Activez le GPS pour reprendre le suivi de votre course.'
+                    : 'Activez le GPS avant de vous rendre disponible.'),
+              );
+              return;
+            }
+
+            const resumed = await resumeDriverLocationTracking(driver.id);
+            if (!resumed) {
+              const pauseError = await pauseAvailableDriverWithoutGps();
+              if (!mounted) return;
+              setGpsState('attention');
+              setGpsMessage(
+                pauseError ??
+                  'Activez la localisation et autorisez l’accès à la position pendant l’utilisation de l’application.',
+              );
+              return;
+            }
+
+            if (!mounted) return;
+            setGpsState('active');
+            setGpsMessage(null);
           })
-          .catch(() => {
+          .catch((error) => {
             if (!mounted) return;
             setGpsState('attention');
-            setGpsMessage('Le service GPS n’a pas pu redémarrer. Réactivez-le pour rester visible.');
+            setGpsMessage(
+              apiMessage(
+                error,
+                'Le service GPS n’a pas pu redémarrer. Réactivez-le pour rester visible.',
+              ),
+            );
+          })
+          .finally(() => {
+            syncInFlight = false;
           });
       };
 
       syncLocation();
       const subscription = AppState.addEventListener('change', (nextState) => {
-        if (nextState === 'active') syncLocation();
+        appIsActive = nextState === 'active';
+        if (appIsActive) {
+          if (automaticallyPausedInBackground) return;
+          if (backgroundPausePromise) {
+            void backgroundPausePromise
+              .then((wasAutomaticallyPaused) => {
+                if (!wasAutomaticallyPaused && mounted) syncLocation();
+              })
+              .catch((error) => {
+                console.error('Could not finish chauffeur foreground resume.', error);
+              });
+          } else {
+            syncLocation();
+          }
+          return;
+        }
+
+        void pauseForBackground()
+          .then((wasAutomaticallyPaused) => {
+            if (!wasAutomaticallyPaused && appIsActive && mounted) syncLocation();
+          })
+          .catch((error) => {
+            console.error('Could not pause chauffeur after app backgrounding.', error);
+            if (appIsActive && mounted && !automaticallyPausedInBackground) {
+              syncLocation();
+            }
+          });
       });
 
       return () => {
@@ -128,7 +301,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
         subscription.remove();
       };
     } else {
-      void stopDriverLocationTracking()
+      void suspendDriverLocationTracking()
         .catch(() => undefined)
         .finally(() => {
           if (mounted) {
@@ -141,7 +314,15 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
     return () => {
       mounted = false;
     };
-  }, [driver?.id, driver?.availability, canUpdateLocation]);
+  }, [
+    driver?.id,
+    driver?.availability,
+    canUpdateLocation,
+    canUpdateAvailability,
+    hasAssignedOrInProgressTrip,
+    availabilityMutation.mutateAsync,
+    queryClient,
+  ]);
 
   const updateAvailability = async () => {
     if (!driver || !canToggleAvailability) return;
@@ -149,7 +330,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
     setGpsMessage(null);
 
     try {
-      if (driver.availability === 'AVAILABLE') {
+      if (isDriverAvailableWithActiveGps(driver.availability, gpsState === 'active')) {
         await availabilityMutation.mutateAsync({
           id: driver.id,
           data: { availability: 'PAUSED' },
@@ -162,19 +343,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
         if (!setup.ok) {
           setGpsState('attention');
           setGpsMessage(setup.message);
-          Alert.alert(
-            'Autorisation GPS nécessaire',
-            setup.message,
-            [
-              { text: 'Plus tard', style: 'cancel' },
-              {
-                text: 'Paramètres',
-                onPress: () => {
-                  void Linking.openSettings().catch(() => undefined);
-                },
-              },
-            ],
-          );
+          showLocationSetupFailure(setup);
           return;
         }
         setGpsState('active');
@@ -204,15 +373,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
       if (!setup.ok) {
         setGpsState('attention');
         setGpsMessage(setup.message);
-        Alert.alert('Autorisation GPS nécessaire', setup.message, [
-          { text: 'Fermer', style: 'cancel' },
-          {
-            text: 'Paramètres',
-            onPress: () => {
-              void Linking.openSettings().catch(() => undefined);
-            },
-          },
-        ]);
+        showLocationSetupFailure(setup);
         return;
       }
       setGpsState('active');
@@ -360,7 +521,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                 driver={driver}
                 colors={colors}
                 canToggle={canToggleAvailability}
-                isBusy={availabilityBusy}
+                isBusy={availabilityBusy || gpsState === 'starting'}
                 gpsState={gpsState}
                 gpsMessage={
                   gpsMessage ??
@@ -369,7 +530,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                     : null)
                 }
                 onToggle={() => void updateAvailability()}
-                onEnableGps={enableGpsAgain}
+                onEnableGps={canUpdateLocation ? enableGpsAgain : undefined}
               />
 
               {session.capabilities?.viewTrips ? (
