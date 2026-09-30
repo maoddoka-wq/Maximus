@@ -86,6 +86,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
   useEffect(() => {
     if (!driver) return;
     let mounted = true;
+    let syncInFlight = false;
     void saveTrackedDriverId(driver.id);
 
     if (!canUpdateLocation) {
@@ -99,6 +100,8 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
 
     if (driver.availability === 'AVAILABLE' || driver.availability === 'ON_TRIP') {
       const syncLocation = () => {
+        if (!mounted || syncInFlight) return;
+        syncInFlight = true;
         setGpsState('starting');
         setGpsMessage(null);
         void resumeDriverLocationTracking(driver.id)
@@ -115,6 +118,9 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
             if (!mounted) return;
             setGpsState('attention');
             setGpsMessage('Le service GPS n’a pas pu redémarrer. Réactivez-le pour rester visible.');
+          })
+          .finally(() => {
+            syncInFlight = false;
           });
       };
 

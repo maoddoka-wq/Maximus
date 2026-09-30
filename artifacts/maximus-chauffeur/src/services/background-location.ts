@@ -17,6 +17,20 @@ const ANDROID_FOREGROUND_SETTLE_MS = 800;
 const ANDROID_FOREGROUND_TIMEOUT_MS = 30_000;
 const FOREGROUND_START_ATTEMPTS = 3;
 
+// Settings-return AppState events can overlap manual GPS actions; serialize native task transitions.
+let locationOperationQueue: Promise<void> = Promise.resolve();
+
+function serializeLocationOperation<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  const result = locationOperationQueue.then(operation, operation);
+  locationOperationQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
 if (Platform.OS !== 'web') {
   TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
     if (error || !data) {
@@ -158,7 +172,7 @@ export type LocationSetupResult =
   | { ok: true }
   | { ok: false; reason: 'services-disabled' | 'foreground-permission' | 'background-permission'; message: string };
 
-export async function enableDriverLocationTracking(
+async function enableDriverLocationTrackingUnlocked(
   driverId: string,
   requestPermissions = true,
 ): Promise<LocationSetupResult> {
@@ -232,7 +246,18 @@ export async function enableDriverLocationTracking(
   }
 }
 
-export async function resumeDriverLocationTracking(driverId: string): Promise<boolean> {
+export function enableDriverLocationTracking(
+  driverId: string,
+  requestPermissions = true,
+): Promise<LocationSetupResult> {
+  return serializeLocationOperation(() =>
+    enableDriverLocationTrackingUnlocked(driverId, requestPermissions),
+  );
+}
+
+async function resumeDriverLocationTrackingUnlocked(
+  driverId: string,
+): Promise<boolean> {
   if (Platform.OS === 'web') return false;
 
   const [foreground, background] = await Promise.all([
@@ -248,16 +273,26 @@ export async function resumeDriverLocationTracking(driverId: string): Promise<bo
     return true;
   }
 
-  const result = await enableDriverLocationTracking(driverId, false);
+  const result = await enableDriverLocationTrackingUnlocked(driverId, false);
   return result.ok;
 }
 
-export async function stopDriverLocationTracking(): Promise<void> {
-  await setLocationTrackingEnabled(false);
-  if (Platform.OS === 'web') return;
-  if (await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK)) {
-    await Location.stopLocationUpdatesAsync(DRIVER_LOCATION_TASK);
-  }
+export function resumeDriverLocationTracking(
+  driverId: string,
+): Promise<boolean> {
+  return serializeLocationOperation(() =>
+    resumeDriverLocationTrackingUnlocked(driverId),
+  );
+}
+
+export function stopDriverLocationTracking(): Promise<void> {
+  return serializeLocationOperation(async () => {
+    await setLocationTrackingEnabled(false);
+    if (Platform.OS === 'web') return;
+    if (await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK)) {
+      await Location.stopLocationUpdatesAsync(DRIVER_LOCATION_TASK);
+    }
+  });
 }
 
 export async function isDriverLocationTrackingActive(): Promise<boolean> {
