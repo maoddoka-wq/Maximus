@@ -4,6 +4,7 @@ import {
   isDriverAvailableWithActiveGps,
   shouldPauseAvailableDriver,
 } from "../src/services/driver-availability-policy.ts";
+import { shouldOpenLocationAppSettings } from "../src/services/location-setup-policy.ts";
 import { canResumeLocationTracking } from "../src/services/location-resume-policy.ts";
 import { createSerializedLocationOperations } from "../src/services/serialized-location-operation-queue.ts";
 
@@ -28,6 +29,32 @@ test("does not resume GPS until the driver has explicitly opted in", () => {
 test("does not resume GPS when phone location services or foreground permission are off", () => {
   assert.equal(canResumeLocationTracking(true, false, true), false);
   assert.equal(canResumeLocationTracking(true, true, false), false);
+});
+
+test("opens app settings only when foreground permission cannot be requested again", () => {
+  assert.equal(
+    shouldOpenLocationAppSettings({
+      reason: "foreground-permission",
+      canAskAgain: false,
+      message: "permission blocked",
+    }),
+    true,
+  );
+  assert.equal(
+    shouldOpenLocationAppSettings({
+      reason: "foreground-permission",
+      canAskAgain: true,
+      message: "permission can be requested again",
+    }),
+    false,
+  );
+  assert.equal(
+    shouldOpenLocationAppSettings({
+      reason: "services-disabled",
+      message: "phone location is off",
+    }),
+    false,
+  );
 });
 
 test("serializes manual GPS activation and app-resume requests", async () => {

@@ -39,6 +39,10 @@ import {
   stopDriverLocationTracking,
 } from '../services/location-tracking';
 import {
+  shouldOpenLocationAppSettings,
+  type LocationSetupFailure,
+} from '../services/location-setup-policy';
+import {
   isDriverAvailableWithActiveGps,
   shouldPauseAvailableDriver,
 } from '../services/driver-availability-policy';
@@ -47,6 +51,35 @@ import { cardRadius, getPalette, space } from '../theme';
 function apiMessage(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
   return error.message.replace(/^HTTP \d+ [^:]*:\s*/, '') || fallback;
+}
+
+function showLocationSetupFailure(failure: LocationSetupFailure): void {
+  const openSettings = shouldOpenLocationAppSettings(failure);
+
+  Alert.alert(
+    failure.reason === 'services-disabled'
+      ? 'Localisation désactivée'
+      : 'Autorisation GPS nécessaire',
+    failure.message,
+    [
+      { text: 'Fermer', style: 'cancel' },
+      ...(openSettings
+        ? [
+            {
+              text: 'Paramètres',
+              onPress: () => {
+                void Linking.openSettings().catch(() => {
+                  Alert.alert(
+                    'Réglages indisponibles',
+                    'Ouvrez les paramètres de l’application et autorisez la position.',
+                  );
+                });
+              },
+            },
+          ]
+        : []),
+    ],
+  );
 }
 
 function companyLogoUri(photo: string | null | undefined): string | null {
@@ -310,19 +343,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
         if (!setup.ok) {
           setGpsState('attention');
           setGpsMessage(setup.message);
-          Alert.alert(
-            'Autorisation GPS nécessaire',
-            setup.message,
-            [
-              { text: 'Plus tard', style: 'cancel' },
-              {
-                text: 'Paramètres',
-                onPress: () => {
-                  void Linking.openSettings().catch(() => undefined);
-                },
-              },
-            ],
-          );
+          showLocationSetupFailure(setup);
           return;
         }
         setGpsState('active');
@@ -352,15 +373,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
       if (!setup.ok) {
         setGpsState('attention');
         setGpsMessage(setup.message);
-        Alert.alert('Autorisation GPS nécessaire', setup.message, [
-          { text: 'Fermer', style: 'cancel' },
-          {
-            text: 'Paramètres',
-            onPress: () => {
-              void Linking.openSettings().catch(() => undefined);
-            },
-          },
-        ]);
+        showLocationSetupFailure(setup);
         return;
       }
       setGpsState('active');

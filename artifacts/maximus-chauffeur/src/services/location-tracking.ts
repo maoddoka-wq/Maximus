@@ -9,6 +9,7 @@ import {
   setLocationTrackingEnabled,
 } from '../lib/auth-storage';
 import { canResumeLocationTracking } from './location-resume-policy';
+import type { LocationSetupFailure } from './location-setup-policy';
 import { createSerializedLocationOperations } from './serialized-location-operation-queue';
 
 const LOCATION_UPDATE_INTERVAL_MS = 15_000;
@@ -34,9 +35,16 @@ export async function updateDriverPosition(
 
 async function stopForegroundLocationUpdates(): Promise<void> {
   const subscription = foregroundLocationSubscription;
-  foregroundLocationSubscription = null;
-  foregroundDriverId = null;
-  subscription?.remove();
+  if (!subscription) {
+    foregroundDriverId = null;
+    return;
+  }
+
+  subscription.remove();
+  if (foregroundLocationSubscription === subscription) {
+    foregroundLocationSubscription = null;
+    foregroundDriverId = null;
+  }
 }
 
 async function startForegroundLocationUpdates(driverId: string): Promise<void> {
@@ -72,13 +80,13 @@ async function startForegroundLocationUpdates(driverId: string): Promise<void> {
     },
   );
 
-  if (AppState.currentState !== 'active') {
-    subscription.remove();
-    throw new Error('Rouvrez MAXIMUS Chauffeur pour activer le GPS.');
-  }
-
   foregroundLocationSubscription = subscription;
   foregroundDriverId = driverId;
+
+  if (AppState.currentState !== 'active') {
+    await stopForegroundLocationUpdates();
+    throw new Error('Rouvrez MAXIMUS Chauffeur pour activer le GPS.');
+  }
 }
 
 async function areLocationServicesEnabled(
@@ -98,11 +106,7 @@ async function areLocationServicesEnabled(
 
 export type LocationSetupResult =
   | { ok: true }
-  | {
-      ok: false;
-      reason: 'services-disabled' | 'foreground-permission';
-      message: string;
-    };
+  | ({ ok: false } & LocationSetupFailure);
 
 async function enableDriverLocationTrackingUnlocked(
   driverId: string,
@@ -116,28 +120,33 @@ async function enableDriverLocationTrackingUnlocked(
     };
   }
 
-  if (!(await areLocationServicesEnabled(requestPermissions))) {
-    return {
-      ok: false,
-      reason: 'services-disabled',
-      message: 'Activez la localisation du téléphone pour partager votre position.',
-    };
-  }
-
-  let foreground = await Location.getForegroundPermissionsAsync();
-  if (!foreground.granted && requestPermissions) {
-    foreground = await Location.requestForegroundPermissionsAsync();
-  }
-  if (!foreground.granted) {
-    return {
-      ok: false,
-      reason: 'foreground-permission',
-      message:
-        'Autorisez l’accès à la position pendant l’utilisation de l’application.',
-    };
-  }
-
   try {
+    if (!(await areLocationServicesEnabled(requestPermissions))) {
+      await suspendDriverLocationTrackingUnlocked();
+      return {
+        ok: false,
+        reason: 'services-disabled',
+        message:
+          'La localisation du téléphone est désactivée. Activez-la puis réessayez.',
+      };
+    }
+
+    let foreground = await Location.getForegroundPermissionsAsync();
+    if (!foreground.granted && requestPermissions) {
+      foreground = await Location.requestForegroundPermissionsAsync();
+    }
+    if (!foreground.granted) {
+      await suspendDriverLocationTrackingUnlocked();
+      return {
+        ok: false,
+        reason: 'foreground-permission',
+        canAskAgain: foreground.canAskAgain,
+        message: foreground.canAskAgain
+          ? 'Autorisez l’accès à la position pendant l’utilisation de l’application, puis réessayez.'
+          : 'L’accès à la position est bloqué. Autorisez-le dans les paramètres de l’application.',
+      };
+    }
+
     const current = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.High,
       mayShowUserSettingsDialog: true,
@@ -151,8 +160,9 @@ async function enableDriverLocationTrackingUnlocked(
     await setLocationTrackingEnabled(true);
     return { ok: true };
   } catch (error) {
-    await setLocationTrackingEnabled(false);
-    await stopForegroundLocationUpdates();
+    await suspendAfterLocationFailure(
+      'Could not stop foreground GPS after location setup failed.',
+    );
     throw error;
   }
 }
@@ -162,43 +172,49 @@ async function resumeDriverLocationTrackingUnlocked(
 ): Promise<boolean> {
   if (Platform.OS === 'web') return false;
 
-  const [
-    explicitConsent,
-    locationServicesEnabled,
-    foregroundPermission,
-  ] = await Promise.all([
-    hasLocationTrackingConsent(),
-    Location.hasServicesEnabledAsync(),
-    Location.getForegroundPermissionsAsync(),
-  ]);
-
-  if (
-    !canResumeLocationTracking(
+  try {
+    const [
       explicitConsent,
       locationServicesEnabled,
-      foregroundPermission.granted,
-    )
-  ) {
-    await setLocationTrackingEnabled(false);
-    await stopForegroundLocationUpdates();
-    return false;
-  }
+      foregroundPermission,
+    ] = await Promise.all([
+      hasLocationTrackingConsent(),
+      Location.hasServicesEnabledAsync(),
+      Location.getForegroundPermissionsAsync(),
+    ]);
 
-  if (AppState.currentState !== 'active') {
-    await suspendDriverLocationTrackingUnlocked();
-    return false;
-  }
+    if (
+      !canResumeLocationTracking(
+        explicitConsent,
+        locationServicesEnabled,
+        foregroundPermission.granted,
+      )
+    ) {
+      await suspendDriverLocationTrackingUnlocked();
+      return false;
+    }
 
-  if (
-    foregroundLocationSubscription &&
-    foregroundDriverId === driverId
-  ) {
-    await setLocationTrackingEnabled(true);
-    return true;
-  }
+    if (AppState.currentState !== 'active') {
+      await suspendDriverLocationTrackingUnlocked();
+      return false;
+    }
 
-  const result = await enableDriverLocationTrackingUnlocked(driverId, false);
-  return result.ok;
+    if (
+      foregroundLocationSubscription &&
+      foregroundDriverId === driverId
+    ) {
+      await setLocationTrackingEnabled(true);
+      return true;
+    }
+
+    const result = await enableDriverLocationTrackingUnlocked(driverId, false);
+    return result.ok;
+  } catch (error) {
+    await suspendAfterLocationFailure(
+      'Could not stop foreground GPS after location resume failed.',
+    );
+    throw error;
+  }
 }
 
 async function suspendDriverLocationTrackingUnlocked(): Promise<void> {
@@ -209,10 +225,40 @@ async function suspendDriverLocationTrackingUnlocked(): Promise<void> {
   }
 }
 
+async function suspendAfterLocationFailure(message: string): Promise<void> {
+  try {
+    await suspendDriverLocationTrackingUnlocked();
+  } catch (error) {
+    console.error(message, error);
+  }
+}
+
 async function stopDriverLocationTrackingUnlocked(): Promise<void> {
-  await setLocationTrackingEnabled(false);
-  await setLocationTrackingConsent(false);
-  await stopForegroundLocationUpdates();
+  let failed = false;
+  let firstError: unknown;
+
+  try {
+    await setLocationTrackingEnabled(false);
+  } catch (error) {
+    failed = true;
+    firstError = error;
+  }
+
+  try {
+    await setLocationTrackingConsent(false);
+  } catch (error) {
+    if (!failed) firstError = error;
+    failed = true;
+  }
+
+  try {
+    await stopForegroundLocationUpdates();
+  } catch (error) {
+    if (!failed) firstError = error;
+    failed = true;
+  }
+
+  if (failed) throw firstError;
 }
 
 const locationOperations = createSerializedLocationOperations<
@@ -228,7 +274,16 @@ const locationOperations = createSerializedLocationOperations<
       driverId,
       requestPermissions,
     );
-    if (result.ok) await setLocationTrackingConsent(true);
+    if (result.ok) {
+      try {
+        await setLocationTrackingConsent(true);
+      } catch (error) {
+        await suspendAfterLocationFailure(
+          'Could not stop foreground GPS after consent could not be saved.',
+        );
+        throw error;
+      }
+    }
     return result;
   },
   resume: resumeDriverLocationTrackingUnlocked,
