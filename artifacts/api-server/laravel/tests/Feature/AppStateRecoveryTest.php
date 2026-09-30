@@ -818,6 +818,104 @@ class AppStateRecoveryTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_sector_manager_can_save_bootstrapped_state_without_writing_company_metadata(): void
+    {
+        $company = Company::query()->create([
+            'id' => 'bootstrap-manager-company',
+            'name' => 'Nom de référence serveur',
+            'manager' => 'Direction',
+            'email' => 'bootstrap-manager@example.test',
+            'status' => 'ACTIF',
+        ]);
+        $manager = AuthUser::query()->create([
+            'id' => 'bootstrap-state-manager',
+            'email' => 'bootstrap.state.manager@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Manager secteur',
+            'role' => 'sector_manager',
+            'company_id' => $company->id,
+            'sector_ids' => ['bootstrap-manager-root'],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+        $state = [
+            'companies' => [[
+                'id' => $company->id,
+                'name' => 'Nom historique du snapshot',
+            ]],
+            'employees' => [],
+            'roles' => [],
+            'orgNodes' => [
+                [
+                    'id' => 'bootstrap-manager-root',
+                    'companyId' => $company->id,
+                    'parentId' => null,
+                    'moduleIds' => [],
+                    'moduleFeatures' => [],
+                ],
+                [
+                    'id' => 'bootstrap-manager-child',
+                    'companyId' => $company->id,
+                    'parentId' => 'bootstrap-manager-root',
+                    'moduleIds' => [],
+                    'moduleFeatures' => [],
+                ],
+            ],
+        ];
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'payload' => json_encode($state, JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($manager));
+        $bootstrap = $request->getJson('/api/app-state/bootstrap')->assertOk();
+        $incoming = $bootstrap->json('data');
+
+        $this->assertSame('Nom de référence serveur', $incoming['companies'][0]['name']);
+
+        $incoming['roles'][] = [
+            'id' => 'bootstrap-manager-created-role',
+            'companyId' => $company->id,
+            'name' => 'Rôle de l’unité',
+            'sectorId' => 'bootstrap-manager-child',
+            'modulePermissions' => [],
+        ];
+        $incoming['employees'][] = [
+            'id' => 'bootstrap-manager-created-employee',
+            'companyId' => $company->id,
+            'sectorId' => 'bootstrap-manager-child',
+            'roleId' => 'bootstrap-manager-created-role',
+            'isSectorAdmin' => false,
+        ];
+        $incoming['companies'][0]['name'] = 'Nom injecté par le client';
+
+        $request->putJson('/api/app-state', [
+            'version' => $bootstrap->json('version'),
+            'data' => $incoming,
+        ])->assertOk();
+
+        $savedState = json_decode(
+            (string) DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload'),
+            true,
+        );
+        $this->assertSame('Nom historique du snapshot', $savedState['companies'][0]['name']);
+        $this->assertContains(
+            'bootstrap-manager-created-role',
+            array_column($savedState['roles'], 'id'),
+        );
+        $this->assertContains(
+            'bootstrap-manager-created-employee',
+            array_column($savedState['employees'], 'id'),
+        );
+
+        $nextBootstrap = $request->getJson('/api/app-state/bootstrap')->assertOk();
+        $this->assertSame('Nom de référence serveur', $nextBootstrap->json('data.companies.0.name'));
+    }
+
     public function test_app_state_rejects_a_stale_write_without_overwriting_the_latest_data(): void
     {
         $admin = AuthUser::query()->create([

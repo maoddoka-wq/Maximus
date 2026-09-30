@@ -410,14 +410,19 @@ class AppStateController extends Controller
                     ], 403);
                 }
 
-                $employeeCollections = ($actor['role'] ?? null) === 'employee'
-                    ? self::EMPLOYEE_WRITABLE_COLLECTIONS
-                    : null;
+                $writableCollections = match ($actor['role'] ?? null) {
+                    'employee' => self::EMPLOYEE_WRITABLE_COLLECTIONS,
+                    'sector_manager' => array_values(array_diff(
+                        array_keys(self::COLLECTION_PERMISSION_MODULES),
+                        ['companies'],
+                    )),
+                    default => null,
+                };
                 $currentPayload = $this->mergeCompanyState(
                     $currentPayload,
                     $incomingState,
                     $companyId,
-                    $employeeCollections,
+                    $writableCollections,
                 );
                 $this->applyExplicitDeletes($currentPayload, $deleted, (string) ($actor['companyId'] ?? ''));
             } else {
@@ -470,6 +475,11 @@ class AppStateController extends Controller
         foreach ($keys as $key) {
             if (! array_key_exists($key, $incoming)) {
                 // Omission is not deletion: clients may submit partial snapshots.
+                continue;
+            }
+            if ($key === 'companies') {
+                // Bootstrap enriches company metadata from the server registry.
+                // Staff may receive that enriched view but cannot write it back.
                 continue;
             }
             if (! is_array($incoming[$key]) || ! array_is_list($incoming[$key])) {
