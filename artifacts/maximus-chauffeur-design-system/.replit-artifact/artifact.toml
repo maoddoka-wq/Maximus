@@ -1,0 +1,19 @@
+kind = "design-system"
+previewPath = "/maximus-chauffeur-design-system/"
+title = "MAXIMUS Chauffeur Design System"
+description = "Système visuel MAXIMUS dédié à l’application native Chauffeur : tokens partagés, règles d’usage, identité de marque et exemples adaptés aux parcours de disponibilité et de courses."
+version = "1.0.0"
+id = "artifacts/maximus-chauffeur-design-system"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/maximus-chauffeur-design-system/" ]
+localPort = 25155
+
+[services.development]
+run = "pnpm --filter @workspace/maximus-chauffeur-design-system run dev"
+
+[services.env]
+PORT = "25155"
+BASE_PATH = "/maximus-chauffeur-design-system/"
