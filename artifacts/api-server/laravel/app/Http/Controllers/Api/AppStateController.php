@@ -482,15 +482,15 @@ class AppStateController extends Controller
                 // Staff may receive that enriched view but cannot write it back.
                 continue;
             }
-            if (! is_array($incoming[$key]) || ! array_is_list($incoming[$key])) {
-                return false;
-            }
             if (! array_key_exists($key, self::COLLECTION_PERMISSION_MODULES)) {
                 // Shared catalog and unknown keys are never writable by staff.
                 if (($current[$key] ?? null) !== $incoming[$key]) {
                     return false;
                 }
                 continue;
+            }
+            if (! is_array($incoming[$key]) || ! array_is_list($incoming[$key])) {
+                return false;
             }
             $before = $this->recordsById($current[$key] ?? []);
             $after = $this->recordsById($incoming[$key]);
