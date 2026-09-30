@@ -271,7 +271,6 @@ function EmployeeFormModal({
   const compatibleRoles = sectorCompatibleRoles.filter(role =>
     isRoleAssignableToUnit(role, company, formData.sectorId, allNodes, moduleDefinitions),
   );
-  const incompatibleRoleCount = sectorCompatibleRoles.length - compatibleRoles.length;
   const selectedRole = allRoles.find(role => role.id === formData.roleId);
   const selectedRoleIsCompatible = compatibleRoles.some(role => role.id === formData.roleId);
   const selectedRoleNeedsCorrection = Boolean(
@@ -357,10 +356,6 @@ function EmployeeFormModal({
           {selectedRoleNeedsCorrection ? (
             <Alert variant="destructive" className="mt-2">
               <AlertDescription>Ce rôle ne peut pas être attribué tel quel. Fermez ce formulaire et corrigez ses permissions dans « Rôles & permissions ».</AlertDescription>
-            </Alert>
-          ) : incompatibleRoleCount > 0 ? (
-            <Alert className="mt-2" role="status">
-              <AlertDescription>{incompatibleRoleCount} rôle(s) de cette unité ne sont pas proposés, car certaines permissions dépassent les droits autorisés. Corrigez-les dans « Rôles & permissions ».</AlertDescription>
             </Alert>
           ) : null}
         </label>
