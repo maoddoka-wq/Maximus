@@ -1,0 +1,275 @@
+Tu es maintenant responsable du diagnostic technique complet de l'application mobile MAXIMUS Chauffeur.
+
+PROBLÈME CRITIQUE :
+À chaque fois que l'utilisateur active/utilise la localisation GPS dans l'application, l'application se ferme brutalement (crash). Cela se produit systématiquement ou très fréquemment au moment où la permission de localisation est demandée, accordée ou lorsque la position GPS commence à être récupérée.
+
+J'ai déjà demandé plusieurs fois de corriger ce problème sans résultat. Cette fois, NE FAIS PAS une correction superficielle. Je veux que tu identifies la cause réelle du crash.
+
+RÈGLE PRINCIPALE :
+NE SUPPOSE PAS la cause.
+NE MODIFIE PAS plusieurs fichiers au hasard.
+NE SUPPRIME PAS les fonctionnalités GPS pour masquer le problème.
+NE remplace PAS le système de localisation par une fausse position.
+NE considère PAS le problème comme résolu simplement parce que l'application compile.
+
+==================================================
+ÉTAPE 1 — AUDIT COMPLET DU PROJET
+
+Analyse d'abord tout le projet MAXIMUS Chauffeur et identifie :
+
+1. Le framework utilisé :
+   
+   - Expo / React Native / React Native CLI
+   - version exacte
+   - Expo SDK
+   - React Native version
+
+2. Le système GPS/localisation utilisé :
+   
+   - expo-location
+   - react-native-geolocation-service
+   - @react-native-community/geolocation
+   - autre bibliothèque
+
+3. Toutes les utilisations de :
+   
+   - requestForegroundPermissionsAsync
+   - requestBackgroundPermissionsAsync
+   - getCurrentPositionAsync
+   - watchPositionAsync
+   - startLocationUpdatesAsync
+   - getLastKnownPositionAsync
+   - PermissionsAndroid
+   - Location
+   - GPS
+   - latitude / longitude
+
+4. Analyse également :
+   
+   - AndroidManifest.xml
+   - app.json
+   - app.config.js / app.config.ts
+   - eas.json
+   - build.gradle
+   - MainActivity
+   - MainApplication
+   - fichiers natifs Android s'ils existent
+   - configuration Expo
+   - permissions Android
+   - services/background location
+   - hooks liés à la localisation
+   - contexte/provider GPS
+   - navigation
+   - composants qui se chargent lorsque le GPS est activé
+
+5. Cherche particulièrement les erreurs pouvant provoquer un crash Android :
+   
+   - permission mal configurée
+   - permission ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION absente
+   - permission ACCESS_BACKGROUND_LOCATION mal utilisée
+   - appel GPS avant obtention de la permission
+   - boucle infinie de watchPosition
+   - useEffect mal configuré
+   - watcher créé plusieurs fois
+   - watcher non supprimé
+   - état mis à jour après démontage du composant
+   - erreur native non catchée
+   - Promise rejetée non gérée
+   - problème de compatibilité Android
+   - bibliothèque GPS incompatible avec la version Expo/React Native
+   - problème lié à Hermes
+   - problème de configuration Gradle
+   - problème de module natif
+   - problème de navigation lors de la récupération de la position
+   - problème lors du parsing latitude/longitude
+   - problème de sérialisation des coordonnées
+   - crash lorsque la permission est refusée
+   - crash lorsque le GPS du téléphone est désactivé
+   - crash lorsque la permission est accordée mais que la position n'est pas immédiatement disponible.
+
+==================================================
+ÉTAPE 2 — REPRODUIRE LE CRASH
+
+Avant de modifier le code, détermine précisément le scénario :
+
+A. Application ouverte
+B. Écran chauffeur ouvert
+C. GPS désactivé
+D. GPS activé
+E. Permission localisation demandée
+F. Permission accordée
+G. Récupération de la position
+H. Envoi de la position au backend
+
+Détermine à quelle étape exacte l'application plante.
+
+Si des logs sont disponibles, analyse-les.
+
+Je veux que tu recherches explicitement :
+
+- FATAL EXCEPTION
+- AndroidRuntime
+- SecurityException
+- NullPointerException
+- IllegalStateException
+- NativeModule
+- Location
+- Expo
+- ReactNativeJS
+- Hermes
+- permission
+- foreground service
+- background location
+
+==================================================
+ÉTAPE 3 — NE PAS DEVINER
+
+Si tu ne disposes pas encore des logs nécessaires pour identifier la cause exacte, dis-moi CLAIREMENT :
+
+"J'ai besoin des logs du crash Android pour identifier précisément la cause."
+
+Puis indique-moi exactement quelle commande ou quelle procédure utiliser pour récupérer les logs.
+
+Par exemple, si adapté au projet :
+
+npx expo start
+npx expo run:android
+
+ou les commandes adaptées au projet actuel.
+
+Si l'application est déjà installée sur un téléphone Android, explique-moi comment récupérer le stack trace du crash.
+
+NE prétends PAS avoir trouvé la cause si tu ne l'as pas démontrée.
+
+==================================================
+ÉTAPE 4 — CORRECTION
+
+Une fois la cause identifiée, corrige le problème proprement.
+
+La solution doit respecter les principes suivants :
+
+1. Demander les permissions avant tout appel GPS.
+
+2. Gérer proprement :
+   
+   - permission accordée
+   - permission refusée
+   - permission bloquée
+   - GPS désactivé
+   - position indisponible
+   - timeout
+   - erreur GPS
+
+3. Tous les appels asynchrones liés au GPS doivent avoir une gestion d'erreur robuste :
+   try/catch ou gestion équivalente.
+
+4. Aucun watcher GPS ne doit être créé plusieurs fois par erreur.
+
+5. Les watchers doivent être nettoyés correctement :
+   
+   - lors du démontage du composant
+   - lors du changement d'écran
+   - lors du changement d'état approprié.
+
+6. Éviter les appels GPS dans une boucle infinie.
+
+7. Éviter les setState après démontage du composant.
+
+8. Ne jamais faire planter l'application si le GPS échoue.
+
+9. Afficher une erreur utilisateur compréhensible au lieu de fermer l'application.
+
+10. Vérifier que la configuration Android correspond réellement à la bibliothèque GPS utilisée.
+
+11. Si une bibliothèque est incompatible avec la version actuelle du projet, identifie-le avant de la remplacer.
+
+12. Ne change pas toute l'architecture de l'application si ce n'est pas nécessaire.
+
+==================================================
+ÉTAPE 5 — COMPATIBILITÉ ANDROID
+
+Vérifie particulièrement les versions Android récentes.
+
+Vérifie :
+
+ACCESS_FINE_LOCATION
+ACCESS_COARSE_LOCATION
+
+Et, uniquement si réellement nécessaire :
+
+ACCESS_BACKGROUND_LOCATION
+FOREGROUND_SERVICE
+FOREGROUND_SERVICE_LOCATION
+
+Ne rajoute PAS des permissions inutiles.
+
+Si MAXIMUS Chauffeur doit suivre la position du chauffeur lorsque l'application est en arrière-plan, distingue clairement :
+
+- localisation lorsque l'application est ouverte
+- localisation en arrière-plan
+- localisation lorsque l'écran est verrouillé
+
+Ne mélange pas ces trois fonctionnalités.
+
+==================================================
+ÉTAPE 6 — TESTS OBLIGATOIRES
+
+Après correction, teste au minimum ces scénarios :
+
+TEST 1
+GPS désactivé → ouvrir l'application → aucune fermeture.
+
+TEST 2
+GPS activé → ouvrir l'écran chauffeur → aucune fermeture.
+
+TEST 3
+Permission localisation refusée → aucune fermeture.
+
+TEST 4
+Permission localisation accordée → récupération latitude/longitude → aucune fermeture.
+
+TEST 5
+Permission accordée puis GPS désactivé → aucune fermeture.
+
+TEST 6
+Perte temporaire du signal GPS → aucune fermeture.
+
+TEST 7
+Quitter l'écran chauffeur pendant la récupération GPS → aucune fermeture.
+
+TEST 8
+Revenir sur l'écran chauffeur plusieurs fois → aucun watcher dupliqué.
+
+TEST 9
+Redémarrer complètement l'application → GPS fonctionne toujours.
+
+TEST 10
+Tester sur Android réel, pas uniquement dans le navigateur.
+
+==================================================
+ÉTAPE 7 — RAPPORT FINAL
+
+Quand tu as terminé, donne-moi un rapport clair avec exactement cette structure :
+
+1. CAUSE EXACTE DU CRASH
+2. FICHIER(S) RESPONSABLE(S)
+3. CODE/LOG QUI PROVOQUAIT LE CRASH
+4. CORRECTION EFFECTUÉE
+5. CONFIGURATION ANDROID MODIFIÉE
+6. BIBLIOTHÈQUES GPS UTILISÉES
+7. TESTS EFFECTUÉS
+8. RÉSULTAT DE CHAQUE TEST
+9. CE QUI RESTE ÉVENTUELLEMENT À TESTER
+
+IMPORTANT :
+
+Ne me réponds pas simplement :
+"J'ai corrigé le problème."
+
+Je veux une preuve technique de la cause et de la correction.
+
+Si tu n'as pas accès aux logs du crash, commence par me dire comment les récupérer avant de modifier massivement le projet.
+
+OBJECTIF FINAL :
+
+MAXIMUS Chauffeur doit pouvoir utiliser la localisation GPS réelle du téléphone Android sans jamais fermer ou crasher l'application, même lorsqu'une permission est refusée, que le GPS est désactivé, que la position est temporairement indisponible ou qu'une erreur native survient.
