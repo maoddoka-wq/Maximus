@@ -8,3 +8,9 @@ Les écrans Commerce utilisent deux périmètres de données : l’état local p
 **Why:** Une mise à jour dans un seul périmètre donne une interface qui semble fonctionner mais laisse le stock, le solde client ou l’historique incohérent après navigation ou rechargement.
 
 **How to apply:** Avant d’ajouter un workflow Commerce, identifier son périmètre de persistance puis synchroniser l’autre périmètre dans la même action utilisateur, avec confirmation pour les changements irréversibles.
+
+Le POS E-commerce maintient son propre stock sur les produits de la boutique et journalise chaque sortie comptoir avec la vente, l’article, le caissier, la référence et les quantités avant/après. Ce stock n’est pas automatiquement lié aux soldes/entrepôts du module Gestion de stock.
+
+**Why:** Les produits e-commerce et les articles d’entrepôt utilisent des identités et des tables distinctes; écrire dans le grand livre de stock sans correspondance de produit et d’entrepôt désynchroniserait les inventaires.
+
+**How to apply:** Conserver les ventes comptoir dans l’inventaire e-commerce. Ne synchroniser vers le module Gestion de stock qu’après définition d’une correspondance produit/entrepôt explicite.

@@ -94,12 +94,25 @@ class EcommerceTest extends TestCase
             ->assertJsonPath('sale.total', 2000)
             ->assertJsonPath('sale.amountReceived', 3000)
             ->assertJsonPath('sale.changeDue', 1000)
-            ->assertJsonPath('sale.items.0.quantity', 2);
+            ->assertJsonPath('sale.paymentMethod', 'CASH')
+            ->assertJsonPath('sale.paymentReference', null)
+            ->assertJsonPath('sale.items.0.quantity', 2)
+            ->assertJsonPath('sale.items.0.stockBefore', 5)
+            ->assertJsonPath('sale.items.0.stockAfter', 3);
 
         $saleId = $response->json('sale.id');
         $this->assertDatabaseHas('ecommerce_products', ['id' => 'ecommerce-pos-product', 'stock' => 3]);
         $this->assertDatabaseHas('ecommerce_pos_sales', ['id' => $saleId, 'status' => 'PAID']);
         $this->assertDatabaseHas('ecommerce_pos_sale_items', ['sale_id' => $saleId, 'product_id' => 'ecommerce-pos-product']);
+        $this->assertDatabaseHas('ecommerce_pos_stock_movements', [
+            'company_id' => 'kora',
+            'sale_id' => $saleId,
+            'product_id' => 'ecommerce-pos-product',
+            'movement_type' => 'VENTE',
+            'quantity' => 2,
+            'stock_before' => 5,
+            'stock_after' => 3,
+        ]);
         $this->assertDatabaseCount('seller_wallet_ledger', 0);
         $this->assertDatabaseCount('maximus_wallet_ledger', 0);
 
@@ -115,12 +128,104 @@ class EcommerceTest extends TestCase
 
         $this->assertDatabaseHas('ecommerce_products', ['id' => 'ecommerce-pos-product', 'stock' => 3]);
         $this->assertDatabaseCount('ecommerce_pos_sales', 1);
+        $this->assertDatabaseCount('ecommerce_pos_stock_movements', 1);
 
         $request->getJson('/api/ecommerce/pos-sales?companyId=kora')
             ->assertOk()
             ->assertJsonPath('summary.todaySalesCount', 1)
             ->assertJsonPath('summary.todayRevenue', 2000)
+            ->assertJsonPath('summary.todayCashReceived', 3000)
+            ->assertJsonPath('summary.todayMobileMoneyReceived', 0)
             ->assertJsonPath('summary.todayChangeGiven', 1000);
+    }
+
+    public function test_pos_external_mobile_money_records_provider_reference_and_inventory_movement_once(): void
+    {
+        $this->setEcommerceFeatures(['dashboard', 'catalogue', 'vente-physique', 'vente-comptoir']);
+        DB::table('ecommerce_products')->insert([
+            'id' => 'ecommerce-pos-mobile-product',
+            'company_id' => 'kora',
+            'name' => 'Produit mobile',
+            'slug' => 'produit-mobile',
+            'sku' => 'POS-MOBILE-001',
+            'description' => '',
+            'category' => 'Général',
+            'price' => 1000,
+            'stock' => 5,
+            'image_url' => '',
+            'featured' => false,
+            'status' => 'PUBLISHED',
+            'product_type' => 'SALE',
+            'fulfillment_type' => 'PHYSICAL',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request = $this->asActor();
+        $request
+            ->withHeader('Idempotency-Key', 'pos-mobile-missing-reference')
+            ->postJson('/api/ecommerce/pos-sales?companyId=kora', [
+                'lines' => [['productId' => 'ecommerce-pos-mobile-product', 'quantity' => 1]],
+                'paymentMethod' => 'WAVE',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['paymentReference', 'paymentConfirmed']);
+        $this->assertDatabaseHas('ecommerce_products', ['id' => 'ecommerce-pos-mobile-product', 'stock' => 5]);
+        $this->assertDatabaseCount('ecommerce_pos_sales', 0);
+        $this->assertDatabaseCount('ecommerce_pos_stock_movements', 0);
+
+        foreach ([
+            ['method' => 'WAVE', 'reference' => 'WAVE-RECEIPT-001', 'stockBefore' => 5, 'stockAfter' => 4],
+            ['method' => 'ORANGE_MONEY', 'reference' => 'OM-RECEIPT-002', 'stockBefore' => 4, 'stockAfter' => 3],
+        ] as $index => $payment) {
+            $payload = [
+                'lines' => [['productId' => 'ecommerce-pos-mobile-product', 'quantity' => 1]],
+                'paymentMethod' => $payment['method'],
+                'paymentReference' => $payment['reference'],
+                'paymentConfirmed' => true,
+            ];
+            $idempotencyKey = 'pos-mobile-payment-'.$index;
+            $response = $request
+                ->withHeader('Idempotency-Key', $idempotencyKey)
+                ->postJson('/api/ecommerce/pos-sales?companyId=kora', $payload)
+                ->assertCreated()
+                ->assertJsonPath('sale.paymentMethod', $payment['method'])
+                ->assertJsonPath('sale.paymentReference', $payment['reference'])
+                ->assertJsonPath('sale.amountReceived', 1000)
+                ->assertJsonPath('sale.changeDue', 0)
+                ->assertJsonPath('sale.items.0.stockBefore', $payment['stockBefore'])
+                ->assertJsonPath('sale.items.0.stockAfter', $payment['stockAfter']);
+            $saleId = $response->json('sale.id');
+
+            $request
+                ->withHeader('Idempotency-Key', $idempotencyKey)
+                ->postJson('/api/ecommerce/pos-sales?companyId=kora', $payload)
+                ->assertCreated()
+                ->assertJsonPath('sale.id', $saleId);
+
+            $conflictingPayload = $payload;
+            $conflictingPayload['paymentReference'] .= '-different';
+            $request
+                ->withHeader('Idempotency-Key', $idempotencyKey)
+                ->postJson('/api/ecommerce/pos-sales?companyId=kora', $conflictingPayload)
+                ->assertConflict()
+                ->assertJsonPath('error', 'La clé d’idempotence a déjà été utilisée pour une autre vente.');
+        }
+
+        $this->assertDatabaseHas('ecommerce_products', ['id' => 'ecommerce-pos-mobile-product', 'stock' => 3]);
+        $this->assertDatabaseCount('ecommerce_pos_sales', 2);
+        $this->assertDatabaseCount('ecommerce_pos_stock_movements', 2);
+        $this->assertDatabaseCount('seller_wallet_ledger', 0);
+        $this->assertDatabaseCount('maximus_wallet_ledger', 0);
+
+        $request
+            ->getJson('/api/ecommerce/pos-sales?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('summary.todaySalesCount', 2)
+            ->assertJsonPath('summary.todayRevenue', 2000)
+            ->assertJsonPath('summary.todayCashReceived', 0)
+            ->assertJsonPath('summary.todayMobileMoneyReceived', 2000)
+            ->assertJsonPath('summary.todayChangeGiven', 0);
     }
 
     public function test_ecommerce_requires_a_session_and_company_context(): void

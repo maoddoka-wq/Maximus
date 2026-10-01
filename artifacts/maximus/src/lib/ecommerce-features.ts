@@ -2,7 +2,7 @@ export const ecommerceFeatureDefinitions = [
   { id: 'dashboard', label: 'Tableau de bord' },
   { id: 'catalogue', label: 'Catalogue' },
   { id: 'vente-physique', label: 'Vente de produits physiques' },
-  { id: 'vente-comptoir', label: 'Vente comptoir en espèces' },
+  { id: 'vente-comptoir', label: 'Vente comptoir' },
   { id: 'vente-numerique', label: 'Vente de produits numériques' },
   { id: 'categories', label: 'Catégories' },
   { id: 'commandes', label: 'Commandes' },

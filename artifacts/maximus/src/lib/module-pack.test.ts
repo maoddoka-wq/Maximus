@@ -66,7 +66,7 @@ test('expose les autorisations de vente physique et numérique dans e-commerce',
     getModuleFeatureOptions(ecommerce).filter((feature) => feature.id.startsWith('vente-')),
     [
       { id: 'vente-physique', label: 'Vente de produits physiques' },
-      { id: 'vente-comptoir', label: 'Vente comptoir en espèces' },
+      { id: 'vente-comptoir', label: 'Vente comptoir' },
       { id: 'vente-numerique', label: 'Vente de produits numériques' },
     ],
   );

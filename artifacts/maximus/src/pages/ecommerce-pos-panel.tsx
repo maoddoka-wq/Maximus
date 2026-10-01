@@ -3,9 +3,18 @@ import { Banknote, Check, Minus, Plus, Search, ShoppingBag, UserRound, X } from 
 import { Badge } from '@workspace/maximus-design-system/components/ui/badge';
 import { Button } from '@workspace/maximus-design-system/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@workspace/maximus-design-system/components/ui/card';
+import { Checkbox } from '@workspace/maximus-design-system/components/ui/checkbox';
 import { Input } from '@workspace/maximus-design-system/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@workspace/maximus-design-system/components/ui/select';
 import { Skeleton } from '@workspace/maximus-design-system/components/ui/skeleton';
 import type {
+  EcommercePosPaymentMethod,
   EcommercePosSale,
   EcommercePosSalesBootstrap,
   EcommerceProduct,
@@ -22,7 +31,10 @@ type EcommercePosPanelProps = {
   loading: boolean;
   onCreateSale(input: {
     lines: Array<{ productId: string; quantity: number }>;
-    amountReceived: number;
+    paymentMethod: EcommercePosPaymentMethod;
+    amountReceived?: number;
+    paymentReference?: string;
+    paymentConfirmed?: boolean;
     customerName?: string;
     idempotencyKey: string;
   }): Promise<EcommercePosSale>;
@@ -45,6 +57,12 @@ const dateTime = (value: string) => {
     : new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 };
 
+const paymentMethodLabels: Record<EcommercePosPaymentMethod, string> = {
+  CASH: 'Espèces',
+  WAVE: 'Wave',
+  ORANGE_MONEY: 'Orange Money',
+};
+
 function createIdempotencyKey(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
     return `pos-${globalThis.crypto.randomUUID()}`;
@@ -55,8 +73,8 @@ function createIdempotencyKey(): string {
 function PosLoadingState() {
   return (
     <div className="space-y-4" aria-label="Chargement du point de vente" data-testid="status-pos-loading">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {Array.from({ length: 4 }, (_, index) => (
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        {Array.from({ length: 5 }, (_, index) => (
           <Card className="p-4" key={index}>
             <Skeleton className="mb-3 h-3 w-24" />
             <Skeleton className="h-6 w-32" />
@@ -93,6 +111,9 @@ export default function EcommercePosPanel({
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<Record<string, CartLine>>({});
   const [customerName, setCustomerName] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<EcommercePosPaymentMethod>('CASH');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [amountReceived, setAmountReceived] = useState('');
   const [pending, setPending] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -120,6 +141,9 @@ export default function EcommercePosPanel({
   const received = Number(amountReceived) || 0;
   const changeDue = Math.max(0, received - total);
   const hasValidCash = Number.isFinite(received) && received >= total && received > 0;
+  const hasValidPayment = paymentMethod === 'CASH'
+    ? hasValidCash
+    : paymentReference.trim().length > 0 && paymentConfirmed;
 
   const addProduct = (product: EcommerceProduct) => {
     setCart(current => {
@@ -151,13 +175,16 @@ export default function EcommercePosPanel({
 
   const submitSale = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!canCreate || pending || !cartLines.length || !hasValidCash) return;
+    if (!canCreate || pending || !cartLines.length || !hasValidPayment) return;
     setPending(true);
     setSubmitError('');
     setCompletedSale(null);
     const payload = {
       lines: cartLines.map(({ product, quantity }) => ({ productId: product.id, quantity })),
-      amountReceived: received,
+      paymentMethod,
+      ...(paymentMethod === 'CASH'
+        ? { amountReceived: received }
+        : { paymentReference: paymentReference.trim(), paymentConfirmed }),
       ...(customerName.trim() ? { customerName: customerName.trim() } : {}),
     };
     const fingerprint = JSON.stringify([idempotencyScope, payload]);
@@ -167,6 +194,9 @@ export default function EcommercePosPanel({
       const sale = await onCreateSale({ ...payload, idempotencyKey });
       setCompletedSale(sale);
       setCart({});
+      setPaymentMethod('CASH');
+      setPaymentReference('');
+      setPaymentConfirmed(false);
       setAmountReceived('');
       setCustomerName('');
       idempotencyKeysByPayload.current.clear();
@@ -181,7 +211,7 @@ export default function EcommercePosPanel({
 
   return (
     <div className="space-y-5" data-testid="panel-pos">
-      <section aria-label="Résumé des ventes du jour" className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <section aria-label="Résumé des ventes du jour" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <Card className="p-4" data-testid="metric-pos-sales-count">
           <p className="text-xs font-medium text-muted-foreground">Ventes du jour</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums">{summary.todaySalesCount}</p>
@@ -193,6 +223,10 @@ export default function EcommercePosPanel({
         <Card className="p-4" data-testid="metric-pos-cash-received">
           <p className="text-xs font-medium text-muted-foreground">Espèces reçues</p>
           <p className="mt-2 text-xl font-semibold tabular-nums">{money(summary.todayCashReceived, currency)}</p>
+        </Card>
+        <Card className="p-4" data-testid="metric-pos-mobile-money-received">
+          <p className="text-xs font-medium text-muted-foreground">Wave &amp; Orange Money</p>
+          <p className="mt-2 text-xl font-semibold tabular-nums">{money(summary.todayMobileMoneyReceived, currency)}</p>
         </Card>
         <Card className="p-4" data-testid="metric-pos-change-given">
           <p className="text-xs font-medium text-muted-foreground">Monnaie rendue</p>
@@ -361,28 +395,86 @@ export default function EcommercePosPanel({
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium" htmlFor="pos-amount-received">Espèces reçues</label>
-                  <div className="relative">
-                    <Banknote aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      aria-describedby="pos-change-due"
-                      className="pl-9"
-                      data-testid="input-pos-cash"
-                      disabled={!canCreate || pending}
-                      id="pos-amount-received"
-                      min="0"
-                      onChange={event => setAmountReceived(event.target.value)}
-                      placeholder="0"
-                      step={currency === 'XOF' ? '1' : '0.01'}
-                      type="number"
-                      value={amountReceived}
-                    />
-                  </div>
+                  <label className="text-sm font-medium" htmlFor="pos-payment-method">Moyen de paiement</label>
+                  <Select
+                    disabled={!canCreate || pending}
+                    onValueChange={value => {
+                      setPaymentMethod(value as EcommercePosPaymentMethod);
+                      setAmountReceived('');
+                      setPaymentReference('');
+                      setPaymentConfirmed(false);
+                      setSubmitError('');
+                    }}
+                    value={paymentMethod}
+                  >
+                    <SelectTrigger id="pos-payment-method" data-testid="select-pos-payment-method">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CASH">Espèces</SelectItem>
+                      <SelectItem value="WAVE">Wave</SelectItem>
+                      <SelectItem value="ORANGE_MONEY">Orange Money</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2" id="pos-change-due">
-                  <span className="text-sm text-muted-foreground">Monnaie à rendre</span>
-                  <span className="font-semibold tabular-nums" data-testid="text-pos-change">{money(changeDue, currency)}</span>
-                </div>
+                {paymentMethod === 'CASH' ? (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium" htmlFor="pos-amount-received">Espèces reçues</label>
+                      <div className="relative">
+                        <Banknote aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          aria-describedby="pos-change-due"
+                          className="pl-9"
+                          data-testid="input-pos-cash"
+                          disabled={!canCreate || pending}
+                          id="pos-amount-received"
+                          min="0"
+                          onChange={event => setAmountReceived(event.target.value)}
+                          placeholder="0"
+                          step={currency === 'XOF' ? '1' : '0.01'}
+                          type="number"
+                          value={amountReceived}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2" id="pos-change-due">
+                      <span className="text-sm text-muted-foreground">Monnaie à rendre</span>
+                      <span className="font-semibold tabular-nums" data-testid="text-pos-change">{money(changeDue, currency)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium" htmlFor="pos-payment-reference">Référence du paiement</label>
+                      <Input
+                        data-testid="input-pos-payment-reference"
+                        disabled={!canCreate || pending}
+                        id="pos-payment-reference"
+                        maxLength={180}
+                        onChange={event => setPaymentReference(event.target.value)}
+                        placeholder="Référence affichée par l’opérateur"
+                        required
+                        value={paymentReference}
+                      />
+                    </div>
+                    <p className="text-xs leading-5 text-muted-foreground" role="note">
+                      Vérifiez le paiement dans l’application {paymentMethodLabels[paymentMethod]} : le transfert se fait hors MAXIMUS.
+                    </p>
+                    <div className="flex items-start gap-2">
+                      <Checkbox
+                        checked={paymentConfirmed}
+                        data-testid="checkbox-pos-payment-confirmed"
+                        disabled={!canCreate || pending}
+                        id="pos-payment-confirmed"
+                        onCheckedChange={checked => setPaymentConfirmed(checked === true)}
+                      />
+                      <label className="text-sm leading-5" htmlFor="pos-payment-confirmed">
+                        J’ai confirmé la réception du paiement.
+                      </label>
+                    </div>
+                  </>
+                )}
               </div>
 
               {submitError && (
@@ -400,14 +492,18 @@ export default function EcommercePosPanel({
               <Button
                 className="w-full"
                 data-testid="button-pos-submit"
-                disabled={!canCreate || pending || cartLines.length === 0 || !hasValidCash}
+                disabled={!canCreate || pending || cartLines.length === 0 || !hasValidPayment}
                 type="submit"
               >
                 {pending ? 'Enregistrement…' : 'Enregistrer la vente'}
               </Button>
-              {!hasValidCash && cartLines.length > 0 && (
+              {!hasValidPayment && cartLines.length > 0 && (
                 <p className="text-xs text-muted-foreground" aria-live="polite">
-                  Saisissez un montant reçu au moins égal au total.
+                  {paymentMethod === 'CASH'
+                    ? 'Saisissez un montant reçu au moins égal au total.'
+                    : !paymentReference.trim()
+                      ? 'Saisissez la référence du paiement confirmé.'
+                      : 'Confirmez la réception du paiement avant de valider.'}
                 </p>
               )}
             </form>
@@ -437,6 +533,10 @@ export default function EcommercePosPanel({
                     <div>
                       <p className="font-semibold" data-testid={`text-pos-sale-reference-${sale.id}`}>{sale.reference}</p>
                       <p className="mt-1 text-xs text-muted-foreground">{dateTime(sale.createdAt)}{sale.customerName ? ` · ${sale.customerName}` : ''}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Paiement : {paymentMethodLabels[sale.paymentMethod]}
+                        {sale.paymentReference ? ` · Réf. ${sale.paymentReference}` : ''}
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold tabular-nums">{money(sale.total, currency)}</p>
@@ -448,7 +548,12 @@ export default function EcommercePosPanel({
                   <ul className="mt-3 space-y-1 border-t border-border pt-3" aria-label={`Articles de la vente ${sale.reference}`}>
                     {sale.items.map(item => (
                       <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm" key={item.id} data-testid={`row-pos-sale-item-${item.id}`}>
-                        <span className="min-w-0 flex-1">{item.productName} <span className="text-muted-foreground">× {item.quantity}</span></span>
+                        <span className="min-w-0 flex-1">
+                          {item.productName} <span className="text-muted-foreground">× {item.quantity}</span>
+                          {item.stockBefore !== null && item.stockAfter !== null && (
+                            <span className="mt-0.5 block text-xs text-muted-foreground">Stock : {item.stockBefore} → {item.stockAfter}</span>
+                          )}
+                        </span>
                         <span className="shrink-0 font-medium tabular-nums">{money(item.lineTotal, currency)}</span>
                       </li>
                     ))}

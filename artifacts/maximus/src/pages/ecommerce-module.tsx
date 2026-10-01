@@ -317,6 +317,7 @@ export default function EcommerceModulePage({
           todaySalesCount: 0,
           todayRevenue: 0,
           todayCashReceived: 0,
+          todayMobileMoneyReceived: 0,
           todayChangeGiven: 0,
         },
       });

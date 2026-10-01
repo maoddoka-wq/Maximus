@@ -56,7 +56,7 @@ final class ModuleCatalog
                 'id' => 'ecommerce',
                 'name' => 'Boutique en ligne',
                 'description' => 'Boutique en ligne, catalogue public et commandes clients.',
-                'features' => ['Tableau de bord', 'Catalogue', 'Vente physique', 'Vente comptoir espèces', 'Vente numérique', 'Catégories', 'Commandes', 'Clients', 'Promotions', 'Location', 'Livraisons', 'Finances', 'Paramètres'],
+                'features' => ['Tableau de bord', 'Catalogue', 'Vente physique', 'Vente comptoir', 'Vente numérique', 'Catégories', 'Commandes', 'Clients', 'Promotions', 'Location', 'Livraisons', 'Finances', 'Paramètres'],
                 'feature_packs' => [
                     ['id' => 'ecommerce-catalogue', 'name' => 'Catalogue en ligne', 'description' => 'Publier une boutique et présenter vos produits.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'finances', 'parametres']],
                     ['id' => 'ecommerce-gestion', 'name' => 'Gestion e-commerce', 'description' => 'Piloter le catalogue, les ventes physiques et les clients.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
@@ -604,7 +604,7 @@ final class ModuleCatalog
             ],
             'ecommerce' => [
                 'dashboard' => 'Tableau de bord', 'catalogue' => 'Catalogue', 'vente-physique' => 'Vente de produits physiques',
-                'vente-comptoir' => 'Vente comptoir en espèces',
+                'vente-comptoir' => 'Vente comptoir',
                 'vente-numerique' => 'Vente de produits numériques', 'categories' => 'Catégories', 'commandes' => 'Commandes',
                 'clients' => 'Clients', 'promotions' => 'Promotions', 'location' => 'Location', 'livraisons' => 'Livraisons',
                 'finances' => 'Finances & retraits', 'parametres' => 'Paramètres',

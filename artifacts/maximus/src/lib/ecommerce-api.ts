@@ -5,6 +5,7 @@ export type EcommerceProductStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type EcommerceProductType = 'SALE' | 'RENTAL';
 export type EcommerceProductFulfillmentType = 'PHYSICAL' | 'DIGITAL';
 export type EcommercePosSaleStatus = 'PAID' | 'REFUNDED';
+export type EcommercePosPaymentMethod = 'CASH' | 'WAVE' | 'ORANGE_MONEY';
 export type EcommerceRentalPeriod = 'JOUR' | 'SEMAINE' | 'MOIS';
 export type EcommerceRentalStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type EcommerceOrderStatus = 'NOUVELLE' | 'CONFIRMÉE' | 'EN PRÉPARATION' | 'EXPÉDIÉE' | 'LIVRÉE' | 'ANNULÉE';
@@ -21,12 +22,16 @@ export interface EcommercePosSaleItem {
   unitPrice: number;
   quantity: number;
   lineTotal: number;
+  stockBefore: number | null;
+  stockAfter: number | null;
 }
 
 export interface EcommercePosSale {
   id: string;
   reference: string;
   customerName: string;
+  paymentMethod: EcommercePosPaymentMethod;
+  paymentReference: string | null;
   currency: 'XOF' | 'EUR' | 'USD';
   subtotal: number;
   total: number;
@@ -44,13 +49,17 @@ export interface EcommercePosSalesBootstrap {
     todaySalesCount: number;
     todayRevenue: number;
     todayCashReceived: number;
+    todayMobileMoneyReceived: number;
     todayChangeGiven: number;
   };
 }
 
 export interface CreateEcommercePosSale {
   lines: Array<{ productId: string; quantity: number }>;
-  amountReceived: number;
+  paymentMethod: EcommercePosPaymentMethod;
+  amountReceived?: number;
+  paymentReference?: string;
+  paymentConfirmed?: boolean;
   customerName?: string;
   idempotencyKey: string;
 }
