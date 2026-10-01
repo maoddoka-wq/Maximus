@@ -45,6 +45,12 @@ export type CompanySubscriptionBilling = SubscriptionPriceBreakdown & {
   payments: SubscriptionPayment[];
 };
 
+export type CompanySubscriptionBillingMode = 'FREE' | 'PAID';
+
+export function getCompanySubscriptionBillingMode(customAmount: number | null): CompanySubscriptionBillingMode {
+  return customAmount === 0 ? 'FREE' : 'PAID';
+}
+
 function record(value: unknown, errorMessage: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(errorMessage);

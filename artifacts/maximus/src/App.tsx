@@ -130,6 +130,7 @@ import { InstallationSyncNotice } from '@/components/installation-sync-notice';
 import { CompanyInstallationAccess } from '@/components/company-installation-access';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company-payment-api';
+import { useCompanySubscriptionBillingMode } from '@/hooks/use-company-subscription-billing-mode';
 import { createEcommerceApi, type EcommerceDomain } from '@/lib/ecommerce-api';
 import { registrationCatalogApi } from '@/lib/registration-catalog-api';
 import { isPublicIntelligentRegistrationEnabled } from '@/lib/registration-policy';
@@ -427,6 +428,7 @@ function AppContent() {
   const [session, setSession] = useState<Session | null>(
     () => localStorage.getItem('maximus-session') as Session | null,
   );
+  const subscriptionBillingMode = useCompanySubscriptionBillingMode(session);
   const [companyLoginReturnPath, setCompanyLoginReturnPath] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [serverModuleStatuses, setServerModuleStatuses] = useState<Record<string, ModuleAvailability> | null>(null);
@@ -1237,6 +1239,13 @@ function AppContent() {
   const employee = employeeId ? (data.employees.find((e) => e.id === employeeId) ?? null) : null;
   const companyId = activeCompanyId ?? '';
   const currentCompany = activeCompany;
+  const workspaceFeaturesHiddenForCompany = new Set<CompanyWorkspaceFeatureId>(
+    currentCompany?.hiddenWorkspaceFeatures ?? [],
+  );
+  if (companyAdmin && subscriptionBillingMode !== 'PAID') {
+    workspaceFeaturesHiddenForCompany.add('abonnement');
+  }
+  const effectiveHiddenWorkspaceFeatures = [...workspaceFeaturesHiddenForCompany];
   const {
     accessRole,
     employeeNode,
@@ -1325,7 +1334,7 @@ function AppContent() {
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
         activeNavStyle={activeNavStyle}
-        hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
+        hiddenWorkspaceFeatures={effectiveHiddenWorkspaceFeatures}
       />
       <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain" tabIndex={-1}>
         <Topbar
@@ -1470,7 +1479,7 @@ function AppContent() {
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}
                    serverModuleAccess={serverModuleAccess}
-                   hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
+                   hiddenWorkspaceFeatures={effectiveHiddenWorkspaceFeatures}
                   screens={{
                     dashboard: RoleAwareCompanyDashboard,
                     control: ControlCenterPage,

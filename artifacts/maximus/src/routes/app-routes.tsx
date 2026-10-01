@@ -405,7 +405,13 @@ export function CompanyRouter({
               ? 'subscription'
               : 'structure';
     return renderScreen(screens.organization, {
-      company,
+      company: {
+        ...company,
+        hiddenWorkspaceFeatures: [...new Set<CompanyWorkspaceFeatureId>([
+          ...(company.hiddenWorkspaceFeatures ?? []),
+          ...(hiddenWorkspaceFeatures ?? []),
+        ])],
+      },
       data,
       mutate,
       initialTab,
