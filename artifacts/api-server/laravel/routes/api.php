@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\OnboardingDraftController;
 use App\Http\Controllers\Api\ModuleController;
 use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\EcommerceSubscriptionController;
+use App\Http\Controllers\Api\EcommerceSubscriptionBillingController;
 use App\Http\Controllers\Api\SystemHealthController;
 use App\Http\Controllers\Api\InstallationController;
 use App\Http\Controllers\Api\InstallationAccessController;
@@ -155,6 +156,13 @@ Route::middleware(['maximus.auth', 'maximus.company'])->prefix('modules')->group
     Route::get('/bootstrap', [ModuleController::class, 'bootstrap']);
     Route::patch('/{moduleId}/access', [ModuleController::class, 'setAccess']);
 });
+
+Route::middleware(['maximus.auth', 'maximus.company'])
+    ->prefix('company/ecommerce-subscription')
+    ->group(function (): void {
+        Route::get('/', [EcommerceSubscriptionBillingController::class, 'show']);
+        Route::post('/checkout', [EcommerceSubscriptionBillingController::class, 'checkout'])->middleware('throttle:orders');
+    });
 
 Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void {
     Route::get('/bootstrap', [AppStateController::class, 'bootstrap']);

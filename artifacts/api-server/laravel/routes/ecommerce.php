@@ -58,7 +58,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'
          Route::delete('/delivery-zones/{id}', [EcommerceController::class, 'deleteDeliveryZone']);
     });
 
-Route::middleware('maximus.installation.public')->group(function (): void {
+Route::middleware(['maximus.installation.public', 'maximus.ecommerce.subscription'])->group(function (): void {
 Route::get('/product-images/{company}/{filename}', [EcommerceController::class, 'serveProductImage'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 Route::get('/store-logos/{company}/{filename}', [EcommerceController::class, 'serveStoreLogo'])
@@ -68,7 +68,7 @@ Route::get('/rental-images/{company}/{filename}', [EcommerceController::class, '
 Route::get('/gallery-images/{company}/{imageId}', [EcommerceController::class, 'serveGalleryImage'])
     ->where(['company' => '[A-Za-z0-9_-]+', 'imageId' => '[A-Za-z0-9_-]+']);
 
-Route::middleware('maximus.public-site')->group(function (): void {
+Route::middleware(['maximus.public-site', 'maximus.ecommerce.subscription'])->group(function (): void {
 Route::get('/shop-domain', [EcommerceController::class, 'publicBootstrapByDomain']);
 Route::get('/shop-domain/location/{id}/quote', [CarRentalController::class, 'quoteDomain']);
 Route::post('/shop-domain/location/reservations', [CarRentalController::class, 'reserveDomain'])->middleware('throttle:orders');
