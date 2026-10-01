@@ -113,7 +113,7 @@ function ProfileButton({
       variant="outline"
       data-testid={`preview-profile-${profile.id}`}
       onClick={() => onChoose(profile.id)}
-      className="h-full min-h-32 w-full justify-start whitespace-normal rounded-xl p-4 text-left"
+      className="min-h-14 w-full justify-start whitespace-normal rounded-lg px-3 py-2.5 text-left"
     >
       <div className="flex w-full items-start gap-3">
         <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
@@ -182,7 +182,7 @@ function ProfilePicker({
                 <span className="h-px flex-1 bg-border" />
                 <span className="text-xs text-muted-foreground">{profiles.length} profil{profiles.length === 1 ? '' : 's'}</span>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="space-y-2">
                 {profiles.map((profile) => {
                   const { access } = resolveProfileAccess(payload, storeData, profile);
                   return (
