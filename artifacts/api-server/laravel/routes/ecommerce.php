@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Api\EcommerceController;
 use App\Http\Controllers\Api\EcommerceCustomerController;
-use App\Http\Controllers\Api\EcommerceInventoryController;
 use App\Http\Controllers\Api\EcommercePaymentController;
 use App\Http\Controllers\Api\EcommercePosController;
 use App\Http\Controllers\Api\SellerWalletController;
@@ -15,8 +14,6 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription', 'm
     ->prefix('ecommerce')
     ->group(function (): void {
         Route::get('/bootstrap', [EcommerceController::class, 'bootstrap']);
-        Route::get('/inventory', [EcommerceInventoryController::class, 'index']);
-        Route::post('/inventory/adjustments', [EcommerceInventoryController::class, 'adjust'])->middleware('throttle:60,1');
         Route::get('/pos-sales', [EcommercePosController::class, 'index']);
         Route::post('/pos-sales', [EcommercePosController::class, 'store'])->middleware('throttle:60,1');
         Route::get('/wallet', [SellerWalletController::class, 'bootstrap']);

@@ -113,16 +113,6 @@ class EcommerceTest extends TestCase
             'stock_before' => 5,
             'stock_after' => 3,
         ]);
-        $this->assertDatabaseHas('ecommerce_inventory_movements', [
-            'company_id' => 'kora',
-            'product_id' => 'ecommerce-pos-product',
-            'source_type' => 'POS_SALE',
-            'direction' => 'OUT',
-            'quantity' => 2,
-            'stock_before' => 5,
-            'stock_after' => 3,
-            'reference' => DB::table('ecommerce_pos_sales')->where('id', $saleId)->value('reference'),
-        ]);
         $this->assertDatabaseCount('seller_wallet_ledger', 0);
         $this->assertDatabaseCount('maximus_wallet_ledger', 0);
 
@@ -139,7 +129,6 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseHas('ecommerce_products', ['id' => 'ecommerce-pos-product', 'stock' => 3]);
         $this->assertDatabaseCount('ecommerce_pos_sales', 1);
         $this->assertDatabaseCount('ecommerce_pos_stock_movements', 1);
-        $this->assertDatabaseCount('ecommerce_inventory_movements', 1);
 
         $request->getJson('/api/ecommerce/pos-sales?companyId=kora')
             ->assertOk()
@@ -150,7 +139,7 @@ class EcommerceTest extends TestCase
             ->assertJsonPath('summary.todayChangeGiven', 1000);
     }
 
-    public function test_pos_external_mobile_money_needs_confirmation_and_records_inventory_movement_once(): void
+    public function test_pos_external_mobile_money_records_provider_reference_and_inventory_movement_once(): void
     {
         $this->setEcommerceFeatures(['dashboard', 'catalogue', 'vente-physique', 'vente-comptoir']);
         DB::table('ecommerce_products')->insert([
@@ -236,108 +225,6 @@ class EcommerceTest extends TestCase
             ->assertJsonPath('summary.todayCashReceived', 0)
             ->assertJsonPath('summary.todayMobileMoneyReceived', 2000)
             ->assertJsonPath('summary.todayChangeGiven', 0);
-    }
-
-    public function test_inventory_is_company_scoped_and_adjustments_are_auditable_and_idempotent(): void
-    {
-        $this->setEcommerceFeatures(['dashboard', 'catalogue', 'vente-physique', 'inventaire']);
-        $request = $this->asActor();
-        $product = $request->postJson('/api/ecommerce/products?companyId=kora', [
-            'name' => 'Stock test',
-            'sku' => 'STOCK-TEST-01',
-            'category' => 'Accessoires',
-            'price' => 2500,
-            'stock' => 5,
-            'status' => 'PUBLISHED',
-        ])->assertCreated()->json();
-
-        DB::table('ecommerce_products')->insert([
-            'id' => 'inventory-product-other-company',
-            'company_id' => 'other-company',
-            'name' => 'Produit autre entreprise',
-            'slug' => 'inventory-other-company',
-            'sku' => 'OTHER-STOCK-01',
-            'description' => '',
-            'category' => 'Accessoires',
-            'price' => 1000,
-            'stock' => 20,
-            'image_url' => '',
-            'featured' => false,
-            'product_type' => 'SALE',
-            'fulfillment_type' => 'PHYSICAL',
-            'status' => 'PUBLISHED',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $request->getJson('/api/ecommerce/inventory?companyId=kora')
-            ->assertOk()
-            ->assertJsonPath('summary.productCount', 1)
-            ->assertJsonPath('summary.totalUnits', 5)
-            ->assertJsonCount(1, 'products')
-            ->assertJsonPath('movements.0.sourceType', 'OPENING_BALANCE');
-
-        $adjustment = [
-            'productId' => $product['id'],
-            'direction' => 'IN',
-            'quantity' => 3,
-            'reason' => 'Réception de marchandises',
-        ];
-        $first = $request->withHeader('Idempotency-Key', 'inventory-test-adjustment-1')
-            ->postJson('/api/ecommerce/inventory/adjustments?companyId=kora', $adjustment)
-            ->assertCreated()
-            ->assertJsonPath('movement.stockBefore', 5)
-            ->assertJsonPath('movement.stockAfter', 8);
-        $movementId = $first->json('movement.id');
-
-        $request->withHeader('Idempotency-Key', 'inventory-test-adjustment-1')
-            ->postJson('/api/ecommerce/inventory/adjustments?companyId=kora', $adjustment)
-            ->assertOk()
-            ->assertJsonPath('movement.id', $movementId);
-
-        $request->withHeader('Idempotency-Key', 'inventory-test-adjustment-1')
-            ->postJson('/api/ecommerce/inventory/adjustments?companyId=kora', [
-                ...$adjustment,
-                'quantity' => 4,
-            ])
-            ->assertConflict();
-
-        $request->withHeader('Idempotency-Key', 'inventory-test-adjustment-2')
-            ->postJson('/api/ecommerce/inventory/adjustments?companyId=kora', [
-                ...$adjustment,
-                'direction' => 'OUT',
-                'quantity' => 9,
-            ])
-            ->assertUnprocessable();
-
-        $request->withHeader('Idempotency-Key', 'inventory-test-adjustment-3')
-            ->postJson('/api/ecommerce/inventory/adjustments?companyId=kora', [
-                ...$adjustment,
-                'productId' => 'inventory-product-other-company',
-            ])
-            ->assertNotFound();
-
-        $request->patchJson('/api/ecommerce/products/'.$product['id'].'?companyId=kora', [
-            'stock' => 99,
-        ])->assertOk();
-        $this->assertDatabaseHas('ecommerce_products', ['id' => $product['id'], 'stock' => 8]);
-        $this->assertDatabaseCount('ecommerce_inventory_movements', 2);
-    }
-
-    public function test_inventory_adjustment_requires_inventory_create_permission(): void
-    {
-        $this->setEcommerceFeatures(['dashboard', 'catalogue', 'vente-physique', 'inventaire']);
-        $request = $this->asActor('employee', [
-            'ecommerce:menu:inventaire' => ['voir'],
-        ]);
-
-        $request->getJson('/api/ecommerce/inventory?companyId=kora')->assertOk();
-        $request->postJson('/api/ecommerce/inventory/adjustments?companyId=kora', [
-            'productId' => 'unimportant-before-authorization',
-            'direction' => 'IN',
-            'quantity' => 1,
-            'reason' => 'Test de permission',
-        ])->assertForbidden();
     }
 
     public function test_ecommerce_requires_a_session_and_company_context(): void
@@ -779,25 +666,6 @@ class EcommerceTest extends TestCase
 
         $order = DB::table('ecommerce_orders')->where('reference', $first->json('reference'))->first();
         $this->assertNotNull($order);
-        $orderItem = DB::table('ecommerce_order_items')->where('order_id', $order->id)->first();
-        $this->assertNotNull($orderItem);
-        $this->assertDatabaseHas('ecommerce_inventory_movements', [
-            'company_id' => 'kora',
-            'product_id' => $orderItem->product_id,
-            'source_type' => 'ONLINE_ORDER',
-            'source_id' => $orderItem->id,
-            'direction' => 'OUT',
-            'quantity' => 1,
-            'stock_before' => 4,
-            'stock_after' => 3,
-        ]);
-        $this->assertSame(
-            1,
-            DB::table('ecommerce_inventory_movements')
-                ->where('source_type', 'ONLINE_ORDER')
-                ->where('source_id', $orderItem->id)
-                ->count(),
-        );
         $this->assertDatabaseCount('ecommerce_orders', 1);
         $request->patchJson('/api/ecommerce/orders/'.$order->id.'/status?companyId=kora', ['status' => 'CONFIRMÉE'])
             ->assertOk()
@@ -807,17 +675,7 @@ class EcommerceTest extends TestCase
         $request->patchJson('/api/ecommerce/orders/'.$order->id.'/status?companyId=kora', ['status' => 'ANNULÉE'])
             ->assertOk()
             ->assertJsonPath('status', 'ANNULÉE');
-        $this->assertDatabaseHas('ecommerce_products', ['slug' => 'produit-transition', 'stock' => 4]);
-        $this->assertDatabaseHas('ecommerce_inventory_movements', [
-            'company_id' => 'kora',
-            'product_id' => $orderItem->product_id,
-            'source_type' => 'ONLINE_RETURN',
-            'source_id' => $orderItem->id,
-            'direction' => 'IN',
-            'quantity' => 1,
-            'stock_before' => 3,
-            'stock_after' => 4,
-        ]);
+        $this->assertDatabaseHas('ecommerce_products', ['slug' => 'produit-transition', 'stock' => 3]);
     }
 
     public function test_public_order_by_slug_rejects_an_inactive_company(): void

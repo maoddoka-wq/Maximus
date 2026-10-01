@@ -42,8 +42,6 @@ import {
   type EcommerceProduct,
   type EcommerceProductFulfillmentType,
   type EcommerceProductType,
-  type EcommerceInventoryBootstrap,
-  type CreateEcommerceInventoryAdjustment,
   type EcommerceRental,
   type EcommerceRentalPeriod,
   type EcommerceRentalStatus,
@@ -57,20 +55,18 @@ import {
   type SellerWalletBootstrap,
 } from '@/lib/ecommerce-api';
 import EcommercePosPanel from '@/pages/ecommerce-pos-panel';
-import EcommerceInventoryPanel from '@/pages/ecommerce-inventory-panel';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
-type EcommerceTab = 'dashboard' | 'accueil' | 'catalogue' | 'inventaire' | 'vente-comptoir' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';
+type EcommerceTab = 'dashboard' | 'accueil' | 'catalogue' | 'vente-comptoir' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';
 
 const tabs: { id: EcommerceTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
   { id: 'accueil', label: 'Accueil', icon: House },
   { id: 'catalogue', label: 'Catalogue', icon: Package },
-  { id: 'inventaire', label: 'Inventaire', icon: Archive },
   { id: 'vente-comptoir', label: 'Vente comptoir', icon: ShoppingBag },
   { id: 'categories', label: 'Catégories', icon: Tags },
   { id: 'commandes', label: 'Commandes', icon: ClipboardList },
@@ -270,18 +266,15 @@ export default function EcommerceModulePage({
   const [data, setData] = useState<EcommerceBootstrap | null>(null);
   const [walletData, setWalletData] = useState<SellerWalletBootstrap | null>(null);
   const [posData, setPosData] = useState<EcommercePosSalesBootstrap | null>(null);
-  const [inventoryData, setInventoryData] = useState<EcommerceInventoryBootstrap | null>(null);
   const visibleTabs = allowedFeatureIds
     ? tabs.filter(item =>
         item.id === 'dashboard'
         || item.id === 'accueil'
-        || (allowedFeatureIds.includes(item.id)
-          && (item.id !== 'inventaire' || !featurePermissions || featurePermissions.inventaire?.includes('voir')))
+        || allowedFeatureIds.includes(item.id)
         || (item.id === 'categories' && allowedFeatureIds.includes('catalogue')),
       )
     : tabs;
   const visibleTabIds = visibleTabs.map(item => item.id);
-  const canViewInventory = !featurePermissions || featurePermissions.inventaire?.includes('voir') === true;
   const [tab, setTab] = useQueryTab({ tabs: visibleTabIds, defaultTab: visibleTabIds[0] ?? 'dashboard' });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -328,28 +321,21 @@ export default function EcommerceModulePage({
           todayChangeGiven: 0,
         },
       });
-      setInventoryData({
-        summary: { productCount: 0, totalUnits: 0, outOfStockCount: 0 },
-        products: [],
-        movements: [],
-      });
       setError('');
       setLoading(false);
       setRefreshing(false);
       return;
     }
     try {
-      const [bootstrap, nextWalletData, nextPosData, nextInventoryData] = await Promise.all([
+      const [bootstrap, nextWalletData, nextPosData] = await Promise.all([
         api.bootstrap(),
         visibleTabIds.includes('finances') ? api.wallet() : Promise.resolve(null),
         visibleTabIds.includes('vente-comptoir') ? api.posSales() : Promise.resolve(null),
-        visibleTabIds.includes('inventaire') && canViewInventory ? api.inventory() : Promise.resolve(null),
       ]);
       const nextData = normalizeEcommerceBootstrap(bootstrap, companyId);
       setData(nextData);
       setWalletData(nextWalletData);
       setPosData(nextPosData);
-      setInventoryData(nextInventoryData);
       setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossible de charger l’espace e-commerce.');
@@ -446,23 +432,6 @@ export default function EcommerceModulePage({
       {tab === 'dashboard' && <Dashboard data={data} onTab={navigate} />}
       {tab === 'accueil' && <HomePanel store={store} canModify={currentCanModify} run={run} />}
       {tab === 'catalogue' && <Catalogue data={data} allowedFeatureIds={allowedFeatureIds} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
-      {tab === 'inventaire' && inventoryData && (
-        <EcommerceInventoryPanel
-          data={inventoryData}
-          canAdjust={currentCanCreate && !preview}
-          refreshing={refreshing}
-          busy={Boolean(pendingAction)}
-          onRefresh={() => void load(true)}
-          onAdjust={async (input: CreateEcommerceInventoryAdjustment) => {
-            const result = await run(
-              () => api.adjustInventory(input),
-              'Ajustement de stock enregistré.',
-              'inventory-adjustment',
-            );
-            return result?.movement;
-          }}
-        />
-      )}
       {tab === 'vente-comptoir' && posData && (
         <EcommercePosPanel
           idempotencyScope={companyId}
@@ -969,7 +938,7 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
     if (!form.name.trim()) missingFields.push('le nom');
     if (!form.sku.trim()) missingFields.push('la référence');
     if (!form.price.trim() || !Number.isFinite(price) || price < 0) missingFields.push('un prix valide');
-    if (modal === 'new' && form.fulfillmentType === 'PHYSICAL' && (!form.stock.trim() || !Number.isFinite(stock) || stock < 0)) {
+    if (form.fulfillmentType === 'PHYSICAL' && (!form.stock.trim() || !Number.isFinite(stock) || stock < 0)) {
       missingFields.push('un stock valide');
     }
     if (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice < 0)) {
@@ -1045,11 +1014,7 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
         <Field label="Slug public (optionnel)" value={form.slug} onChange={value => { setSlugManuallyEdited(true); patch({ slug: value }); }} placeholder="généré automatiquement si vide" />
         <Field label="Prix de vente" required type="number" value={form.price} onChange={value => patch({ price: value })} placeholder="0" />
         <Field label="Prix barré" type="number" value={form.compareAtPrice} onChange={value => patch({ compareAtPrice: value })} placeholder="Optionnel" />
-         {form.fulfillmentType === 'PHYSICAL'
-           ? modal === 'new'
-             ? <Field label="Stock initial" required type="number" value={form.stock} onChange={value => patch({ stock: value })} placeholder="0" />
-             : <div className="rounded-lg border bg-[hsl(var(--muted))] px-3 py-2.5 text-xs"><strong className="block">Stock actuel : {form.stock}</strong><span className="mt-1 block text-[hsl(var(--muted-foreground))]">Pour garder un historique fiable, modifiez les quantités depuis l’onglet Inventaire.</span></div>
-           : <div className="rounded-lg border border-[hsl(var(--primary)/.24)] bg-[hsl(var(--primary)/.06)] px-3 py-2.5 text-xs"><strong className="block">Vente numérique</strong><span className="mt-1 block text-[hsl(var(--muted-foreground))]">Le stock physique n’est pas décrémenté. Une unité est réservée par commande.</span></div>}
+         {form.fulfillmentType === 'PHYSICAL' ? <Field label="Stock disponible" required type="number" value={form.stock} onChange={value => patch({ stock: value })} placeholder="0" /> : <div className="rounded-lg border border-[hsl(var(--primary)/.24)] bg-[hsl(var(--primary)/.06)] px-3 py-2.5 text-xs"><strong className="block">Vente numérique</strong><span className="mt-1 block text-[hsl(var(--muted-foreground))]">Le stock physique n’est pas décrémenté. Une unité est réservée par commande.</span></div>}
          {form.fulfillmentType === 'DIGITAL' ? <label className="block text-xs font-bold">Fichier numérique<input type="file" accept={digitalFileAccept} onChange={event => { const file = event.target.files?.[0] ?? null; patch({ digitalFile: file, digitalFileName: file?.name ?? form.digitalFileName }); }} className="mt-1.5 block w-full rounded-lg border px-3 py-2.5 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal leading-5 text-[hsl(var(--muted-foreground))]">Vidéo, musique, PDF, Word ou PowerPoint · 1 Go maximum · requis pour publier. Un brouillon peut être enregistré avant l’ajout du fichier.</span>{form.digitalFileName && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">{form.digitalFileName}</span>}</label> : null}
          <label className="block text-xs font-bold sm:col-span-2">Images du produit<input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={event => { const files = Array.from(event.target.files ?? []); patch({ imageFile: files[0] ?? null, galleryFiles: files.slice(1) }); }} className="mt-1.5 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[hsl(var(--muted))] file:px-2.5 file:py-1.5 file:text-xs file:font-bold" /><span className="mt-1 block text-[11px] font-normal text-[hsl(var(--muted-foreground))]">Le premier fichier devient l’image principale ; les suivants sont ajoutés à la galerie. Les images déjà enregistrées sont conservées.</span>{form.imageFile && <span className="mt-1 block truncate text-[11px] font-semibold text-[hsl(var(--primary))]">Image principale : {form.imageFile.name}{form.galleryFiles.length > 0 ? ` · ${form.galleryFiles.length} autre(s) ajoutée(s)` : ''}</span>}{form.imageUrl && !form.imageFile && <img src={form.imageUrl} alt="" className="mt-2 h-16 w-16 rounded-lg object-cover" />}</label>
       </div>

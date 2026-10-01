@@ -708,67 +708,16 @@ final class SellerWalletController extends Controller
 
     public function restoreOrderStock(object $order): void
     {
-        DB::transaction(function () use ($order): void {
-            $lockedOrder = DB::table('ecommerce_orders')
-                ->where('id', $order->id)
-                ->where('company_id', $order->company_id)
-                ->lockForUpdate()
-                ->first();
-            if (! $lockedOrder || $lockedOrder->stock_restored_at !== null) {
-                return;
+        if ($order->stock_restored_at !== null) {
+            return;
+        }
+        $items = DB::table('ecommerce_order_items')->where('order_id', $order->id)->get();
+        foreach ($items as $item) {
+            if ($item->product_id && ($item->fulfillment_type ?? 'PHYSICAL') === 'PHYSICAL') {
+                DB::table('ecommerce_products')->where('id', $item->product_id)->increment('stock', (int) $item->quantity, ['updated_at' => now()]);
             }
-
-            $items = DB::table('ecommerce_order_items')
-                ->where('order_id', $lockedOrder->id)
-                ->get();
-            foreach ($items as $item) {
-                if (! $item->product_id || ($item->fulfillment_type ?? 'PHYSICAL') !== 'PHYSICAL') {
-                    continue;
-                }
-
-                $product = DB::table('ecommerce_products')
-                    ->where('id', $item->product_id)
-                    ->where('company_id', $lockedOrder->company_id)
-                    ->lockForUpdate()
-                    ->first();
-                if (! $product) {
-                    continue;
-                }
-
-                $quantity = (int) $item->quantity;
-                $stockBefore = (int) $product->stock;
-                $stockAfter = $stockBefore + $quantity;
-                DB::table('ecommerce_products')
-                    ->where('id', $product->id)
-                    ->where('company_id', $lockedOrder->company_id)
-                    ->update(['stock' => $stockAfter, 'updated_at' => now()]);
-
-                DB::table('ecommerce_inventory_movements')->insert([
-                    'id' => (string) Str::uuid(),
-                    'company_id' => $lockedOrder->company_id,
-                    'product_id' => $product->id,
-                    'product_name' => $item->product_name,
-                    'sku' => $product->sku ?? '',
-                    'source_type' => 'ONLINE_RETURN',
-                    'source_id' => $item->id,
-                    'direction' => 'IN',
-                    'quantity' => $quantity,
-                    'stock_before' => $stockBefore,
-                    'stock_after' => $stockAfter,
-                    'reason' => 'Stock restitué après annulation de commande en ligne.',
-                    'reference' => $lockedOrder->reference,
-                    'created_by' => null,
-                    'idempotency_key' => null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-
-            DB::table('ecommerce_orders')
-                ->where('id', $lockedOrder->id)
-                ->where('company_id', $lockedOrder->company_id)
-                ->update(['stock_restored_at' => now(), 'updated_at' => now()]);
-        });
+        }
+        DB::table('ecommerce_orders')->where('id', $order->id)->update(['stock_restored_at' => now(), 'updated_at' => now()]);
     }
 
     private function isDigitalOrder(object $order): bool
