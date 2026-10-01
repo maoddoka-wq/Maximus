@@ -408,9 +408,13 @@ function ProfileWorkspace({
   onStoreDataChange: PreviewMutate;
 }) {
   const search = useSearch();
-  const [route, setRoute] = useState(
-    profile.kind === 'platform-admin' ? '/maximus/dashboard' : '/entreprise/dashboard',
-  );
+  const previewSection = new URLSearchParams(search.replace(/^\?/, '')).get('section');
+  const [route, setRoute] = useState(() => {
+    if (profile.kind === 'platform-admin') return '/maximus/dashboard';
+    if (previewSection === 'stocks') return '/entreprise/stocks';
+    if (previewSection === 'presences') return '/entreprise/presences';
+    return '/entreprise/dashboard';
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { company, employee, session, access } = resolveProfileAccess(payload, storeData, profile);
@@ -558,7 +562,14 @@ function ProfileWorkspace({
             </div>
             <PreviewModuleContext.Provider
               value={{
-                stockData: payload.stockData,
+                stockData: {
+                  ...payload.stockData,
+                  products: payload.stockData.products.map((product) => ({
+                    ...product,
+                    priceDataMissing: product.priceDataMissing
+                      ?? (product.purchasePrice === 0 && product.salePrice === 0),
+                  })),
+                },
                 presenceItems: payload.presenceData.items,
                 mutate,
               }}

@@ -15,6 +15,7 @@ export interface StockProduct {
   unit: string;
   purchasePrice: number;
   salePrice: number;
+  priceDataMissing?: boolean;
   minStock: number;
   maxStock: number;
   supplierId: string | null;
