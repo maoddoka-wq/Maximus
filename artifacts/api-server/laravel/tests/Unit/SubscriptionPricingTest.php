@@ -65,4 +65,17 @@ class SubscriptionPricingTest extends TestCase
         $this->assertNull($result['moduleTotal']);
         $this->assertSame(18000, $result['payableAmount']);
     }
+
+    public function test_zero_custom_amount_keeps_a_company_in_free_mode(): void
+    {
+        $result = (new SubscriptionPricing())->calculate(
+            [['id' => 'commerce', 'name' => 'Commerce']],
+            ['commerce' => 12000],
+            0,
+        );
+
+        $this->assertSame(12000, $result['moduleTotal']);
+        $this->assertSame(0, $result['customAmount']);
+        $this->assertSame(0, $result['payableAmount']);
+    }
 }

@@ -62,6 +62,42 @@ class SubscriptionBillingTest extends TestCase
             'custom_monthly_amount' => 27000,
             'updated_by' => $admin->id,
         ]);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $session)
+            ->putJson('/api/platform-settings/subscription-billing/companies/'.$company->id, [
+                'customAmount' => 0,
+            ])
+            ->assertOk()
+            ->assertJsonPath('customAmount', 0);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $session)
+            ->getJson('/api/platform-settings/subscription-billing')
+            ->assertOk()
+            ->assertJsonPath('companies.0.customAmount', 0)
+            ->assertJsonPath('companies.0.payableAmount', 0);
+
+        $this->assertDatabaseHas('maximus_company_subscription_prices', [
+            'company_id' => $company->id,
+            'custom_monthly_amount' => 0,
+            'updated_by' => $admin->id,
+        ]);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $session)
+            ->putJson('/api/platform-settings/subscription-billing/companies/'.$company->id, [
+                'customAmount' => null,
+            ])
+            ->assertOk()
+            ->assertJsonPath('customAmount', null);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $session)
+            ->getJson('/api/platform-settings/subscription-billing')
+            ->assertOk()
+            ->assertJsonPath('companies.0.customAmount', null)
+            ->assertJsonPath('companies.0.payableAmount', 26000);
     }
 
     public function test_removed_catalog_modules_are_excluded_from_the_grid_and_company_total(): void
