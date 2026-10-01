@@ -14,3 +14,9 @@ Pour Immobilier, la liste canonique doit rester synchronisée à quatre endroits
 **Why:** Une correction limitée à deux liens peut laisser les autres fonctionnalités Immobilier afficher le même écran, ce qui rend le routage nominal mais le parcours métier incohérent.
 
 **How to apply:** Ajouter toute nouvelle fonctionnalité dans `getModuleFeatureOptions`, le test de routes Immobilier et la table de vues du module avant de la publier dans un pack.
+
+Pour Stock, les clés de permission détaillée suivent la forme `stocks:<featureId>` plutôt que la forme générique `stocks:menu:<featureId>`. Les sélecteurs de rubriques doivent employer la même forme que le contrôle des droits. Les maps de permissions persistées doivent aussi être lues par clés propres et valeurs validées : des tableaux vides peuvent apparaître là où le code attend un objet, et des noms de fonctionnalités comme `entries` entrent en collision avec des méthodes natives.
+
+**Why:** Un rôle pouvait avoir Stock autorisé mais un menu vide si le sélecteur cherchait une autre forme de clé; une lecture héritée d’un tableau pouvait aussi faire échouer le calcul complet des accès.
+
+**How to apply:** Réutiliser les conventions propres à chaque module pour dériver ses rubriques, vérifier les clés avec `hasOwnProperty` et conserver les refus explicites représentés par une liste vide.
