@@ -60,10 +60,6 @@ import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog
 import { ModulePackDraftForm } from '@/components/module-pack-draft-form';
 import { EcommerceSubscriptionManagement } from '@/components/ecommerce-subscription-management';
 import {
-  CompanyEcommerceSubscriptionPage,
-  EcommerceSubscriptionReminder,
-} from '@/components/company-ecommerce-subscription';
-import {
   ActionButton,
   ActivityRow,
   Brand,
@@ -280,11 +276,6 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     kicker: 'Espace entreprise',
     title: 'Pilotage de l’entreprise',
     description: 'Comprenez votre activité et agissez depuis un espace unifié.',
-  },
-  '/entreprise/abonnement': {
-    kicker: 'Espace entreprise',
-    title: 'Abonnement E-commerce',
-    description: 'Consultez l’état de l’accès, l’échéance et les actions de paiement.',
   },
   '/entreprise/controle': {
     kicker: 'Espace entreprise',
@@ -1482,7 +1473,6 @@ function AppContent() {
                    hiddenWorkspaceFeatures={currentCompany?.hiddenWorkspaceFeatures}
                   screens={{
                     dashboard: RoleAwareCompanyDashboard,
-                    ecommerceSubscription: CompanyEcommerceSubscriptionPage,
                     control: ControlCenterPage,
                     notifications: NotificationsPage,
                     setupGuide: CompanySetupGuide,
@@ -2956,14 +2946,12 @@ function RoleAwareCompanyDashboard({
   allowed,
   companyId,
   hiddenWorkspaceFeatures,
-  companyAdmin,
 }: {
   data: StoreData;
   onNavigate: (path: string) => void;
   allowed: ModuleId[];
   companyId: string;
   hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
-  companyAdmin: boolean;
 }) {
   const inCompany = <T extends { companyId?: string }>(item: T) => !item.companyId || item.companyId === companyId;
   const canCommerce = allowed.includes('commerce') || allowed.includes('ventes');
@@ -3090,11 +3078,6 @@ function RoleAwareCompanyDashboard({
 
   return (
     <div className="space-y-6">
-      <EcommerceSubscriptionReminder
-        companyAdmin={companyAdmin}
-        companyId={companyId}
-        onNavigate={onNavigate}
-      />
       <section className="overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[linear-gradient(135deg,hsl(var(--primary)/.09),hsl(var(--card)),hsl(var(--accent)/.1))] p-6 sm:p-7">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">

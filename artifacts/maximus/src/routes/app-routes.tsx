@@ -161,7 +161,6 @@ export function AdminRouter({
 
 export type CompanyRouteScreens = {
   dashboard: Screen;
-  ecommerceSubscription: Screen;
   control: Screen;
   notifications: Screen;
   setupGuide: Screen;
@@ -261,15 +260,6 @@ export function CompanyRouter({
         effectiveFeaturePermissions(permissions) ?? [],
       ]),
     ) as Partial<Record<string, string[]>> | undefined;
-  if (routePath === '/entreprise/abonnement') {
-    return companyAdmin
-      ? renderScreen(screens.ecommerceSubscription, { companyId, companyAdmin })
-      : renderScreen(screens.empty, {
-          title: 'Accès réservé à l’administrateur',
-          text: 'La gestion de l’abonnement E-commerce est accessible à l’administrateur de l’entreprise.',
-          action: () => onBack('/entreprise/dashboard'),
-        });
-  }
   const routeModuleOverrides: Partial<Record<string, ModuleId>> = {
     '/entreprise/finance': 'finance',
     '/entreprise/rh': 'rh',
@@ -299,7 +289,6 @@ export function CompanyRouter({
       allowed,
       companyId,
       hiddenWorkspaceFeatures,
-      companyAdmin,
     });
   }
   if (routePath === '/entreprise/controle') {

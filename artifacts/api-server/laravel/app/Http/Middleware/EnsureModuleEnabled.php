@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Services\EcommerceSubscriptionService;
 use App\Support\ModuleCatalog;
 use Closure;
 use Illuminate\Http\Request;
@@ -34,17 +33,6 @@ class EnsureModuleEnabled
                 'moduleId' => $moduleId,
                 'status' => $status,
             ], 503);
-        }
-
-        if ($moduleId === 'ecommerce'
-            && in_array($status, ['ACTIF', 'BETA'], true)
-            && ! app(EcommerceSubscriptionService::class)->hasCurrentPeriod($companyId)) {
-            return response()->json([
-                'error' => 'L’abonnement E-commerce est requis ou arrivé à échéance. Renouvelez-le pour rétablir l’accès.',
-                'code' => 'ECOMMERCE_SUBSCRIPTION_REQUIRED',
-                'moduleId' => $moduleId,
-                'status' => $status,
-            ], 403);
         }
 
         if (!in_array($status, ['ACTIF', 'BETA'], true)) {

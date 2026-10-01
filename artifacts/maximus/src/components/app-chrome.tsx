@@ -76,7 +76,6 @@ export function Sidebar({
     : companyNav.filter(
         item =>
           (!item.peopleAdminOnly || companyAdmin || canManagePeople) &&
-          (!item.companyAdminOnly || companyAdmin) &&
           (item.module === null || allowed.includes(item.module as ModuleId)) &&
           !hiddenWorkspaceFeatureSet.has(companyWorkspaceFeatureForPath(item.href) as CompanyWorkspaceFeatureId),
       );

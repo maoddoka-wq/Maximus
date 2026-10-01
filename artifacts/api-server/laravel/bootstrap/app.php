@@ -4,7 +4,6 @@ use App\Http\Middleware\AuthenticateDiagnosticToken;
 use App\Http\Middleware\AuthenticateInstallationToken;
 use App\Http\Middleware\AuthenticateMaximus;
 use App\Http\Middleware\EnsureModuleEnabled;
-use App\Http\Middleware\EnsureEcommerceSubscriptionCurrent;
 use App\Http\Middleware\EnsurePublicSiteAuthorized;
 use App\Http\Middleware\NoStoreApiResponses;
 use App\Http\Middleware\RequireCentralInstallation;
@@ -43,7 +42,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'maximus.diagnostic' => AuthenticateDiagnosticToken::class,
             'maximus.company' => ResolveCompanyContext::class,
             'maximus.module' => EnsureModuleEnabled::class,
-            'maximus.ecommerce.subscription' => EnsureEcommerceSubscriptionCurrent::class,
             'maximus.public-site' => EnsurePublicSiteAuthorized::class,
             'maximus.central' => RequireCentralInstallation::class,
             'maximus.installation.token' => AuthenticateInstallationToken::class,

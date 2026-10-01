@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\DiamanoPayService;
 use App\Services\EcommerceCommissionPolicy;
-use App\Services\EcommerceSubscriptionPaymentService;
 use App\Services\MaximusWalletService;
 use App\Services\PayrollService;
 use App\Services\SellerWalletFeePolicy;
@@ -30,7 +29,6 @@ final class SellerWalletController extends Controller
         private readonly EcommerceCommissionPolicy $commissionPolicy,
         private readonly MaximusWalletService $maximusWallet,
         private readonly PayrollService $payroll,
-        private readonly EcommerceSubscriptionPaymentService $subscriptionPayments,
         private readonly SellerWalletFeePolicy $feePolicy,
         private readonly SellerWalletMaturityPolicy $maturityPolicy,
     ) {}
@@ -371,16 +369,6 @@ final class SellerWalletController extends Controller
             }
 
             return response()->json(['received' => true]);
-        }
-
-        try {
-            if ($this->subscriptionPayments->handleWebhook($providerId, $data)) {
-                return response()->json(['received' => true]);
-            }
-        } catch (Throwable $error) {
-            report($error);
-
-            return response()->json(['error' => 'Le webhook de paiement d’abonnement n’a pas pu être traité.'], 500);
         }
 
         $order = DB::table('ecommerce_orders')->where('payment_charge_id', $providerId)->first();

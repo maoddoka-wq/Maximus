@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, RefreshCw, Search, ShieldCheck, ShoppingCart } from 'lucide-react';
-import { ActionButton } from '@workspace/maximus-design-system/components/ui/action-button';
-import { Button } from '@workspace/maximus-design-system/components/ui/button';
-import { Input } from '@workspace/maximus-design-system/components/ui/input';
-import { Skeleton } from '@workspace/maximus-design-system/components/ui/skeleton';
-import { StatusBadge as DesignSystemStatusBadge } from '@workspace/maximus-design-system/components/ui/status-badge';
+import { ActionButton, StatusBadge } from '@/components/app-ui';
 import {
   loadEcommerceSubscriptions,
   updateEcommerceSubscription,
@@ -32,23 +28,6 @@ function amountFromInput(value: string): { valid: boolean; amount: number | null
 
 function enabledStatus(status: EcommerceSubscriptionAccessStatus) {
   return status !== 'INACTIF';
-}
-
-function paymentAccessStatus(status: string | null) {
-  const normalized = status?.trim().toLocaleUpperCase('fr') ?? '';
-  if (['SUSPENDED', 'SUSPENDU'].includes(normalized)) return 'SUSPENDU';
-  if (['EXPIRED', 'EXPIRÉ', 'EXPIRE'].includes(normalized)) return 'EXPIRÉ';
-  if (['PAYMENT_REQUIRED', 'IMPAYÉ', 'UNPAID'].includes(normalized)) return 'IMPAYÉ';
-  if (['ACTIVE', 'ACTIF'].includes(normalized)) return 'ACTIF';
-  if (['NOT_MANAGED', 'UNAVAILABLE'].includes(normalized)) return 'NON CONFIGURÉ';
-  return status || 'NON CONFIGURÉ';
-}
-
-function formatPaidThrough(value: string | null) {
-  if (!value) return 'Aucune échéance enregistrée';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Date indisponible';
-  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 }
 
 function formatAmount(amount: number | null) {
@@ -120,8 +99,8 @@ export function EcommerceSubscriptionManagement({
       showAppToast('Saisissez un montant entier positif ou égal à zéro.', 'warning');
       return;
     }
-    if (enabledStatus(status) && (parsedAmount.amount === null || parsedAmount.amount <= 0)) {
-      showAppToast('Définissez un tarif mensuel strictement positif avant d’activer l’accès.', 'warning');
+    if (enabledStatus(status) && parsedAmount.amount === null) {
+      showAppToast('Définissez le prix mensuel avant d’activer l’abonnement.', 'warning');
       return;
     }
 
@@ -175,13 +154,13 @@ export function EcommerceSubscriptionManagement({
           </div>
           <label className="relative block w-full sm:max-w-xs">
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
-            <Input
+            <input
               data-testid="input-ecommerce-company-search"
               aria-label="Rechercher une entreprise pour l’abonnement E-commerce"
               value={searchTerm}
               onChange={event => setSearchTerm(event.target.value)}
               placeholder="Rechercher une entreprise…"
-              className="w-full bg-[hsl(var(--card))] py-2.5 pl-9 pr-3 text-sm"
+              className="w-full rounded-lg border bg-[hsl(var(--card))] py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-[hsl(var(--primary))]"
             />
           </label>
         </div>
@@ -190,28 +169,22 @@ export function EcommerceSubscriptionManagement({
       {loadError && (
         <div role="alert" className="m-5 rounded-lg border border-[hsl(var(--destructive)/.35)] bg-[hsl(var(--destructive)/.08)] p-3 text-sm text-[hsl(var(--destructive))]">
           <p>{loadError}</p>
-          <Button
+          <button
             type="button"
-            variant="outline"
-            size="sm"
             data-testid="button-ecommerce-subscriptions-retry"
             onClick={() => {
               setLoading(true);
               setLoadAttempt(attempt => attempt + 1);
             }}
-            className="mt-2 inline-flex items-center gap-2 text-xs font-bold"
+            className="mt-2 inline-flex items-center gap-2 text-xs font-bold underline underline-offset-4"
           >
             <RefreshCw size={13} /> Réessayer
-          </Button>
+          </button>
         </div>
       )}
 
       {loading ? (
-        <div className="space-y-3 p-5" role="status" aria-label="Chargement des accès E-commerce">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </div>
+        <p className="p-6 text-sm text-[hsl(var(--muted-foreground))]" role="status">Chargement des accès E-commerce…</p>
       ) : companies.length === 0 ? (
         <p className="p-6 text-sm text-[hsl(var(--muted-foreground))]">Aucune entreprise à configurer.</p>
       ) : visibleCompanies.length === 0 ? (
@@ -225,10 +198,6 @@ export function EcommerceSubscriptionManagement({
               status: 'INACTIF' as const,
               monthlyAmount: null,
               updatedAt: null,
-              subscriptionStatus: null,
-              paidThroughAt: null,
-              daysRemaining: null,
-              lastPaymentStatus: null,
             };
             const active = enabledStatus(entry.status);
             const inputValue = priceDrafts[company.id]
@@ -236,7 +205,6 @@ export function EcommerceSubscriptionManagement({
             const parsedAmount = amountFromInput(inputValue);
             const saving = savingCompanyIds[company.id] === true;
             const nextStatus = active ? 'INACTIF' : 'ACTIF';
-            const subscriptionStatus = paymentAccessStatus(entry.subscriptionStatus);
 
             return (
               <article
@@ -247,33 +215,13 @@ export function EcommerceSubscriptionManagement({
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="truncate text-sm font-bold" data-testid={`text-ecommerce-company-${company.id}`}>{company.name}</h3>
-                    <span className="text-[10px] text-[hsl(var(--muted-foreground))]">Accès module</span>
-                    <DesignSystemStatusBadge status={entry.status} />
+                    <StatusBadge status={entry.status === 'INACTIF' ? 'SUSPENDU' : entry.status} />
                   </div>
                   <p className="mt-1 truncate text-xs text-[hsl(var(--muted-foreground))]">{company.email || company.id}</p>
                   <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
                     Tarif actuel : <strong className="text-[hsl(var(--foreground))]" data-testid={`text-ecommerce-price-${company.id}`}>{formatAmount(entry.monthlyAmount)}</strong>
                     <span> / mois</span>
                   </p>
-                  <div className="mt-3 rounded-lg bg-[hsl(var(--muted)/.45)] p-3" data-testid={`subscription-billing-state-${company.id}`}>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">État de facturation</span>
-                      <DesignSystemStatusBadge status={subscriptionStatus} />
-                    </div>
-                    <p className="mt-2 text-xs">
-                      Couvert jusqu’au <strong>{formatPaidThrough(entry.paidThroughAt)}</strong>
-                    </p>
-                    <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-                      {entry.daysRemaining === null
-                        ? 'Durée restante non renseignée'
-                        : entry.daysRemaining > 0
-                          ? `${entry.daysRemaining} jour${entry.daysRemaining > 1 ? 's' : ''} restant${entry.daysRemaining > 1 ? 's' : ''}`
-                          : entry.daysRemaining === 0
-                            ? 'Échu'
-                            : `Échu depuis ${Math.abs(entry.daysRemaining)} jour${Math.abs(entry.daysRemaining) > 1 ? 's' : ''}`}
-                      {entry.lastPaymentStatus && <span> · Dernier paiement : {entry.lastPaymentStatus}</span>}
-                    </p>
-                  </div>
                   {entry.status === 'MAINTENANCE' && (
                     <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">Le module est en maintenance côté MAXIMUS.</p>
                   )}
@@ -282,11 +230,11 @@ export function EcommerceSubscriptionManagement({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <label className="min-w-0 flex-1 text-xs font-semibold">
                     Prix mensuel (FCFA)
-                    <Input
+                    <input
                       data-testid={`input-ecommerce-price-${company.id}`}
                       aria-label={`Prix mensuel E-commerce pour ${company.name}`}
                       type="number"
-                      min={enabledStatus(entry.status) ? '1' : '0'}
+                      min="0"
                       max="2147483647"
                       step="1"
                       inputMode="numeric"
@@ -294,7 +242,7 @@ export function EcommerceSubscriptionManagement({
                       onChange={event => setPriceDrafts(previous => ({ ...previous, [company.id]: event.target.value }))}
                       disabled={loading || loadError !== '' || saving}
                       placeholder="Prix à définir"
-                      className="mt-1.5 w-full bg-[hsl(var(--card))] px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                      className="mt-1.5 w-full rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm outline-none transition focus:border-[hsl(var(--primary))] disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -302,7 +250,7 @@ export function EcommerceSubscriptionManagement({
                       primary
                       icon={Check}
                       testId={`button-ecommerce-save-price-${company.id}`}
-                      disabled={loading || loadError !== '' || !parsedAmount.valid || (enabledStatus(entry.status) && (parsedAmount.amount === null || parsedAmount.amount <= 0))}
+                      disabled={loading || loadError !== '' || !parsedAmount.valid || (entry.status !== 'INACTIF' && parsedAmount.amount === null)}
                       loading={saving}
                       onClick={() => save(company, entry.status, entry)}
                     >
@@ -311,7 +259,7 @@ export function EcommerceSubscriptionManagement({
                     <ActionButton
                       icon={active ? RefreshCw : ShieldCheck}
                       testId={`button-ecommerce-toggle-${company.id}`}
-                      disabled={loading || loadError !== '' || (nextStatus === 'ACTIF' && (parsedAmount.amount === null || parsedAmount.amount <= 0))}
+                      disabled={loading || loadError !== '' || (nextStatus === 'ACTIF' && parsedAmount.amount === null)}
                       loading={saving}
                       onClick={() => save(company, nextStatus, entry)}
                     >

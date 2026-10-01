@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Services\EcommerceSubscriptionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -630,12 +629,7 @@ final class ModuleCatalog
 
     public static function isEnabled(string $companyId, string $moduleId): bool
     {
-        if (! in_array(self::statusFor($companyId, $moduleId), ['ACTIF', 'BETA'], true)) {
-            return false;
-        }
-
-        return $moduleId !== 'ecommerce'
-            || app(EcommerceSubscriptionService::class)->hasCurrentPeriod($companyId);
+        return in_array(self::statusFor($companyId, $moduleId), ['ACTIF', 'BETA'], true);
     }
 
     public static function allowsFeature(string $companyId, string $moduleId, string $featureId): bool
@@ -694,25 +688,13 @@ final class ModuleCatalog
             ->where('company_id', $companyId)
             ->get()
             ->keyBy('module_id');
-        $subscription = app(EcommerceSubscriptionService::class)->snapshot($companyId);
 
-        return collect(self::definitionsWithCustom())->map(function (array $definition) use ($access, $subscription): array {
+        return collect(self::definitionsWithCustom())->map(function (array $definition) use ($access): array {
             $row = $access->get($definition['id']);
-            $status = $row?->status ?? 'INACTIF';
-            $subscriptionBlocked = $definition['id'] === 'ecommerce'
-                && $subscription['required']
-                && ! $subscription['hasCurrentPeriod']
-                && in_array($status, ['ACTIF', 'BETA'], true);
-            if ($subscriptionBlocked) {
-                $status = 'INACTIF';
-            }
 
             return [
                 ...$definition,
-                'status' => $status,
-                ...($definition['id'] === 'ecommerce' ? [
-                    'accessReason' => $subscriptionBlocked ? 'ECOMMERCE_SUBSCRIPTION_REQUIRED' : null,
-                ] : []),
+                'status' => $row?->status ?? 'INACTIF',
                 'featureIds' => $row ? json_decode($row->feature_ids ?? '[]', true) : [],
                 'configuration' => $row ? json_decode($row->configuration ?? '{}', true) : [],
                 'featurePacks' => collect($definition['feature_packs'] ?? [])

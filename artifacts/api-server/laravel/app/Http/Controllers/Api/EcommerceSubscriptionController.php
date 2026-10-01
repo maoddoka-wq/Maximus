@@ -4,13 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
-use App\Services\EcommerceSubscriptionPaymentService;
-use App\Services\EcommerceSubscriptionService;
 use App\Support\ModuleCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class EcommerceSubscriptionController extends Controller
@@ -21,9 +18,6 @@ class EcommerceSubscriptionController extends Controller
     {
         if (! $this->isMaximusAdmin($request)) {
             return response()->json(['error' => 'Seul MAXIMUS peut consulter ces abonnements.'], 403);
-        }
-        if (! Schema::hasTable('maximus_company_ecommerce_prices')) {
-            return response()->json(['error' => 'La configuration de l’abonnement E-commerce n’est pas encore déployée.'], 503);
         }
 
         $companies = Company::query()
@@ -47,8 +41,6 @@ class EcommerceSubscriptionController extends Controller
                 $access = $moduleAccess->get($company->id);
                 $price = $prices->get($company->id);
                 $status = (string) ($access?->status ?? 'INACTIF');
-                $latestPayment = app(EcommerceSubscriptionPaymentService::class)->latestForCompany($company->id);
-                $subscription = app(EcommerceSubscriptionService::class)->snapshot($company->id, $latestPayment);
 
                 if (! in_array($status, ['ACTIF', 'BETA', 'MAINTENANCE', 'INACTIF'], true)) {
                     $status = 'INACTIF';
@@ -61,10 +53,6 @@ class EcommerceSubscriptionController extends Controller
                     'monthlyAmount' => $price?->monthly_amount === null
                         ? null
                         : (int) $price->monthly_amount,
-                    'subscriptionStatus' => $subscription['status'],
-                    'paidThroughAt' => $subscription['paidThroughAt'],
-                    'daysRemaining' => $subscription['daysRemaining'],
-                    'lastPaymentStatus' => $subscription['payment']['status'] ?? null,
                     'updatedAt' => $price?->updated_at,
                 ];
             })->values(),
@@ -76,19 +64,15 @@ class EcommerceSubscriptionController extends Controller
         if (! $this->isMaximusAdmin($request)) {
             return response()->json(['error' => 'Seul MAXIMUS peut modifier ces abonnements.'], 403);
         }
-        if (! Schema::hasTable('maximus_company_ecommerce_prices')) {
-            return response()->json(['error' => 'La configuration de l’abonnement E-commerce n’est pas encore déployée.'], 503);
-        }
 
         $input = $request->validate([
             'status' => ['required', 'in:ACTIF,BETA,MAINTENANCE,INACTIF'],
             'monthlyAmount' => ['present', 'nullable', 'integer', 'min:0', 'max:2147483647'],
         ]);
 
-        if ($input['status'] !== 'INACTIF'
-            && ($input['monthlyAmount'] === null || (int) $input['monthlyAmount'] < 1)) {
+        if ($input['status'] !== 'INACTIF' && $input['monthlyAmount'] === null) {
             return response()->json([
-                'error' => 'Définissez d’abord un tarif mensuel strictement supérieur à 0 FCFA avant d’activer l’abonnement.',
+                'error' => 'Définissez d’abord un tarif mensuel, même à 0 FCFA, avant d’activer l’abonnement.',
             ], 422);
         }
 
@@ -167,20 +151,12 @@ class EcommerceSubscriptionController extends Controller
                 ],
             );
 
-            $subscription = app(EcommerceSubscriptionService::class)->snapshot($companyId);
-            $lastPaymentStatus = app(EcommerceSubscriptionPaymentService::class)
-                ->latestForCompany($companyId)?->status;
-
             return response()->json([
                 'subscription' => [
                     'companyId' => $companyId,
                     'companyName' => $company->name,
                     'status' => $input['status'],
                     'monthlyAmount' => $input['monthlyAmount'] === null ? null : (int) $input['monthlyAmount'],
-                    'subscriptionStatus' => $subscription['status'],
-                    'paidThroughAt' => $subscription['paidThroughAt'],
-                    'daysRemaining' => $subscription['daysRemaining'],
-                    'lastPaymentStatus' => $lastPaymentStatus,
                     'updatedAt' => $now->toISOString(),
                 ],
             ]);
