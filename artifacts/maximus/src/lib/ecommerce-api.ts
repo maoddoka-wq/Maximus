@@ -58,7 +58,6 @@ export interface CreateEcommercePosSale {
   lines: Array<{ productId: string; quantity: number }>;
   paymentMethod: EcommercePosPaymentMethod;
   amountReceived?: number;
-  paymentReference?: string;
   paymentConfirmed?: boolean;
   customerName?: string;
   idempotencyKey: string;

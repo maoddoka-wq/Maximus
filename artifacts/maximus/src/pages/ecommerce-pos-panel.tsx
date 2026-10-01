@@ -33,7 +33,6 @@ type EcommercePosPanelProps = {
     lines: Array<{ productId: string; quantity: number }>;
     paymentMethod: EcommercePosPaymentMethod;
     amountReceived?: number;
-    paymentReference?: string;
     paymentConfirmed?: boolean;
     customerName?: string;
     idempotencyKey: string;
@@ -112,7 +111,6 @@ export default function EcommercePosPanel({
   const [cart, setCart] = useState<Record<string, CartLine>>({});
   const [customerName, setCustomerName] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<EcommercePosPaymentMethod>('CASH');
-  const [paymentReference, setPaymentReference] = useState('');
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [amountReceived, setAmountReceived] = useState('');
   const [pending, setPending] = useState(false);
@@ -143,7 +141,7 @@ export default function EcommercePosPanel({
   const hasValidCash = Number.isFinite(received) && received >= total && received > 0;
   const hasValidPayment = paymentMethod === 'CASH'
     ? hasValidCash
-    : paymentReference.trim().length > 0 && paymentConfirmed;
+    : paymentConfirmed;
 
   const addProduct = (product: EcommerceProduct) => {
     setCart(current => {
@@ -184,7 +182,7 @@ export default function EcommercePosPanel({
       paymentMethod,
       ...(paymentMethod === 'CASH'
         ? { amountReceived: received }
-        : { paymentReference: paymentReference.trim(), paymentConfirmed }),
+        : { paymentConfirmed }),
       ...(customerName.trim() ? { customerName: customerName.trim() } : {}),
     };
     const fingerprint = JSON.stringify([idempotencyScope, payload]);
@@ -195,7 +193,6 @@ export default function EcommercePosPanel({
       setCompletedSale(sale);
       setCart({});
       setPaymentMethod('CASH');
-      setPaymentReference('');
       setPaymentConfirmed(false);
       setAmountReceived('');
       setCustomerName('');
@@ -401,7 +398,6 @@ export default function EcommercePosPanel({
                     onValueChange={value => {
                       setPaymentMethod(value as EcommercePosPaymentMethod);
                       setAmountReceived('');
-                      setPaymentReference('');
                       setPaymentConfirmed(false);
                       setSubmitError('');
                     }}
@@ -445,19 +441,6 @@ export default function EcommercePosPanel({
                   </>
                 ) : (
                   <>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium" htmlFor="pos-payment-reference">Référence du paiement</label>
-                      <Input
-                        data-testid="input-pos-payment-reference"
-                        disabled={!canCreate || pending}
-                        id="pos-payment-reference"
-                        maxLength={180}
-                        onChange={event => setPaymentReference(event.target.value)}
-                        placeholder="Référence affichée par l’opérateur"
-                        required
-                        value={paymentReference}
-                      />
-                    </div>
                     <p className="text-xs leading-5 text-muted-foreground" role="note">
                       Vérifiez le paiement dans l’application {paymentMethodLabels[paymentMethod]} : le transfert se fait hors MAXIMUS.
                     </p>
@@ -501,9 +484,7 @@ export default function EcommercePosPanel({
                 <p className="text-xs text-muted-foreground" aria-live="polite">
                   {paymentMethod === 'CASH'
                     ? 'Saisissez un montant reçu au moins égal au total.'
-                    : !paymentReference.trim()
-                      ? 'Saisissez la référence du paiement confirmé.'
-                      : 'Confirmez la réception du paiement avant de valider.'}
+                    : 'Confirmez la réception du paiement avant de valider.'}
                 </p>
               )}
             </form>
@@ -535,7 +516,6 @@ export default function EcommercePosPanel({
                       <p className="mt-1 text-xs text-muted-foreground">{dateTime(sale.createdAt)}{sale.customerName ? ` · ${sale.customerName}` : ''}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Paiement : {paymentMethodLabels[sale.paymentMethod]}
-                        {sale.paymentReference ? ` · Réf. ${sale.paymentReference}` : ''}
                       </p>
                     </div>
                     <div className="text-right">

@@ -163,25 +163,24 @@ class EcommerceTest extends TestCase
 
         $request = $this->asActor();
         $request
-            ->withHeader('Idempotency-Key', 'pos-mobile-missing-reference')
+            ->withHeader('Idempotency-Key', 'pos-mobile-unconfirmed')
             ->postJson('/api/ecommerce/pos-sales?companyId=kora', [
                 'lines' => [['productId' => 'ecommerce-pos-mobile-product', 'quantity' => 1]],
                 'paymentMethod' => 'WAVE',
             ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['paymentReference', 'paymentConfirmed']);
+            ->assertJsonValidationErrors('paymentConfirmed');
         $this->assertDatabaseHas('ecommerce_products', ['id' => 'ecommerce-pos-mobile-product', 'stock' => 5]);
         $this->assertDatabaseCount('ecommerce_pos_sales', 0);
         $this->assertDatabaseCount('ecommerce_pos_stock_movements', 0);
 
         foreach ([
-            ['method' => 'WAVE', 'reference' => 'WAVE-RECEIPT-001', 'stockBefore' => 5, 'stockAfter' => 4],
-            ['method' => 'ORANGE_MONEY', 'reference' => 'OM-RECEIPT-002', 'stockBefore' => 4, 'stockAfter' => 3],
+            ['method' => 'WAVE', 'stockBefore' => 5, 'stockAfter' => 4],
+            ['method' => 'ORANGE_MONEY', 'stockBefore' => 4, 'stockAfter' => 3],
         ] as $index => $payment) {
             $payload = [
                 'lines' => [['productId' => 'ecommerce-pos-mobile-product', 'quantity' => 1]],
                 'paymentMethod' => $payment['method'],
-                'paymentReference' => $payment['reference'],
                 'paymentConfirmed' => true,
             ];
             $idempotencyKey = 'pos-mobile-payment-'.$index;
@@ -190,7 +189,7 @@ class EcommerceTest extends TestCase
                 ->postJson('/api/ecommerce/pos-sales?companyId=kora', $payload)
                 ->assertCreated()
                 ->assertJsonPath('sale.paymentMethod', $payment['method'])
-                ->assertJsonPath('sale.paymentReference', $payment['reference'])
+                ->assertJsonPath('sale.paymentReference', null)
                 ->assertJsonPath('sale.amountReceived', 1000)
                 ->assertJsonPath('sale.changeDue', 0)
                 ->assertJsonPath('sale.items.0.stockBefore', $payment['stockBefore'])
@@ -204,7 +203,7 @@ class EcommerceTest extends TestCase
                 ->assertJsonPath('sale.id', $saleId);
 
             $conflictingPayload = $payload;
-            $conflictingPayload['paymentReference'] .= '-different';
+            $conflictingPayload['paymentMethod'] = $payment['method'] === 'WAVE' ? 'ORANGE_MONEY' : 'WAVE';
             $request
                 ->withHeader('Idempotency-Key', $idempotencyKey)
                 ->postJson('/api/ecommerce/pos-sales?companyId=kora', $conflictingPayload)

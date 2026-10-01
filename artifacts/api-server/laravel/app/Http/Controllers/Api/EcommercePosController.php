@@ -84,14 +84,14 @@ final class EcommercePosController extends Controller
             'lines.*.quantity' => ['required', 'integer', 'min:1', 'max:9999'],
             'paymentMethod' => ['sometimes', 'string', 'in:CASH,WAVE,ORANGE_MONEY'],
             'amountReceived' => [$paymentMethodForRules === 'CASH' ? 'required' : 'nullable', 'integer', 'min:0'],
-            'paymentReference' => [$paymentMethodForRules === 'CASH' ? 'nullable' : 'required', 'string', 'max:180'],
+            'paymentReference' => ['nullable', 'string', 'max:180'],
             'paymentConfirmed' => [$paymentMethodForRules === 'CASH' ? 'nullable' : 'accepted'],
             'customerName' => ['nullable', 'string', 'max:180'],
         ])->validate();
         $paymentMethod = (string) ($input['paymentMethod'] ?? 'CASH');
-        $paymentReference = $paymentMethod === 'CASH'
+        $paymentReference = $paymentMethod === 'CASH' || ! isset($input['paymentReference'])
             ? null
-            : trim((string) ($input['paymentReference'] ?? ''));
+            : (trim((string) $input['paymentReference']) ?: null);
 
         $quantities = [];
         foreach ($input['lines'] as $line) {
