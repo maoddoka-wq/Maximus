@@ -94,6 +94,7 @@ import {
 } from '@/lib/store';
 import { appStateApi, AppStateRequestError } from '@/lib/app-state-api';
 import { appStateScopeMatchesSession } from '@/lib/app-state-scope';
+import { buildAnaPreviewHref } from '@/lib/ana-preview-path';
 import {
   discardCatalogDraft,
   getCatalogImpact,
@@ -1648,6 +1649,20 @@ function Login({
               {pendingEmail ? 'Connexion en cours…' : 'Se connecter'}
             </button>
           </form>
+          {import.meta.env.DEV && !installationProfile?.companyOnly && (
+            <div className="mt-5 rounded-xl border border-border bg-card px-4 py-3 text-center">
+              <a
+                href={buildAnaPreviewHref(import.meta.env.BASE_URL)}
+                data-testid="link-preview-ana"
+                className="text-sm font-bold text-primary hover:underline"
+              >
+                Ouvrir l’aperçu ANA
+              </a>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Profils fictifs, sans identifiants et en lecture seule.
+              </p>
+            </div>
+          )}
            {!installationProfile?.companyOnly && (
              <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
                Pas encore d’espace ?{' '}

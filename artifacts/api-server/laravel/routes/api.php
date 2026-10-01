@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AppStateController;
+use App\Http\Controllers\Api\DemoPreviewController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MobileAuthController;
 use App\Http\Controllers\Api\CompanyController;
@@ -51,6 +52,8 @@ Route::get('/healthz', function () {
 Route::get('/installation', function () {
     return response()->json(InstallationContext::publicProfile());
 });
+
+Route::get('/preview/ana', [DemoPreviewController::class, 'ana']);
 
 Route::middleware('maximus.central')->group(function (): void {
     Route::get('/registration-catalog', [AppStateController::class, 'registrationCatalog']);
