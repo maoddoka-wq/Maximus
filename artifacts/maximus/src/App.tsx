@@ -128,6 +128,7 @@ import {
 import { InstallationUnavailable } from '@/components/installation-unavailable';
 import { InstallationSyncNotice } from '@/components/installation-sync-notice';
 import { CompanyInstallationAccess } from '@/components/company-installation-access';
+import { CompanySubscriptionExpiryNotice } from '@/components/company-subscription-expiry-notice';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company-payment-api';
 import { useCompanySubscriptionBillingMode } from '@/hooks/use-company-subscription-billing-mode';
@@ -1385,6 +1386,13 @@ function AppContent() {
           }}
         />
         <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
+          {!isAdmin && companyId && (
+            <CompanySubscriptionExpiryNotice
+              companyId={companyId}
+              isCompanyAdmin={companyAdmin}
+              onNavigate={navigate}
+            />
+          )}
           {installationProfile?.companyOnly && (companyAdmin || sectorManager) && (
             <InstallationSyncNotice sync={installationProfile.sync} onRefresh={() => setInstallationRetry((value) => value + 1)} />
           )}

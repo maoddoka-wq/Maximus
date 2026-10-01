@@ -32,8 +32,8 @@ final class EnsureCompanySubscriptionActive
 
         return response()->json([
             'error' => $subscription['status'] === 'EXPIRED'
-                ? 'Votre abonnement a expiré. Réglez l’échéance pour rétablir l’accès.'
-                : 'Aucun abonnement actif n’est enregistré pour cette entreprise.',
+                ? 'L’abonnement de votre entreprise a expiré. Pour rétablir l’accès, l’administrateur doit le renouveler dans l’onglet « Abonnement ».'
+                : 'L’accès de votre entreprise n’est pas encore activé. L’administrateur peut régler l’abonnement dans l’onglet « Abonnement ».',
             'code' => 'SUBSCRIPTION_REQUIRED',
             'subscription' => $subscription,
         ], 402)->header('Cache-Control', 'private, no-store');

@@ -4,6 +4,8 @@ export type SubscriptionCountdown = {
   label: string;
 };
 
+export const SUBSCRIPTION_WARNING_WINDOW_SECONDS = 48 * 60 * 60;
+
 export function getSubscriptionCountdown(
   periodEndsAt: string | null,
   nowMs = Date.now(),
@@ -32,4 +34,9 @@ export function getSubscriptionCountdown(
     expired: false,
     label: `${days} j ${String(hours).padStart(2, '0')} h ${String(minutes).padStart(2, '0')} min ${String(seconds).padStart(2, '0')} s`,
   };
+}
+
+export function shouldShowSubscriptionExpiryWarning(periodEndsAt: string | null, nowMs = Date.now()): boolean {
+  const countdown = getSubscriptionCountdown(periodEndsAt, nowMs);
+  return !countdown.expired && countdown.remainingSeconds <= SUBSCRIPTION_WARNING_WINDOW_SECONDS;
 }

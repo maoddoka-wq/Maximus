@@ -286,6 +286,47 @@ class SubscriptionBillingTest extends TestCase
             ->assertJsonPath('subscription.status', 'UNPAID');
     }
 
+    public function test_company_employee_can_read_a_minimal_expiry_status_for_the_workspace_notice(): void
+    {
+        $company = $this->createCompany('subscription-employee-notice');
+        $this->setCompanyPaid($company->id);
+        $employee = $this->createUser('subscription-notice-employee', 'employee', $company->id);
+        DB::table('maximus_company_subscriptions')->insert([
+            'company_id' => $company->id,
+            'last_payment_id' => 'notice-period-payment',
+            'current_period_started_at' => now()->subDays(29),
+            'current_period_ends_at' => now()->addDay(),
+            'created_at' => now()->subDays(29),
+            'updated_at' => now()->subDays(29),
+        ]);
+
+        $response = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($employee))
+            ->getJson('/api/company-subscription/status')
+            ->assertOk()
+            ->assertJsonPath('companyId', $company->id)
+            ->assertJsonPath('subscription.billingMode', 'PAID')
+            ->assertJsonPath('subscription.status', 'ACTIVE');
+
+        $payload = $response->json();
+        $topLevelKeys = array_keys($payload);
+        sort($topLevelKeys);
+        $this->assertSame(['companyId', 'subscription'], $topLevelKeys);
+
+        $subscriptionKeys = array_keys($payload['subscription']);
+        sort($subscriptionKeys);
+        $this->assertSame([
+            'billingMode',
+            'currentPeriodEndsAt',
+            'currentPeriodStartsAt',
+            'remainingSeconds',
+            'status',
+        ], $subscriptionKeys);
+        $this->assertNotEmpty($payload['subscription']['currentPeriodEndsAt']);
+        $this->assertGreaterThan(0, $payload['subscription']['remainingSeconds']);
+        $this->assertLessThanOrEqual(48 * 60 * 60, $payload['subscription']['remainingSeconds']);
+    }
+
     public function test_diamanopay_charge_uses_the_server_calculated_custom_amount_and_webhook_confirms_it(): void
     {
         $company = $this->createCompany('subscription-payment-acme');

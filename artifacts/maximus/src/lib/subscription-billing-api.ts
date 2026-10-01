@@ -216,6 +216,28 @@ export async function updateCompanySubscriptionPrice(
   );
 }
 
+function parseEntitlement(value: unknown): CompanySubscriptionEntitlement {
+  const subscription = record(value, 'Le statut d’abonnement reçu est invalide.');
+  if (
+    !['FREE', 'PAID'].includes(String(subscription.billingMode))
+    || !['FREE', 'ACTIVE', 'UNPAID', 'EXPIRED'].includes(String(subscription.status))
+    || (subscription.currentPeriodStartsAt !== null && typeof subscription.currentPeriodStartsAt !== 'string')
+    || (subscription.currentPeriodEndsAt !== null && typeof subscription.currentPeriodEndsAt !== 'string')
+    || !Number.isInteger(subscription.remainingSeconds)
+    || (subscription.remainingSeconds as number) < 0
+  ) {
+    throw new Error('Le statut d’abonnement reçu est invalide.');
+  }
+
+  return {
+    billingMode: subscription.billingMode as CompanySubscriptionBillingMode,
+    status: subscription.status as CompanySubscriptionEntitlement['status'],
+    currentPeriodStartsAt: subscription.currentPeriodStartsAt as string | null,
+    currentPeriodEndsAt: subscription.currentPeriodEndsAt as string | null,
+    remainingSeconds: subscription.remainingSeconds as number,
+  };
+}
+
 export async function loadCompanySubscription(): Promise<CompanySubscriptionBilling> {
   const response = await requestJson<Record<string, unknown>>(
     '/company-subscription',
@@ -230,30 +252,32 @@ export async function loadCompanySubscription(): Promise<CompanySubscriptionBill
   ) {
     throw new Error('Les informations d’abonnement reçues sont incomplètes.');
   }
-  const subscription = record(response.subscription, 'Le statut d’abonnement reçu est invalide.');
-  if (
-    !['FREE', 'PAID'].includes(String(subscription.billingMode))
-    || !['FREE', 'ACTIVE', 'UNPAID', 'EXPIRED'].includes(String(subscription.status))
-    || (subscription.currentPeriodStartsAt !== null && typeof subscription.currentPeriodStartsAt !== 'string')
-    || (subscription.currentPeriodEndsAt !== null && typeof subscription.currentPeriodEndsAt !== 'string')
-    || !Number.isInteger(subscription.remainingSeconds)
-    || (subscription.remainingSeconds as number) < 0
-  ) {
-    throw new Error('Le statut d’abonnement reçu est invalide.');
-  }
   return {
     ...parseBreakdown(response),
     companyId: response.companyId,
     companyName: response.companyName,
     paymentReady: response.paymentReady,
     payments: response.payments.map(parsePayment),
-    subscription: {
-      billingMode: subscription.billingMode as CompanySubscriptionBillingMode,
-      status: subscription.status as CompanySubscriptionEntitlement['status'],
-      currentPeriodStartsAt: subscription.currentPeriodStartsAt as string | null,
-      currentPeriodEndsAt: subscription.currentPeriodEndsAt as string | null,
-      remainingSeconds: subscription.remainingSeconds as number,
-    },
+    subscription: parseEntitlement(response.subscription),
+  };
+}
+
+export async function loadCompanySubscriptionStatus(): Promise<{
+  companyId: string;
+  subscription: CompanySubscriptionEntitlement;
+}> {
+  const response = await requestJson<Record<string, unknown>>(
+    '/company-subscription/status',
+    undefined,
+    { fallbackMessage: 'Le statut de l’abonnement est indisponible.' },
+  );
+  if (typeof response.companyId !== 'string' || response.companyId === '') {
+    throw new Error('Le statut de l’abonnement reçu est incomplet.');
+  }
+
+  return {
+    companyId: response.companyId,
+    subscription: parseEntitlement(response.subscription),
   };
 }
 

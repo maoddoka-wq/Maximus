@@ -169,6 +169,26 @@ final class SubscriptionBillingController extends Controller
         return response()->json($this->companyPayload($companyId));
     }
 
+    public function statusForCompanyMembers(Request $request): JsonResponse
+    {
+        $actor = $request->attributes->get('authActor');
+        $companyId = $request->attributes->get('companyId');
+        if (
+            ! is_array($actor)
+            || ($actor['role'] ?? null) === 'maximus_admin'
+            || ! is_string($companyId)
+            || $companyId === ''
+            || ($actor['companyId'] ?? null) !== $companyId
+        ) {
+            return response()->json(['error' => 'Le statut de l’abonnement de cette entreprise est indisponible.'], 403);
+        }
+
+        return response()->json([
+            'companyId' => $companyId,
+            'subscription' => $this->entitlement->statusForCompany($companyId),
+        ])->header('Cache-Control', 'private, no-store');
+    }
+
     public function createPayment(Request $request): JsonResponse
     {
         $companyId = $this->companyAdminId($request);

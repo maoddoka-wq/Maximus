@@ -186,6 +186,7 @@ Route::middleware(['maximus.central', 'maximus.auth'])->prefix('platform-setting
 
 Route::middleware(['maximus.auth', 'maximus.company'])->prefix('company-subscription')->group(function (): void {
     Route::get('/', [SubscriptionBillingController::class, 'showForCompany']);
+    Route::get('/status', [SubscriptionBillingController::class, 'statusForCompanyMembers']);
     Route::post('/payments', [SubscriptionBillingController::class, 'createPayment'])->middleware('throttle:withdrawals');
     Route::get('/payments/{paymentId}', [SubscriptionBillingController::class, 'paymentStatus']);
 });
