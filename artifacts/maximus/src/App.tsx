@@ -59,6 +59,7 @@ import { parseClientPwaPath } from '@/lib/pwa';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
 import { ModulePackDraftForm } from '@/components/module-pack-draft-form';
 import { EcommerceSubscriptionManagement } from '@/components/ecommerce-subscription-management';
+import { SubscriptionPricingManagement } from '@/components/subscription-pricing-management';
 import {
   ActionButton,
   ActivityRow,
@@ -5105,6 +5106,7 @@ function SubscriptionsPage({
     return (
       <div className="space-y-6">
         <MaximusWalletPanel formatAmount={formatAmount} />
+        <SubscriptionPricingManagement />
         <EcommerceSubscriptionManagement companies={data.companies} onRefresh={onRefresh} />
         <EmptyState
           title="Aucun abonnement enregistré"
@@ -5138,6 +5140,7 @@ function SubscriptionsPage({
       </section>
 
       <MaximusWalletPanel formatAmount={formatAmount} />
+      <SubscriptionPricingManagement />
       <EcommerceSubscriptionManagement companies={data.companies} onRefresh={onRefresh} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

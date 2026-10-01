@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\OnboardingDraftController;
 use App\Http\Controllers\Api\ModuleController;
 use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\EcommerceSubscriptionController;
+use App\Http\Controllers\Api\SubscriptionBillingController;
 use App\Http\Controllers\Api\SystemHealthController;
 use App\Http\Controllers\Api\InstallationController;
 use App\Http\Controllers\Api\InstallationAccessController;
@@ -162,6 +163,9 @@ Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void 
 });
 
 Route::middleware(['maximus.central', 'maximus.auth'])->prefix('platform-settings')->group(function (): void {
+    Route::get('/subscription-billing', [SubscriptionBillingController::class, 'platformIndex']);
+    Route::put('/subscription-billing/modules/{moduleId}', [SubscriptionBillingController::class, 'updateModulePrice']);
+    Route::put('/subscription-billing/companies/{companyId}', [SubscriptionBillingController::class, 'updateCompanyPrice']);
     Route::get('/ecommerce-subscriptions', [EcommerceSubscriptionController::class, 'index']);
     Route::put('/ecommerce-subscriptions/{companyId}', [EcommerceSubscriptionController::class, 'update']);
     Route::get('/public-registration', [PlatformSettingsController::class, 'publicRegistration']);
@@ -179,6 +183,16 @@ Route::middleware(['maximus.central', 'maximus.auth'])->prefix('platform-setting
     Route::post('/diagnostic-tokens', [DiagnosticTokenController::class, 'store']);
     Route::delete('/diagnostic-tokens/{id}', [DiagnosticTokenController::class, 'revoke']);
 });
+
+Route::middleware(['maximus.auth', 'maximus.company'])->prefix('company-subscription')->group(function (): void {
+    Route::get('/', [SubscriptionBillingController::class, 'showForCompany']);
+    Route::post('/payments', [SubscriptionBillingController::class, 'createPayment'])->middleware('throttle:withdrawals');
+    Route::get('/payments/{paymentId}', [SubscriptionBillingController::class, 'paymentStatus']);
+});
+Route::post(
+    '/payments/diamanopay/subscription-webhook',
+    [SubscriptionBillingController::class, 'webhook'],
+)->middleware('throttle:withdrawals');
 
 Route::middleware(['maximus.central', 'maximus.auth'])->post('/maximus-assistant/ask', [MaximusAssistantController::class, 'ask']);
 Route::middleware(['maximus.central', 'maximus.auth'])->prefix('maximus-assistant/actions')->group(function (): void {

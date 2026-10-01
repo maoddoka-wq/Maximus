@@ -378,7 +378,9 @@ export function CompanyRouter({
         : routePath === '/entreprise/employes'
           || (routePath === '/entreprise/organisation' && query.get('tab') === 'employees')
             ? 'employees'
-            : 'structure';
+            : routePath === '/entreprise/organisation' && query.get('tab') === 'subscription'
+              ? 'subscription'
+              : 'structure';
     return company && (companyAdmin || sectorManager) ? (
       renderScreen(screens.organization, {
         company,
