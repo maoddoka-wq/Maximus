@@ -88,22 +88,62 @@ class MobileAuthTest extends TestCase
                     'assets' => [['name' => 'maximus-erp.zip', 'url' => 'https://example.test/erp.zip']],
                 ],
                 [
-                    'tag_name' => 'chauffeur-v1.2.3',
-                    'name' => 'MAXIMUS Chauffeur 1.2.3',
+                    'tag_name' => 'chauffeur-v1.0.9',
+                    'name' => 'MAXIMUS Chauffeur 1.0.9',
                     'published_at' => '2026-09-01T00:00:00Z',
                     'assets' => [[
                         'name' => 'maximus-chauffeur.apk',
-                        'url' => 'https://api.github.com/repos/maoddoka-wq/Maximus/releases/assets/123',
-                        'size' => 1024,
+                        'url' => 'https://api.github.com/repos/maoddoka-wq/Maximus/releases/assets/109',
+                        'size' => 512,
                         'digest' => 'sha256:'.str_repeat('a', 64),
+                    ]],
+                ],
+                [
+                    'tag_name' => 'chauffeur-v1.0.16',
+                    'name' => 'MAXIMUS Chauffeur 1.0.16',
+                    'published_at' => '2026-09-30T23:37:51Z',
+                    'assets' => [[
+                        'name' => 'maximus-chauffeur.apk',
+                        'url' => 'https://api.github.com/repos/maoddoka-wq/Maximus/releases/assets/116',
+                        'size' => 2048,
+                        'digest' => 'sha256:'.str_repeat('b', 64),
+                    ]],
+                ],
+                [
+                    'tag_name' => 'chauffeur-v1.0.15',
+                    'name' => 'MAXIMUS Chauffeur 1.0.15',
+                    'published_at' => '2026-09-30T22:04:24Z',
+                    'assets' => [[
+                        'name' => 'maximus-chauffeur.apk',
+                        'url' => 'https://api.github.com/repos/maoddoka-wq/Maximus/releases/assets/115',
+                        'size' => 1024,
+                        'digest' => 'sha256:'.str_repeat('c', 64),
+                    ]],
+                ],
+                [
+                    'tag_name' => 'chauffeur-v1.0.99',
+                    'prerelease' => true,
+                    'assets' => [[
+                        'name' => 'maximus-chauffeur.apk',
+                        'url' => 'https://api.github.com/repos/maoddoka-wq/Maximus/releases/assets/199',
+                        'size' => 4096,
+                    ]],
+                ],
+                [
+                    'tag_name' => 'chauffeur-v1.0.100',
+                    'draft' => true,
+                    'assets' => [[
+                        'name' => 'maximus-chauffeur.apk',
+                        'url' => 'https://api.github.com/repos/maoddoka-wq/Maximus/releases/assets/1100',
+                        'size' => 8192,
                     ]],
                 ],
             ]),
         ]);
         $this->getJson('/api/transport/mobile/releases/latest', $headers)
             ->assertOk()
-            ->assertJsonPath('version', '1.2.3')
-            ->assertJsonPath('sizeBytes', 1024);
+            ->assertJsonPath('version', '1.0.16')
+            ->assertJsonPath('sizeBytes', 2048);
 
         $this->postJson('/api/transport/drivers', [
             'employeeId' => $employee->employee_id,

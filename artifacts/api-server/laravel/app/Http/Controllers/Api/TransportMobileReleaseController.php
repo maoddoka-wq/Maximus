@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Http;
 class TransportMobileReleaseController extends Controller
 {
     private const APK_ASSET_NAME = 'maximus-chauffeur.apk';
+
     private const APK_MAX_BYTES = 157286400;
 
     public function latest(Request $request): JsonResponse
@@ -76,6 +77,7 @@ class TransportMobileReleaseController extends Controller
 
             if (! $download->successful() || filesize($temporaryPath) < 1 || filesize($temporaryPath) > self::APK_MAX_BYTES) {
                 @unlink($temporaryPath);
+
                 return response()->json(['error' => 'GitHub n’a pas fourni un APK valide.'], 502);
             }
 
@@ -123,18 +125,39 @@ class TransportMobileReleaseController extends Controller
             return response()->json(['error' => 'GitHub a renvoyé une liste de versions invalide.'], 502);
         }
 
+        $latestRelease = null;
+        $latestVersion = null;
+
         foreach ($releases as $release) {
             if (! is_array($release)
-                || ! preg_match('/^chauffeur-v\d+\.\d+\.\d+$/', (string) ($release['tag_name'] ?? ''))) {
+                || ! empty($release['draft'])
+                || ! empty($release['prerelease'])
+                || ! preg_match(
+                    '/^chauffeur-v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))$/',
+                    (string) ($release['tag_name'] ?? ''),
+                    $matches,
+                )) {
                 continue;
             }
 
             $asset = collect($release['assets'] ?? [])->first(
                 fn (array $candidate): bool => ($candidate['name'] ?? null) === self::APK_ASSET_NAME,
             );
-            if (is_array($asset) && ! empty($asset['url'])) {
-                return ['release' => $release, 'asset' => $asset];
+            if (! is_array($asset) || empty($asset['url'])) {
+                continue;
             }
+
+            $version = $matches[1];
+            if ($latestVersion !== null && version_compare($version, $latestVersion, '<=')) {
+                continue;
+            }
+
+            $latestRelease = ['release' => $release, 'asset' => $asset];
+            $latestVersion = $version;
+        }
+
+        if ($latestRelease !== null) {
+            return $latestRelease;
         }
 
         return response()->json(['error' => 'Aucune version APK MAXIMUS Chauffeur n’a encore été publiée.'], 404);
