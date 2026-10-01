@@ -84,10 +84,8 @@ export const modulePageMeta = Object.fromEntries(
     module.path,
     {
       kicker: 'Espace entreprise',
-      title: module.id === 'commerce' || module.id === 'ecommerce' ? 'Commerce' : module.name,
-      description: module.id === 'commerce' || module.id === 'ecommerce'
-        ? 'Ventes en magasin, catalogue partagé, boutique en ligne et suivi des encaissements.'
-        : module.description,
+      title: module.name,
+      description: module.description,
     },
   ]),
 ) as Record<string, { kicker: string; title: string; description: string }>;

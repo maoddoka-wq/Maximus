@@ -82,7 +82,7 @@ test('un employé retrouve les fonctionnalités de plusieurs modules dans le men
   });
 
   assert.deepEqual(groups.map(group => group.label), [
-    'Commerce',
+    'Gestion commerciale',
     'Gestion de stock',
   ]);
   assert.deepEqual(groups.flatMap(group => group.items.map(item => item.href)), [
@@ -117,7 +117,7 @@ test('un administrateur d’entreprise voit les fonctionnalités de ses modules'
   });
 
   assert.deepEqual(groups.map(group => group.label), [
-    'Commerce',
+    'Gestion commerciale',
     'Gestion de stock',
   ]);
   assert.deepEqual(groups[0]?.items.map(item => item.href), [
@@ -140,7 +140,7 @@ test('un administrateur d’entreprise voit les fonctionnalités de ses modules'
   assert.ok(groups[1]?.items.some(item => item.href === '/entreprise/stocks?tab=products'));
 });
 
-test('Commerce et boutique en ligne partagent une entrée et des fonctionnalités distinctes', () => {
+test('Gestion commerciale et E-commerce ont des sections séparées et des fonctionnalités distinctes', () => {
   const groups = buildSidebarFeatureGroups({
     allowed: ['commerce', 'ecommerce'],
     configuredModules,
@@ -155,9 +155,11 @@ test('Commerce et boutique en ligne partagent une entrée et des fonctionnalité
     ecommerceFeatureIds: ['catalogue', 'vente-comptoir'],
   });
 
-  assert.deepEqual(groups.map(group => group.label), ['Commerce']);
-  assert.deepEqual(groups.flatMap(group => group.items.map(item => item.href)), [
+  assert.deepEqual(groups.map(group => group.label), ['Gestion commerciale', 'E-commerce']);
+  assert.deepEqual(groups[0]?.items.map(item => item.href), [
     '/entreprise/commerce?tab=sales',
+  ]);
+  assert.deepEqual(groups[1]?.items.map(item => item.href), [
     '/entreprise/ecommerce?tab=catalogue',
     '/entreprise/ecommerce?tab=categories',
     '/entreprise/ecommerce?tab=vente-comptoir',
