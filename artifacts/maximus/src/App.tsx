@@ -176,6 +176,12 @@ const defaultDemoAccounts: DemoAccount[] = import.meta.env.DEV
         password: 'MaximusLocal!2026',
       },
       {
+        id: 'ana-company-admin',
+        label: 'Direction générale ANA',
+        email: 'ana.demo@example.test',
+        password: 'DirectionANA!2026',
+      },
+      {
         id: 'ana-manager',
         label: 'Manager ANA · Gestion de stock',
         email: 'manager.ana@example.test',
