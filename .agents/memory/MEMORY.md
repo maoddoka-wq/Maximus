@@ -12,6 +12,7 @@
 - [Parcours Organisation](organization-workflow.md) — construire la hiérarchie, configurer les rôles, puis créer les employés et désigner les managers.
 - [Validation des vues authentifiées](authenticated-preview.md) — pour contrôler les écrans connectés, conserver une session locale via le navigateur CDP avant les captures.
 - [Frontière des données Commerce](commerce-data-boundary.md) — le POS garde son registre de stock E-commerce distinct des entrepôts tant qu’aucune correspondance explicite n’existe.
+- [Comptabilisation de l’inventaire E-commerce](ecommerce-inventory-accounting.md) — écrire chaque mouvement dans la transaction du stock et rendre les restitutions idempotentes.
 - [Routage avec paramètres](query-routing.md) — les routeurs d’espace doivent comparer le chemin sans query string, car les onglets internes modifient l’URL courante.
 - [Thème du menu entreprise](company-menu-theme.md) — le fond du menu reste distinct, mais les états actif et survol reprennent la couleur principale de l’entreprise.
 - [Migration Laravel progressive](laravel-migration-boundary.md) — garder Laravel réversible et inspecter toutes les migrations en attente avant leur exécution.

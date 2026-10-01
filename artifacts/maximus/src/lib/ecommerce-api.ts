@@ -196,6 +196,57 @@ export interface EcommerceProduct {
   } | null;
 }
 
+export type EcommerceInventoryDirection = 'IN' | 'OUT';
+export type EcommerceInventorySource =
+  | 'OPENING_BALANCE'
+  | 'MANUAL_ADJUSTMENT'
+  | 'POS_SALE'
+  | 'ONLINE_ORDER'
+  | 'ONLINE_RETURN';
+
+export interface EcommerceInventoryProduct {
+  id: string;
+  name: string;
+  sku: string;
+  category: string;
+  stock: number;
+  status: EcommerceProductStatus;
+}
+
+export interface EcommerceInventoryMovement {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  direction: EcommerceInventoryDirection;
+  sourceType: EcommerceInventorySource;
+  quantity: number;
+  stockBefore: number | null;
+  stockAfter: number | null;
+  reason: string | null;
+  reference: string | null;
+  createdBy: string | null;
+  createdAt: string | null;
+}
+
+export interface EcommerceInventoryBootstrap {
+  summary: {
+    productCount: number;
+    totalUnits: number;
+    outOfStockCount: number;
+  };
+  products: EcommerceInventoryProduct[];
+  movements: EcommerceInventoryMovement[];
+}
+
+export interface CreateEcommerceInventoryAdjustment {
+  productId: string;
+  direction: EcommerceInventoryDirection;
+  quantity: number;
+  reason: string;
+  idempotencyKey: string;
+}
+
 export interface EcommerceCategory {
   id: string;
   companyId: string;
@@ -546,6 +597,15 @@ export const createEcommerceApi = (companyId: string) => {
   return {
     bootstrap: () => request<EcommerceBootstrap>(withCompany('/ecommerce/bootstrap')),
     posSales: () => request<EcommercePosSalesBootstrap>(withCompany('/ecommerce/pos-sales')),
+    inventory: () => request<EcommerceInventoryBootstrap>(withCompany('/ecommerce/inventory')),
+    adjustInventory: (body: CreateEcommerceInventoryAdjustment) => {
+      const { idempotencyKey, ...payload } = body;
+      return request<{ movement: EcommerceInventoryMovement }>(withCompany('/ecommerce/inventory/adjustments'), {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: { 'Idempotency-Key': idempotencyKey },
+      });
+    },
     createPosSale: (body: CreateEcommercePosSale) => {
       const { idempotencyKey, ...payload } = body;
       return request<{ sale: EcommercePosSale }>(withCompany('/ecommerce/pos-sales'), {

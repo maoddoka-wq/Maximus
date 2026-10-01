@@ -244,6 +244,29 @@ final class EcommercePosController extends Controller
                     $stockMovementSnapshots,
                 );
                 DB::table('ecommerce_pos_stock_movements')->insert($movementRows);
+                $inventoryMovementRows = array_map(
+                    static fn (array $movement): array => [
+                        'id' => (string) Str::uuid(),
+                        'company_id' => $companyId,
+                        'product_id' => $movement['product_id'],
+                        'product_name' => $movement['product_name'],
+                        'sku' => $movement['sku'],
+                        'source_type' => 'POS_SALE',
+                        'source_id' => $movement['sale_item_id'],
+                        'direction' => 'OUT',
+                        'quantity' => $movement['quantity'],
+                        'stock_before' => $movement['stock_before'],
+                        'stock_after' => $movement['stock_after'],
+                        'reason' => 'Vente comptoir',
+                        'reference' => $saleRow['reference'],
+                        'created_by' => $saleRow['cashier_id'],
+                        'idempotency_key' => null,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ],
+                    $stockMovementSnapshots,
+                );
+                DB::table('ecommerce_inventory_movements')->insert($inventoryMovementRows);
 
                 return $this->saleWithItems($companyId, (object) $saleRow);
             });

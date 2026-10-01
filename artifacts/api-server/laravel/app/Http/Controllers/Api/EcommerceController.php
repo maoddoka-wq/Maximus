@@ -388,7 +388,38 @@ class EcommerceController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ], $this->snake($input));
-        DB::table('ecommerce_products')->insert($row);
+        $actor = $request->attributes->get('authActor', []);
+        $createdBy = is_array($actor)
+            ? trim((string) ($actor['userId'] ?? $actor['id'] ?? ''))
+            : '';
+        DB::transaction(function () use ($row, $createdBy): void {
+            DB::table('ecommerce_products')->insert($row);
+
+            $initialStock = (int) ($row['stock'] ?? 0);
+            if ($initialStock <= 0 || ($row['fulfillment_type'] ?? 'PHYSICAL') !== 'PHYSICAL') {
+                return;
+            }
+
+            DB::table('ecommerce_inventory_movements')->insert([
+                'id' => (string) Str::uuid(),
+                'company_id' => $row['company_id'],
+                'product_id' => $row['id'],
+                'product_name' => $row['name'],
+                'sku' => $row['sku'],
+                'source_type' => 'OPENING_BALANCE',
+                'source_id' => $row['id'],
+                'direction' => 'IN',
+                'quantity' => $initialStock,
+                'stock_before' => 0,
+                'stock_after' => $initialStock,
+                'reason' => 'Stock initial déclaré lors de la création du produit.',
+                'reference' => null,
+                'created_by' => $createdBy !== '' ? $createdBy : null,
+                'idempotency_key' => null,
+                'created_at' => $row['created_at'],
+                'updated_at' => $row['updated_at'],
+            ]);
+        });
 
         return response()->json($this->product((object) $row), 201);
     }
@@ -410,6 +441,8 @@ class EcommerceController extends Controller
             return $this->forbidden('Ce type de vente n’est pas autorisé pour cette entreprise.');
         }
         $input = $this->productInput($request, true);
+        // Stock changes belong to the auditable inventory workflow, not catalogue edits.
+        unset($input['stock']);
         $input = $this->normalizeProductType($input, true);
         $input = $this->normalizeFulfillment($input, true, $existingFulfillment);
         if (array_key_exists('fulfillmentType', $input)
@@ -968,9 +1001,7 @@ class EcommerceController extends Controller
                     $wallet->reverseOrderFunds($updated);
                     DB::table('ecommerce_orders')->where('id', $id)->update(['payment_status' => 'REFUNDED', 'updated_at' => now()]);
                 }
-                if (in_array($updated->payment_status, ['PENDING', 'FAILED'], true)) {
-                    $wallet->restoreOrderStock($updated);
-                }
+                $wallet->restoreOrderStock($updated);
             }
         });
 
@@ -1810,6 +1841,7 @@ class EcommerceController extends Controller
         try {
             $order = DB::transaction(function () use ($input, $attachments, $store, $customer, $idempotencyKey, $activeDeliveryZones, $deliveryZone, &$uploadedAttachmentPaths): array {
                 $lines = [];
+                $inventorySnapshots = [];
                 $total = 0;
                 $hasPhysicalProduct = false;
                 foreach ($input['items'] as $item) {
@@ -1875,8 +1907,9 @@ class EcommerceController extends Controller
                     }
                     $lineTotal = $product->price * $quantity;
                     $total += $lineTotal;
+                    $orderItemId = $this->id('order-line');
                     $lines[] = [
-                        'id' => $this->id('order-line'),
+                        'id' => $orderItemId,
                         'product_id' => $product->id,
                         'rental_id' => null,
                         'product_name' => $product->name,
@@ -1891,10 +1924,21 @@ class EcommerceController extends Controller
                         'updated_at' => now(),
                     ];
                     if ($fulfillmentType === 'PHYSICAL') {
+                        $stockBefore = (int) $product->stock;
+                        $stockAfter = $stockBefore - $quantity;
                         DB::table('ecommerce_products')->where('id', $product->id)->update([
-                            'stock' => $product->stock - $quantity,
+                            'stock' => $stockAfter,
                             'updated_at' => now(),
                         ]);
+                        $inventorySnapshots[] = [
+                            'source_id' => $orderItemId,
+                            'product_id' => (string) $product->id,
+                            'product_name' => (string) $product->name,
+                            'sku' => (string) ($product->sku ?? ''),
+                            'quantity' => $quantity,
+                            'stock_before' => $stockBefore,
+                            'stock_after' => $stockAfter,
+                        ];
                     }
                 }
                 if ($hasPhysicalProduct && $activeDeliveryZones->isNotEmpty() && ! $deliveryZone) {
@@ -1926,6 +1970,27 @@ class EcommerceController extends Controller
                 ]);
                 foreach ($lines as $line) {
                     DB::table('ecommerce_order_items')->insert(array_merge($line, ['order_id' => $id]));
+                }
+                foreach ($inventorySnapshots as $snapshot) {
+                    DB::table('ecommerce_inventory_movements')->insert([
+                        'id' => (string) Str::uuid(),
+                        'company_id' => $store->company_id,
+                        'product_id' => $snapshot['product_id'],
+                        'product_name' => $snapshot['product_name'],
+                        'sku' => $snapshot['sku'],
+                        'source_type' => 'ONLINE_ORDER',
+                        'source_id' => $snapshot['source_id'],
+                        'direction' => 'OUT',
+                        'quantity' => $snapshot['quantity'],
+                        'stock_before' => $snapshot['stock_before'],
+                        'stock_after' => $snapshot['stock_after'],
+                        'reason' => 'Vente en ligne',
+                        'reference' => $reference,
+                        'created_by' => null,
+                        'idempotency_key' => null,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
                 }
                 foreach ($attachments as $file) {
                     $mimeType = (string) $file->getMimeType();
