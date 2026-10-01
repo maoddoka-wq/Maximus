@@ -33,6 +33,11 @@ final class VerifyCookieRequestOrigin
             $this->normalizeOrigin((string) config('app.url', '')),
             $this->normalizeOrigin($request->getSchemeAndHttpHost()),
         ];
+        foreach ((array) config('maximus.preview_hosts', []) as $previewHost) {
+            if (is_string($previewHost) && preg_match('/^[a-z0-9.-]+$/iD', $previewHost)) {
+                $allowedOrigins[] = $this->normalizeOrigin('https://'.$previewHost);
+            }
+        }
         foreach (config('maximus.allowed_origins', []) as $origin) {
             $allowedOrigins[] = $this->normalizeOrigin((string) $origin);
         }

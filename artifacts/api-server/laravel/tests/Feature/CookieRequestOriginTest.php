@@ -56,6 +56,35 @@ class CookieRequestOriginTest extends TestCase
             ->assertNoContent();
     }
 
+    public function test_exact_configured_preview_host_is_allowed_for_cookie_mutations(): void
+    {
+        config([
+            'app.url' => 'http://localhost',
+            'maximus.preview_hosts' => ['maximus--workspace.replit.dev'],
+        ]);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, 'session-token')
+            ->withHeader('Origin', 'https://maximus--workspace.replit.dev')
+            ->postJson('/api/auth/logout')
+            ->assertNoContent();
+    }
+
+    public function test_unlisted_preview_host_is_rejected_for_cookie_mutations(): void
+    {
+        config([
+            'app.url' => 'http://localhost',
+            'maximus.preview_hosts' => ['maximus--workspace.replit.dev'],
+        ]);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, 'session-token')
+            ->withHeader('Origin', 'https://other--workspace.replit.dev')
+            ->postJson('/api/auth/logout')
+            ->assertForbidden()
+            ->assertJsonPath('code', 'COOKIE_REQUEST_ORIGIN_FORBIDDEN');
+    }
+
     public function test_explicitly_allowed_store_origin_is_accepted(): void
     {
         config([
