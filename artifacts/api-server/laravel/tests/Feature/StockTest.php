@@ -305,6 +305,103 @@ class StockTest extends TestCase
         $this->assertDatabaseMissing('stock_products', ['sku' => 'FORBIDDEN-01']);
     }
 
+    public function test_requests_only_bootstrap_returns_requests_and_minimal_lookups(): void
+    {
+        $this->seedStockBootstrapRows();
+        $this->asActor('employee', ['stocks:requests' => ['voir']])
+            ->getJson('/api/stock/bootstrap?scope=operations')
+            ->assertOk()
+            ->assertJsonCount(1, 'requests')
+            ->assertJsonCount(0, 'movements')
+            ->assertJsonCount(1, 'productLookups')
+            ->assertJsonMissingPath('productLookups.0.purchasePrice')
+            ->assertJsonMissingPath('productLookups.0.description')
+            ->assertJsonMissingPath('productLookups.0.sku')
+            ->assertJsonCount(0, 'reportMovements')
+            ->assertJsonPath('requests.0.reason', 'Commande urgente');
+    }
+
+    public function test_products_only_bootstrap_does_not_expose_other_features_or_reference_rows(): void
+    {
+        $this->seedStockBootstrapRows();
+        $this->asActor('employee', ['stocks:products' => ['voir']])
+            ->getJson('/api/stock/bootstrap?scope=core')
+            ->assertOk()
+            ->assertJsonCount(1, 'products')
+            ->assertJsonPath('products.0.purchasePrice', 1200)
+            ->assertJsonCount(0, 'warehouses')
+            ->assertJsonCount(0, 'suppliers')
+            ->assertJsonCount(2, 'balances');
+    }
+
+    public function test_entries_and_exits_only_receive_their_exact_movement_types(): void
+    {
+        $this->seedStockBootstrapRows();
+
+        $this->asActor('employee', ['stocks:entries' => ['voir']], 'stock-entries-only')
+            ->getJson('/api/stock/bootstrap?scope=operations')
+            ->assertOk()
+            ->assertJsonCount(1, 'movements')
+            ->assertJsonPath('movements.0.type', 'ENTRÉE')
+            ->assertJsonMissingPath('movements.0.beneficiary')
+            ->assertJsonCount(0, 'requests');
+
+        $this->asActor('employee', ['stocks:exits' => ['voir']], 'stock-exits-only')
+            ->getJson('/api/stock/bootstrap?scope=operations')
+            ->assertOk()
+            ->assertJsonCount(1, 'movements')
+            ->assertJsonPath('movements.0.type', 'SORTIE')
+            ->assertJsonMissingPath('movements.0.purchasePrice')
+            ->assertJsonMissingPath('movements.0.supplierId');
+    }
+
+    public function test_inventory_permission_returns_inventory_and_minimal_page_lookups(): void
+    {
+        $this->seedStockBootstrapRows();
+        $this->asActor('employee', ['stocks:inventory' => ['voir']])
+            ->getJson('/api/stock/bootstrap?scope=inventory')
+            ->assertOk()
+            ->assertJsonCount(1, 'inventories')
+            ->assertJsonCount(1, 'inventoryLines')
+            ->assertJsonCount(1, 'products')
+            ->assertJsonMissingPath('products.0.purchasePrice')
+            ->assertJsonMissingPath('movements')
+            ->assertJsonCount(0, 'suppliers');
+    }
+
+    public function test_dashboard_only_receives_aggregate_and_minimal_recent_movement_projection(): void
+    {
+        $this->seedStockBootstrapRows();
+
+        $this->asActor('employee', ['stocks:dashboard' => ['voir']])
+            ->getJson('/api/stock/bootstrap?scope=all')
+            ->assertOk()
+            ->assertJsonCount(0, 'products')
+            ->assertJsonCount(0, 'balances')
+            ->assertJsonCount(0, 'movements')
+            ->assertJsonCount(0, 'requests')
+            ->assertJsonPath('dashboardSummary.totalQuantity', 9)
+            ->assertJsonCount(2, 'dashboardSummary.recentMovements')
+            ->assertJsonStructure(['dashboardSummary' => ['recentMovements' => [['type', 'quantity', 'movementDate']]]])
+            ->assertJsonMissingPath('dashboardSummary.recentMovements.0.productId')
+            ->assertJsonMissingPath('dashboardSummary.recentMovements.0.reference');
+    }
+
+    public function test_company_admin_keeps_full_bootstrap_access(): void
+    {
+        $this->seedStockBootstrapRows();
+        $this->asActor()
+            ->getJson('/api/stock/bootstrap?scope=all')
+            ->assertOk()
+            ->assertJsonCount(1, 'products')
+            ->assertJsonCount(1, 'warehouses')
+            ->assertJsonCount(1, 'suppliers')
+            ->assertJsonCount(2, 'movements')
+            ->assertJsonCount(1, 'requests')
+            ->assertJsonCount(1, 'inventories')
+            ->assertJsonPath('movements.0.type', 'SORTIE');
+    }
+
     public function test_stock_feature_requires_the_permission_ladder_for_mutations(): void
     {
         $actor = fn (array $permissions): array => [
@@ -331,11 +428,52 @@ class StockTest extends TestCase
         $this->assertTrue(ModuleAuthorization::allows($fullAccess, 'stocks', 'delete', 'products'));
     }
 
-    private function asActor(string $role = 'company_admin', array $permissions = []): self
+    private function seedStockBootstrapRows(): void
+    {
+        DB::table('stock_products')->insert([
+            'id' => 'product-1', 'company_id' => 'kora', 'name' => 'Café', 'category' => 'Épicerie',
+            'subcategory' => '', 'brand' => '', 'sku' => 'CAF-01', 'barcode' => '', 'image_url' => '',
+            'unit' => 'sachet', 'purchase_price' => 1200, 'sale_price' => 1500, 'min_stock' => 2,
+            'max_stock' => 20, 'supplier_id' => 'supplier-1', 'description' => 'Interne produit',
+            'archived' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('stock_warehouses')->insert([
+            'id' => 'warehouse-1', 'company_id' => 'kora', 'name' => 'Principal', 'manager' => 'Responsable',
+            'address' => 'Adresse interne', 'archived' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('stock_suppliers')->insert([
+            'id' => 'supplier-1', 'company_id' => 'kora', 'name' => 'Fournisseur', 'contact_name' => 'Contact privé',
+            'email' => 'supplier@private.demo', 'phone' => '000000', 'address' => 'Adresse fournisseur',
+            'notes' => 'Note privée', 'archived' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('stock_balances')->insert([
+            ['id' => 'balance-1', 'company_id' => 'kora', 'product_id' => 'product-1', 'supplier_id' => null, 'warehouse_id' => 'warehouse-1', 'location_id' => null, 'quantity' => 5, 'updated_at' => now()],
+            ['id' => 'balance-2', 'company_id' => 'kora', 'product_id' => 'product-1', 'supplier_id' => null, 'warehouse_id' => 'warehouse-1', 'location_id' => null, 'quantity' => 4, 'updated_at' => now()],
+        ]);
+        DB::table('stock_movements')->insert([
+            ['id' => 'movement-in', 'company_id' => 'kora', 'product_id' => 'product-1', 'supplier_id' => 'supplier-1', 'warehouse_id' => 'warehouse-1', 'destination_warehouse_id' => null, 'location_id' => null, 'requester_service' => null, 'beneficiary' => null, 'type' => 'ENTRÉE', 'quantity' => 3, 'purchase_price' => 1200, 'reason' => 'Réception', 'movement_date' => now()->subMinute(), 'user_name' => 'Agent', 'reference' => 'DOC-IN', 'comment' => 'Commentaire privé', 'status' => 'VALIDÉ', 'created_at' => now()],
+            ['id' => 'movement-out', 'company_id' => 'kora', 'product_id' => 'product-1', 'supplier_id' => null, 'warehouse_id' => 'warehouse-1', 'destination_warehouse_id' => null, 'location_id' => null, 'requester_service' => 'Atelier', 'beneficiary' => 'Bénéficiaire privé', 'type' => 'SORTIE', 'quantity' => 2, 'purchase_price' => 900, 'reason' => 'Distribution', 'movement_date' => now(), 'user_name' => 'Agent', 'reference' => 'DOC-OUT', 'comment' => 'Commentaire privé', 'status' => 'VALIDÉ', 'created_at' => now()],
+        ]);
+        DB::table('stock_requests')->insert([
+            'id' => 'request-1', 'company_id' => 'kora', 'product_id' => 'product-1', 'warehouse_id' => 'warehouse-1',
+            'quantity' => 6, 'reason' => 'Commande urgente', 'status' => 'EN ATTENTE', 'created_by' => 'Agent',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('stock_inventories')->insert([
+            'id' => 'inventory-1', 'company_id' => 'kora', 'warehouse_id' => 'warehouse-1', 'status' => 'BROUILLON',
+            'inventory_date' => now(), 'notes' => 'Comptage', 'created_by' => 'Agent', 'validated_at' => null, 'created_at' => now(),
+        ]);
+        DB::table('stock_inventory_lines')->insert([
+            'id' => 'inventory-line-1', 'inventory_id' => 'inventory-1', 'product_id' => 'product-1',
+            'theoretical_quantity' => 9, 'actual_quantity' => 9, 'difference' => 0,
+        ]);
+    }
+
+    private function asActor(string $role = 'company_admin', array $permissions = [], string $id = 'stock-admin'): self
     {
         $user = AuthUser::query()->create([
-            'id' => 'stock-admin',
-            'email' => 'stock-admin@kora.demo',
+            'id' => $id,
+            'email' => $id.'@kora.demo',
             'password_hash' => 'not-used-in-this-test',
             'display_name' => 'Gestionnaire Stock',
             'role' => $role,

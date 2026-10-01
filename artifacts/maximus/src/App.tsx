@@ -177,9 +177,15 @@ const defaultDemoAccounts: DemoAccount[] = import.meta.env.DEV
       },
       {
         id: 'ana-company-admin',
-        label: 'Direction générale ANA',
+        label: 'Administrateur entreprise ANA',
         email: 'ana.demo@example.test',
         password: 'DirectionANA!2026',
+      },
+      {
+        id: 'ana-direction-general',
+        label: 'Direction générale ANA · Awa Ndiaye',
+        email: 'awa.ndiaye@example.test',
+        password: 'AwaNdiaye!2026',
       },
       {
         id: 'ana-manager',
