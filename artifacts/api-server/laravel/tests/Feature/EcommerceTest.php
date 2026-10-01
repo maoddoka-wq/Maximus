@@ -139,7 +139,7 @@ class EcommerceTest extends TestCase
             ->assertJsonPath('summary.todayChangeGiven', 1000);
     }
 
-    public function test_pos_external_mobile_money_records_provider_reference_and_inventory_movement_once(): void
+    public function test_pos_external_mobile_money_needs_confirmation_and_records_inventory_movement_once(): void
     {
         $this->setEcommerceFeatures(['dashboard', 'catalogue', 'vente-physique', 'vente-comptoir']);
         DB::table('ecommerce_products')->insert([
