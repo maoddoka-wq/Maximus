@@ -49,7 +49,6 @@ final class SellerWalletController extends Controller
             'ledger' => $this->ledger($company),
             'maturityPolicy' => $this->maturityPolicy->payload(),
             'withdrawalFee' => $this->feePolicy->payload(),
-            'commissionPolicy' => $this->commissionPolicy->payload(),
         ]);
     }
 

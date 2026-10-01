@@ -27,6 +27,7 @@ class SellerWalletTest extends TestCase
         $response->assertJsonPath('wallet.companyId', 'kora');
         $response->assertJsonPath('wallet.availableBalance', 0);
         $response->assertJsonMissing(['companyId' => 'other-company']);
+        $response->assertJsonMissingPath('commissionPolicy');
         $this->getJson('/api/ecommerce/wallet?companyId=other-company')->assertForbidden();
     }
 
