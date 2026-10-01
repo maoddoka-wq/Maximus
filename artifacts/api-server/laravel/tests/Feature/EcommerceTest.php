@@ -35,6 +35,92 @@ class EcommerceTest extends TestCase
         }
     }
 
+    public function test_pos_requires_an_explicit_feature_grant(): void
+    {
+        $this->setEcommerceFeatures(['dashboard', 'catalogue', 'vente-physique']);
+
+        $this->asActor()
+            ->getJson('/api/ecommerce/pos-sales?companyId=kora')
+            ->assertForbidden();
+    }
+
+    public function test_cash_pos_sale_decrements_shared_stock_once_and_reports_the_change(): void
+    {
+        $this->setEcommerceFeatures(['dashboard', 'catalogue', 'vente-physique', 'vente-comptoir']);
+        DB::table('ecommerce_stores')->updateOrInsert(
+            ['id' => 'ecommerce-store-kora'],
+            [
+                'company_id' => 'kora',
+                'slug' => 'kora-boutique',
+                'name' => 'Boutique KORA',
+                'description' => '',
+                'status' => 'PUBLISHED',
+                'currency' => 'XOF',
+                'primary_color' => '#D69E2E',
+                'accent_color' => '#172033',
+                'logo_url' => '',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+        DB::table('ecommerce_products')->insert([
+            'id' => 'ecommerce-pos-product',
+            'company_id' => 'kora',
+            'name' => 'Produit comptoir',
+            'slug' => 'produit-comptoir',
+            'sku' => 'POS-001',
+            'description' => '',
+            'category' => 'Général',
+            'price' => 1000,
+            'stock' => 5,
+            'image_url' => '',
+            'featured' => false,
+            'status' => 'PUBLISHED',
+            'product_type' => 'SALE',
+            'fulfillment_type' => 'PHYSICAL',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $request = $this->asActor();
+        $response = $request
+            ->withHeader('Idempotency-Key', 'pos-test-sale-001')
+            ->postJson('/api/ecommerce/pos-sales?companyId=kora', [
+                'lines' => [['productId' => 'ecommerce-pos-product', 'quantity' => 2]],
+                'amountReceived' => 3000,
+                'customerName' => 'Client comptoir',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('sale.total', 2000)
+            ->assertJsonPath('sale.amountReceived', 3000)
+            ->assertJsonPath('sale.changeDue', 1000)
+            ->assertJsonPath('sale.items.0.quantity', 2);
+
+        $saleId = $response->json('sale.id');
+        $this->assertDatabaseHas('ecommerce_products', ['id' => 'ecommerce-pos-product', 'stock' => 3]);
+        $this->assertDatabaseHas('ecommerce_pos_sales', ['id' => $saleId, 'status' => 'PAID']);
+        $this->assertDatabaseHas('ecommerce_pos_sale_items', ['sale_id' => $saleId, 'product_id' => 'ecommerce-pos-product']);
+
+        $request
+            ->withHeader('Idempotency-Key', 'pos-test-sale-001')
+            ->postJson('/api/ecommerce/pos-sales?companyId=kora', [
+                'lines' => [['productId' => 'ecommerce-pos-product', 'quantity' => 2]],
+                'amountReceived' => 3000,
+                'customerName' => 'Client comptoir',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('sale.id', $saleId);
+
+        $this->assertDatabaseHas('ecommerce_products', ['id' => 'ecommerce-pos-product', 'stock' => 3]);
+        $this->assertDatabaseCount('ecommerce_pos_sales', 1);
+
+        $request->getJson('/api/ecommerce/pos-sales?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('summary.todaySalesCount', 1)
+            ->assertJsonPath('summary.todayRevenue', 2000)
+            ->assertJsonPath('summary.todayChangeGiven', 1000);
+    }
+
     public function test_ecommerce_requires_a_session_and_company_context(): void
     {
         $this->getJson('/api/ecommerce/bootstrap?companyId=kora')->assertUnauthorized();
@@ -1370,5 +1456,23 @@ class EcommerceTest extends TestCase
         return $this
             ->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
+    }
+
+    /**
+     * @param array<int, string> $featureIds
+     */
+    private function setEcommerceFeatures(array $featureIds): void
+    {
+        DB::table('maximus_company_modules')->updateOrInsert(
+            ['company_id' => 'kora', 'module_id' => 'ecommerce'],
+            [
+                'id' => 'company-module-kora-ecommerce',
+                'status' => 'ACTIF',
+                'feature_ids' => json_encode($featureIds),
+                'configuration' => json_encode(['featureScope' => 'explicit']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
     }
 }

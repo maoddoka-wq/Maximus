@@ -82,7 +82,7 @@ test('un employé retrouve les fonctionnalités de plusieurs modules dans le men
   });
 
   assert.deepEqual(groups.map(group => group.label), [
-    'Gestion commerciale',
+    'Commerce',
     'Gestion de stock',
   ]);
   assert.deepEqual(groups.flatMap(group => group.items.map(item => item.href)), [
@@ -117,7 +117,7 @@ test('un administrateur d’entreprise voit les fonctionnalités de ses modules'
   });
 
   assert.deepEqual(groups.map(group => group.label), [
-    'Gestion commerciale',
+    'Commerce',
     'Gestion de stock',
   ]);
   assert.deepEqual(groups[0]?.items.map(item => item.href), [
@@ -138,6 +138,30 @@ test('un administrateur d’entreprise voit les fonctionnalités de ses modules'
       '/entreprise/commerce?tab=settings',
   ]);
   assert.ok(groups[1]?.items.some(item => item.href === '/entreprise/stocks?tab=products'));
+});
+
+test('Commerce et boutique en ligne partagent une entrée et des fonctionnalités distinctes', () => {
+  const groups = buildSidebarFeatureGroups({
+    allowed: ['commerce', 'ecommerce'],
+    configuredModules,
+    employeeRole: null,
+    employeeNode: null,
+    companyAdmin: true,
+    selectedFeatureIdsByModule: {
+      commerce: ['sales'],
+      ecommerce: ['catalogue', 'vente-comptoir'],
+    },
+    commerceTabIds: ['sales'],
+    ecommerceFeatureIds: ['catalogue', 'vente-comptoir'],
+  });
+
+  assert.deepEqual(groups.map(group => group.label), ['Commerce']);
+  assert.deepEqual(groups.flatMap(group => group.items.map(item => item.href)), [
+    '/entreprise/commerce?tab=sales',
+    '/entreprise/ecommerce?tab=catalogue',
+    '/entreprise/ecommerce?tab=categories',
+    '/entreprise/ecommerce?tab=vente-comptoir',
+  ]);
 });
 
 test('le menu Transport utilise les identifiants canoniques des fonctionnalités', () => {

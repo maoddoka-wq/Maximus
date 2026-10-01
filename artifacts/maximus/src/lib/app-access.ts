@@ -137,9 +137,11 @@ export function buildAppAccessContext({
     const requestedFeatures = activeCompany.requestedModuleFeatures;
     if (!requestedFeatures || !Object.prototype.hasOwnProperty.call(requestedFeatures, module.id)) {
       // Comme les autres modules, un module autorisé sans sélection détaillée
-      // expose ses fonctionnalités configurées. Une sélection explicite reste
-      // respectée lorsqu’elle existe.
-      return undefined;
+      // expose ses fonctionnalités historiques. Les nouvelles capacités du
+      // Commerce unifié restent opt-in pour les entreprises déjà configurées.
+      return module.id === 'ecommerce'
+        ? getModuleFeatureOptions(module).map(feature => feature.id).filter(featureId => featureId !== 'vente-comptoir')
+        : undefined;
     }
 
     return keepCompanySettings(module, [
@@ -170,7 +172,9 @@ export function buildAppAccessContext({
 
     const requestedFeatures = activeCompany.requestedModuleFeatures;
     if (!requestedFeatures || !Object.prototype.hasOwnProperty.call(requestedFeatures, module.id)) {
-      return undefined;
+      return module.id === 'ecommerce'
+        ? new Set(getModuleFeatureOptions(module).map(feature => feature.id).filter(featureId => featureId !== 'vente-comptoir'))
+        : undefined;
     }
     return new Set(getEffectiveModuleFeatureIds(module, requestedFeatures[module.id] ?? []));
   };
@@ -245,6 +249,10 @@ export function buildAppAccessContext({
       ? companySelectedFeatureIds(ecommerceModule)
       : accessRole && ecommerceModule
         ? [...getSelectedFeatureIds(accessRole, ecommerceModule, employeeNode?.moduleFeatures?.[ecommerceModule.id])]
+          .filter(featureId => {
+            const ceiling = companyFeatureCeiling(ecommerceModule);
+            return !ceiling || ceiling.has(featureId);
+          })
         : undefined;
   const payrollModule = configuredModules.find(module => module.id === 'paie');
   const selectedPayrollFeatureIds =
@@ -381,6 +389,7 @@ export function buildAppAccessContext({
           employeeNode,
           companyAdmin,
           selectedFeatureIdsByModule,
+          ecommerceFeatureIds: selectedEcommerceFeatureIds,
           commerceTabIds,
           stockPermissions,
         })

@@ -4,6 +4,7 @@ export type EcommerceStoreStatus = 'DRAFT' | 'PUBLISHED' | 'SUSPENDED';
 export type EcommerceProductStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type EcommerceProductType = 'SALE' | 'RENTAL';
 export type EcommerceProductFulfillmentType = 'PHYSICAL' | 'DIGITAL';
+export type EcommercePosSaleStatus = 'PAID' | 'REFUNDED';
 export type EcommerceRentalPeriod = 'JOUR' | 'SEMAINE' | 'MOIS';
 export type EcommerceRentalStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type EcommerceOrderStatus = 'NOUVELLE' | 'CONFIRMÉE' | 'EN PRÉPARATION' | 'EXPÉDIÉE' | 'LIVRÉE' | 'ANNULÉE';
@@ -11,6 +12,48 @@ export type EcommerceDeliveryRequestStatus = 'DEMANDEE' | 'CONFIRMEE' | 'EN_COUR
 export type EcommerceDeliveryServiceType = 'STANDARD' | 'URGENT';
 export type SellerWithdrawalStatus = 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
 export type PaymentProvider = 'WAVE' | 'ORANGE_MONEY';
+
+export interface EcommercePosSaleItem {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  unitPrice: number;
+  quantity: number;
+  lineTotal: number;
+}
+
+export interface EcommercePosSale {
+  id: string;
+  reference: string;
+  customerName: string;
+  currency: 'XOF' | 'EUR' | 'USD';
+  subtotal: number;
+  total: number;
+  amountReceived: number;
+  changeDue: number;
+  status: EcommercePosSaleStatus;
+  createdAt: string;
+  items: EcommercePosSaleItem[];
+}
+
+export interface EcommercePosSalesBootstrap {
+  sales: EcommercePosSale[];
+  summary: {
+    currency: EcommercePosSale['currency'];
+    todaySalesCount: number;
+    todayRevenue: number;
+    todayCashReceived: number;
+    todayChangeGiven: number;
+  };
+}
+
+export interface CreateEcommercePosSale {
+  lines: Array<{ productId: string; quantity: number }>;
+  amountReceived: number;
+  customerName?: string;
+  idempotencyKey: string;
+}
 
 export type EcommerceRentalTransmission = 'MANUAL' | 'AUTOMATIC';
 export type EcommerceRentalFuel = 'GASOLINE' | 'DIESEL' | 'HYBRID' | 'ELECTRIC';
@@ -501,6 +544,15 @@ export const createEcommerceApi = (companyId: string) => {
 
   return {
     bootstrap: () => request<EcommerceBootstrap>(withCompany('/ecommerce/bootstrap')),
+    posSales: () => request<EcommercePosSalesBootstrap>(withCompany('/ecommerce/pos-sales')),
+    createPosSale: (body: CreateEcommercePosSale) => {
+      const { idempotencyKey, ...payload } = body;
+      return request<{ sale: EcommercePosSale }>(withCompany('/ecommerce/pos-sales'), {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: { 'Idempotency-Key': idempotencyKey },
+      });
+    },
     wallet: () => request<SellerWalletBootstrap>(withCompany('/ecommerce/wallet')),
     reconcilePayments: () => request<{ sync: { checked: number; updated: number; failed: number }; wallet: SellerWallet }>(withCompany('/ecommerce/wallet/reconcile'), { method: 'POST' }),
     updatePayoutAccount: (body: { provider: 'WAVE'; mobile: string; beneficiaryName: string }) =>

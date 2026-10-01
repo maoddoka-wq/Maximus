@@ -304,7 +304,7 @@ test('affiche les modules dans le menu de l’administrateur d’entreprise', ()
 
   assert.deepEqual(access.allowed, ['commerce']);
   assert.equal(access.verticalModuleNavigation, true);
-  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), ['Gestion commerciale']);
+  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), ['Commerce']);
   assert.ok(access.sidebarFeatureGroups[0]?.items.some(item => item.href === '/entreprise/commerce?tab=dashboard'));
 });
 
@@ -324,7 +324,7 @@ test('affiche les fonctionnalités de tous les modules autorisés dans le menu e
   });
 
   assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), [
-    'Gestion commerciale',
+    'Commerce',
     'Gestion de stock',
     'Présences',
   ]);
@@ -501,7 +501,7 @@ test('affiche le menu des modules pendant un test réel de secteur', () => {
     serverModuleStatuses: null,
   });
 
-  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), ['Gestion commerciale']);
+  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), ['Commerce']);
   assert.equal(access.verticalModuleNavigation, true);
 });
 
@@ -549,7 +549,7 @@ test('affiche immédiatement les modules du test réel sans attendre les accès 
 
   assert.deepEqual(access.allowed, ['commerce', 'stocks']);
   assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), [
-    'Gestion commerciale',
+    'Commerce',
     'Gestion de stock',
   ]);
   assert.equal(access.verticalModuleNavigation, true);
@@ -561,6 +561,7 @@ test('limite le menu e-commerce de l’administrateur aux fonctionnalités chois
   company.allowedModules = ['commerce', 'ecommerce'];
   company.requestedModulePackIds = {};
   company.requestedModuleFeatures = {
+    commerce: ['sales'],
     ecommerce: ['dashboard', 'catalogue'],
   };
 
@@ -575,18 +576,40 @@ test('limite le menu e-commerce de l’administrateur aux fonctionnalités chois
   });
 
   assert.deepEqual(access.selectedEcommerceFeatureIds, ['dashboard', 'catalogue', 'parametres']);
+  assert.equal(access.selectedEcommerceFeatureIds?.includes('vente-comptoir'), false);
   assert.equal(access.verticalModuleNavigation, true);
-  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), [
-    'Gestion commerciale',
-    'E-commerce',
-  ]);
+  assert.deepEqual(access.sidebarFeatureGroups.map(group => group.label), ['Commerce']);
   assert.deepEqual(
-    access.sidebarFeatureGroups.find(group => group.label === 'E-commerce')?.items.map(item => item.href),
+    access.sidebarFeatureGroups.find(group => group.label === 'Commerce')?.items.map(item => item.href),
     [
+      '/entreprise/commerce?tab=sales',
       '/entreprise/ecommerce?tab=dashboard',
       '/entreprise/ecommerce?tab=catalogue',
       '/entreprise/ecommerce?tab=categories',
       '/entreprise/ecommerce?tab=parametres',
     ],
   );
+});
+
+test('ne donne pas automatiquement la vente comptoir aux anciens accès e-commerce', () => {
+  const { data, company } = createAccessFixture();
+  company.requestedModules = ['ecommerce'];
+  company.allowedModules = ['ecommerce'];
+  company.requestedModulePackIds = {};
+  company.requestedModuleFeatures = {};
+
+  const access = buildAppAccessContext({
+    data,
+    session: `company:${company.id}`,
+    employee: null,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+  });
+
+  assert.equal(access.selectedEcommerceFeatureIds?.includes('vente-comptoir'), false);
+  assert.equal(access.sidebarFeatureGroups.some(group =>
+    group.items.some(item => item.href.endsWith('?tab=vente-comptoir')),
+  ), false);
 });

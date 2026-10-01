@@ -2,6 +2,7 @@ export const ecommerceFeatureDefinitions = [
   { id: 'dashboard', label: 'Tableau de bord' },
   { id: 'catalogue', label: 'Catalogue' },
   { id: 'vente-physique', label: 'Vente de produits physiques' },
+  { id: 'vente-comptoir', label: 'Vente comptoir en espèces' },
   { id: 'vente-numerique', label: 'Vente de produits numériques' },
   { id: 'categories', label: 'Catégories' },
   { id: 'commandes', label: 'Commandes' },
@@ -19,6 +20,7 @@ export const ecommerceFeatureDependencies: Partial<Record<string, string[]>> = {
   promotions: ['catalogue'],
   location: ['catalogue'],
   'vente-physique': ['catalogue'],
+  'vente-comptoir': ['catalogue', 'vente-physique'],
   'vente-numerique': ['catalogue'],
   livraisons: ['commandes'],
 };
@@ -50,6 +52,18 @@ export const ecommerceFeaturePacks = [
       clients: ['voir'],
       finances: ['voir', 'modifier'],
       parametres: ['voir', 'modifier'],
+    },
+  },
+  {
+    id: 'ecommerce-vente-comptoir',
+    name: 'Vente comptoir',
+    description: 'Enregistrer les ventes en magasin et suivre les encaissements en espèces.',
+    featureIds: ['dashboard', 'catalogue', 'vente-physique', 'vente-comptoir'],
+    featurePermissions: {
+      dashboard: ['voir'],
+      catalogue: ['voir'],
+      'vente-physique': ['voir'],
+      'vente-comptoir': ['voir', 'créer'],
     },
   },
   {
@@ -105,14 +119,18 @@ export const ecommerceFeaturePacks = [
     id: 'ecommerce-supervision',
     name: 'Supervision boutique',
     description: 'Superviser les ventes physiques et numériques, les promotions et les livraisons.',
-    featureIds: ecommerceFeatureDefinitions.map(feature => feature.id),
+    featureIds: ecommerceFeatureDefinitions
+      .filter(feature => feature.id !== 'vente-comptoir')
+      .map(feature => feature.id),
     featurePermissions: Object.fromEntries(
-      ecommerceFeatureDefinitions.map(feature => [
+      ecommerceFeatureDefinitions
+        .filter(feature => feature.id !== 'vente-comptoir')
+        .map(feature => [
         feature.id,
         feature.id === 'dashboard' || feature.id === 'clients'
           ? ['voir']
           : ['voir', 'créer', 'modifier'],
-      ]),
+        ]),
     ),
   },
 ] as const;

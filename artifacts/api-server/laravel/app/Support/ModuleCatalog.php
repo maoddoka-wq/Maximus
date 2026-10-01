@@ -12,7 +12,7 @@ final class ModuleCatalog
         return [
             [
                 'id' => 'commerce',
-                'name' => 'Gestion commerciale',
+                'name' => 'Commerce',
                 'description' => 'Piloter les ventes, les clients, les achats et la performance commerciale.',
                 'features' => ['Clients', 'Devis et commandes', 'Chiffre d’affaires'],
                 'feature_packs' => [
@@ -54,9 +54,9 @@ final class ModuleCatalog
             ],
             [
                 'id' => 'ecommerce',
-                'name' => 'E-commerce',
+                'name' => 'Boutique en ligne',
                 'description' => 'Boutique en ligne, catalogue public et commandes clients.',
-                    'features' => ['Tableau de bord', 'Catalogue', 'Vente physique', 'Vente numérique', 'Catégories', 'Commandes', 'Clients', 'Promotions', 'Location', 'Livraisons', 'Finances', 'Paramètres'],
+                'features' => ['Tableau de bord', 'Catalogue', 'Vente physique', 'Vente comptoir espèces', 'Vente numérique', 'Catégories', 'Commandes', 'Clients', 'Promotions', 'Location', 'Livraisons', 'Finances', 'Paramètres'],
                 'feature_packs' => [
                     ['id' => 'ecommerce-catalogue', 'name' => 'Catalogue en ligne', 'description' => 'Publier une boutique et présenter vos produits.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'finances', 'parametres']],
                     ['id' => 'ecommerce-gestion', 'name' => 'Gestion e-commerce', 'description' => 'Piloter le catalogue, les ventes physiques et les clients.', 'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'categories', 'commandes', 'clients', 'finances', 'parametres']],
@@ -95,6 +95,18 @@ final class ModuleCatalog
                             'parametres' => ['voir', 'modifier'],
                         ],
                     ],
+                    [
+                        'id' => 'ecommerce-vente-comptoir',
+                        'name' => 'Vente comptoir',
+                        'description' => 'Enregistrer les ventes en magasin et suivre les encaissements en espèces.',
+                        'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'vente-comptoir'],
+                        'feature_permissions' => [
+                            'dashboard' => ['voir'],
+                            'catalogue' => ['voir'],
+                            'vente-physique' => ['voir'],
+                            'vente-comptoir' => ['voir', 'créer'],
+                        ],
+                    ],
                 ],
                 'feature_dependencies' => [
                     'commandes' => ['catalogue'],
@@ -102,6 +114,7 @@ final class ModuleCatalog
                     'promotions' => ['catalogue'],
                     'location' => ['catalogue'],
                     'vente-physique' => ['catalogue'],
+                    'vente-comptoir' => ['catalogue', 'vente-physique'],
                     'vente-numerique' => ['catalogue'],
                     'livraisons' => ['commandes'],
                 ],
@@ -573,6 +586,7 @@ final class ModuleCatalog
             ],
             'ecommerce' => [
                 'dashboard' => 'Tableau de bord', 'catalogue' => 'Catalogue', 'vente-physique' => 'Vente de produits physiques',
+                'vente-comptoir' => 'Vente comptoir en espèces',
                 'vente-numerique' => 'Vente de produits numériques', 'categories' => 'Catégories', 'commandes' => 'Commandes',
                 'clients' => 'Clients', 'promotions' => 'Promotions', 'location' => 'Location', 'livraisons' => 'Livraisons',
                 'finances' => 'Finances & retraits', 'parametres' => 'Paramètres',
@@ -642,12 +656,12 @@ final class ModuleCatalog
         }
 
         // Legacy rows with no explicit scope preserve physical sales for existing
-        // catalogues, but digital sales require an explicit grant.
+        // catalogues, but digital sales and the new in-person POS require explicit grants.
         // New writes set featureScope=explicit, including an intentionally empty list.
         if (($configuration['featureScope'] ?? null) === 'explicit') {
             return in_array($featureId, $featureIds, true);
         }
-        if ($featureId === 'vente-numerique') {
+        if (in_array($featureId, ['vente-numerique', 'vente-comptoir'], true)) {
             return false;
         }
         if ($featureId === 'vente-physique') {

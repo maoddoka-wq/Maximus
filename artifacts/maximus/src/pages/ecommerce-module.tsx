@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import {
   createEcommerceApi,
+  type EcommercePosSalesBootstrap,
   type EcommerceBootstrap,
   type EcommerceCategory,
   type EcommerceDeliveryRequest,
@@ -53,18 +54,20 @@ import {
   type EcommerceStore,
   type SellerWalletBootstrap,
 } from '@/lib/ecommerce-api';
+import EcommercePosPanel from '@/pages/ecommerce-pos-panel';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
-type EcommerceTab = 'dashboard' | 'accueil' | 'catalogue' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';
+type EcommerceTab = 'dashboard' | 'accueil' | 'catalogue' | 'vente-comptoir' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';
 
 const tabs: { id: EcommerceTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
   { id: 'accueil', label: 'Accueil', icon: House },
   { id: 'catalogue', label: 'Catalogue', icon: Package },
+  { id: 'vente-comptoir', label: 'Vente comptoir', icon: ShoppingBag },
   { id: 'categories', label: 'Catégories', icon: Tags },
   { id: 'commandes', label: 'Commandes', icon: ClipboardList },
   { id: 'clients', label: 'Clients', icon: Users },
@@ -262,6 +265,7 @@ export default function EcommerceModulePage({
 }) {
   const [data, setData] = useState<EcommerceBootstrap | null>(null);
   const [walletData, setWalletData] = useState<SellerWalletBootstrap | null>(null);
+  const [posData, setPosData] = useState<EcommercePosSalesBootstrap | null>(null);
   const visibleTabs = allowedFeatureIds
     ? tabs.filter(item =>
         item.id === 'dashboard'
@@ -306,19 +310,31 @@ export default function EcommerceModulePage({
         deliveryRequests: [],
       });
       setWalletData(null);
+      setPosData({
+        sales: [],
+        summary: {
+          currency: 'XOF',
+          todaySalesCount: 0,
+          todayRevenue: 0,
+          todayCashReceived: 0,
+          todayChangeGiven: 0,
+        },
+      });
       setError('');
       setLoading(false);
       setRefreshing(false);
       return;
     }
     try {
-      const [bootstrap, nextWalletData] = await Promise.all([
+      const [bootstrap, nextWalletData, nextPosData] = await Promise.all([
         api.bootstrap(),
         visibleTabIds.includes('finances') ? api.wallet() : Promise.resolve(null),
+        visibleTabIds.includes('vente-comptoir') ? api.posSales() : Promise.resolve(null),
       ]);
       const nextData = normalizeEcommerceBootstrap(bootstrap, companyId);
       setData(nextData);
       setWalletData(nextWalletData);
+      setPosData(nextPosData);
       setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossible de charger l’espace e-commerce.');
@@ -415,6 +431,22 @@ export default function EcommerceModulePage({
       {tab === 'dashboard' && <Dashboard data={data} onTab={navigate} />}
       {tab === 'accueil' && <HomePanel store={store} canModify={currentCanModify} run={run} />}
       {tab === 'catalogue' && <Catalogue data={data} allowedFeatureIds={allowedFeatureIds} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
+      {tab === 'vente-comptoir' && posData && (
+        <EcommercePosPanel
+          idempotencyScope={companyId}
+          products={data.products}
+          sales={posData.sales}
+          summary={posData.summary}
+          currency={store.currency}
+          canCreate={currentCanCreate}
+          loading={!posData}
+          onCreateSale={async input => {
+            const result = await api.createPosSale(input);
+            void load(true);
+            return result.sale;
+          }}
+        />
+      )}
       {tab === 'categories' && <CategoryManager data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'commandes' && <><Orders data={data} canModify={currentCanModify} run={run} /><OrderAttachments data={data} /></>}
       {tab === 'clients' && <Clients data={data} />}

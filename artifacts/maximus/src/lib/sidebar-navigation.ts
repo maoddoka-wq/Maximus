@@ -131,6 +131,7 @@ type SidebarNavigationInput = {
   employeeNode: OrgNode | null;
   companyAdmin?: boolean;
   selectedFeatureIdsByModule?: Partial<Record<ModuleId, string[]>>;
+  ecommerceFeatureIds?: string[];
   commerceTabIds?: string[];
   stockPermissions?: Record<string, string[]>;
 };
@@ -142,6 +143,7 @@ export function buildSidebarFeatureGroups({
   employeeNode,
   companyAdmin = false,
   selectedFeatureIdsByModule,
+  ecommerceFeatureIds,
   commerceTabIds,
   stockPermissions,
 }: SidebarNavigationInput): SidebarFeatureGroup[] {
@@ -161,19 +163,37 @@ export function buildSidebarFeatureGroups({
           employeeNode?.moduleFeatures?.[module.id],
         );
 
-    if (moduleId === 'commerce') {
-      const visibleCommerceTabs = commerceTabIds
-        ? commerceTabDefinitions.filter(tab => commerceTabIds.includes(tab.id))
-        : companyAdmin
-          ? commerceTabDefinitions.filter(tab => !hasExplicitCompanySelection || selectedFeatureIds.has(tab.id))
-          : [];
+    if (moduleId === 'ecommerce' && allowed.includes('commerce')) return [];
 
-      const items = visibleCommerceTabs.map(tab => ({
-        href: `/entreprise/commerce?tab=${tab.id}`,
-        label: tab.label,
-        icon: commerceTabIcons[tab.id],
-      }));
-      return items.length ? [{ label: module.name, items }] : [];
+    if (moduleId === 'commerce' || moduleId === 'ecommerce') {
+      const items: SidebarFeatureGroup['items'] = [];
+      if (allowed.includes('commerce')) {
+        const visibleCommerceTabs = commerceTabIds
+          ? commerceTabDefinitions.filter(tab => commerceTabIds.includes(tab.id))
+          : companyAdmin
+            ? commerceTabDefinitions.filter(tab => !hasExplicitCompanySelection || selectedFeatureIds.has(tab.id))
+            : [];
+        items.push(...visibleCommerceTabs.map(tab => ({
+          href: `/entreprise/commerce?tab=${tab.id}`,
+          label: tab.label,
+          icon: commerceTabIcons[tab.id],
+        })));
+      }
+
+      if (allowed.includes('ecommerce')) {
+        const ecommerceModule = configuredModules.find(item => item.id === 'ecommerce');
+        if (ecommerceModule) {
+          const features = new Set(
+            ecommerceFeatureIds
+              ?? (moduleId === 'ecommerce'
+                ? [...selectedFeatureIds]
+                : getModuleFeatureOptions(ecommerceModule).map(feature => feature.id)),
+          );
+          items.push(...buildEcommerceNavigationItems(ecommerceModule, features));
+        }
+      }
+
+      return items.length ? [{ label: 'Commerce', items }] : [];
     }
 
     const items = moduleId === 'stocks'
