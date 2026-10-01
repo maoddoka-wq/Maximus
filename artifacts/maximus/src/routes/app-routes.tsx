@@ -20,6 +20,7 @@ import type { CompanyWorkspaceFeatureId } from '@/lib/company-workspace-features
 type Screen = ComponentType<never>;
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
 type Navigate = (path: string) => void;
+type Refresh = () => Promise<boolean>;
 
 function renderScreen<Props extends object>(screen: Screen, props: Props): ReactElement | null {
   const ScreenComponent = screen as ComponentType<Props>;
@@ -56,6 +57,7 @@ export function AdminRouter({
   mutate,
   notify,
   onNavigate,
+  onRefresh,
   onBack,
   onModuleAccess,
   onTestSector,
@@ -70,6 +72,7 @@ export function AdminRouter({
   mutate: Mutate;
   notify: (message: string) => void;
   onNavigate: Navigate;
+  onRefresh: Refresh;
   onBack: (fallback: string) => void;
   onModuleAccess: (companyId: string, moduleId: ModuleId, status: ModuleAvailability) => Promise<void>;
   onTestSector: (preset: SectorPreset) => void;
@@ -138,7 +141,7 @@ export function AdminRouter({
     return renderScreen(screens.sectors, { data, mutate, onTestSector });
   }
   if (routePath === '/maximus/abonnements') {
-    return renderScreen(screens.subscriptions, { data, onNavigate });
+    return renderScreen(screens.subscriptions, { data, onNavigate, onRefresh });
   }
   if (routePath === '/maximus/notifications') {
     return renderScreen(screens.notifications, { data, mutate, context: { isAdmin: true } });

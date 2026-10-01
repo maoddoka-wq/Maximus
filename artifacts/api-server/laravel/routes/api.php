@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\MaximusAssistantController;
 use App\Http\Controllers\Api\OnboardingDraftController;
 use App\Http\Controllers\Api\ModuleController;
 use App\Http\Controllers\Api\PlatformSettingsController;
+use App\Http\Controllers\Api\EcommerceSubscriptionController;
 use App\Http\Controllers\Api\SystemHealthController;
 use App\Http\Controllers\Api\InstallationController;
 use App\Http\Controllers\Api\InstallationAccessController;
@@ -161,6 +162,8 @@ Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void 
 });
 
 Route::middleware(['maximus.central', 'maximus.auth'])->prefix('platform-settings')->group(function (): void {
+    Route::get('/ecommerce-subscriptions', [EcommerceSubscriptionController::class, 'index']);
+    Route::put('/ecommerce-subscriptions/{companyId}', [EcommerceSubscriptionController::class, 'update']);
     Route::get('/public-registration', [PlatformSettingsController::class, 'publicRegistration']);
     Route::put('/public-registration', [PlatformSettingsController::class, 'updatePublicRegistration']);
     Route::get('/seller-wallet-maturity', [PlatformSettingsController::class, 'sellerWalletMaturity']);

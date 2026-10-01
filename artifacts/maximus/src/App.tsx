@@ -58,6 +58,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { parseClientPwaPath } from '@/lib/pwa';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
 import { ModulePackDraftForm } from '@/components/module-pack-draft-form';
+import { EcommerceSubscriptionManagement } from '@/components/ecommerce-subscription-management';
 import {
   ActionButton,
   ActivityRow,
@@ -1406,6 +1407,7 @@ function AppContent() {
                   mutate={mutate}
                   notify={notify}
                   onNavigate={navigate}
+                  onRefresh={refreshAppState}
                   onBack={goBack}
                   onModuleAccess={updateCompanyModuleAccess}
                    assistantScope={adminAssistantScope}
@@ -5062,9 +5064,11 @@ function RolesPage({ data, onNavigate }: { data: StoreData; onNavigate: (path: s
 function SubscriptionsPage({
   data,
   onNavigate,
+  onRefresh,
 }: {
   data: StoreData;
   onNavigate: (path: string) => void;
+  onRefresh: () => Promise<boolean>;
 }) {
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState(data.subscriptions[0]?.id ?? '');
   const [searchTerm, setSearchTerm] = useState('');
@@ -5101,6 +5105,7 @@ function SubscriptionsPage({
     return (
       <div className="space-y-6">
         <MaximusWalletPanel formatAmount={formatAmount} />
+        <EcommerceSubscriptionManagement companies={data.companies} onRefresh={onRefresh} />
         <EmptyState
           title="Aucun abonnement enregistré"
           text="Les souscriptions apparaîtront ici avec leur plan, leur cycle de paiement et leurs factures."
@@ -5133,6 +5138,7 @@ function SubscriptionsPage({
       </section>
 
       <MaximusWalletPanel formatAmount={formatAmount} />
+      <EcommerceSubscriptionManagement companies={data.companies} onRefresh={onRefresh} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
