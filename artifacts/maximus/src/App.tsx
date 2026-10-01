@@ -1514,6 +1514,11 @@ function AppContent() {
                   commerceTabIds={commerceTabIds}
                   moduleStatuses={serverModuleStatuses ?? {}}
                    serverModuleAccess={serverModuleAccess}
+                    serverModuleAccessReady={
+                      serverModuleAccessReady
+                      && (!activeCompanyId || serverModuleAccessCompanyId === activeCompanyId)
+                    }
+                    serverModuleAccessError={serverModuleAccessError}
                    hiddenWorkspaceFeatures={effectiveHiddenWorkspaceFeatures}
                   screens={{
                     dashboard: RoleAwareCompanyDashboard,

@@ -210,6 +210,8 @@ export function CompanyRouter({
   commerceTabPermissions,
   moduleStatuses,
   serverModuleAccess,
+  serverModuleAccessReady = true,
+  serverModuleAccessError = '',
   hiddenWorkspaceFeatures,
   screens,
 }: {
@@ -243,6 +245,8 @@ export function CompanyRouter({
   commerceTabPermissions?: Partial<Record<string, string[]>>;
   moduleStatuses: Record<string, ModuleAvailability>;
   serverModuleAccess?: import('@/lib/module-api').ServerModuleAccess[] | null;
+  serverModuleAccessReady?: boolean;
+  serverModuleAccessError?: string;
   screens: CompanyRouteScreens;
   hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
 }) {
@@ -272,6 +276,15 @@ export function CompanyRouter({
     return renderScreen(screens.empty, {
       title: 'Module en maintenance',
       text: 'Ce module est temporairement indisponible pendant une opération de maintenance. Les autres modules restent accessibles.',
+      action: () => onBack('/entreprise/dashboard'),
+    });
+  }
+  if (requiredModule && !serverModuleAccessReady) {
+    return renderScreen(screens.empty, {
+      title: serverModuleAccessError ? 'Vérification de l’accès impossible' : 'Vérification de l’accès en cours',
+      text: serverModuleAccessError
+        ? 'Nous ne pouvons pas confirmer vos droits pour le moment. Réessayez dans quelques instants ou contactez l’administrateur de votre entreprise.'
+        : 'Nous vérifions les accès de votre entreprise. Cette page s’ouvrira dès que la vérification sera terminée.',
       action: () => onBack('/entreprise/dashboard'),
     });
   }
