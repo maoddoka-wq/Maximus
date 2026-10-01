@@ -133,6 +133,7 @@ import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company
 import { createEcommerceApi, type EcommerceDomain } from '@/lib/ecommerce-api';
 import { registrationCatalogApi } from '@/lib/registration-catalog-api';
 import { isPublicIntelligentRegistrationEnabled } from '@/lib/registration-policy';
+import { loadAnaPreview, type AnaPreviewProfile } from '@/lib/ana-preview-api';
 import { platformSettingsApi, type MaximusWalletBootstrap } from '@/lib/platform-settings-api';
 import {
   loadCompanyModuleAccess,
@@ -1500,6 +1501,65 @@ function AppContent() {
   );
 }
 
+function AnaPreviewLoginProfiles() {
+  const [profiles, setProfiles] = useState<AnaPreviewProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let current = true;
+    void loadAnaPreview()
+      .then((payload) => {
+        if (current) setProfiles(payload.profiles);
+      })
+      .catch(() => {
+        if (current) setError('Les profils ANA sont indisponibles dans le stockage local de prévisualisation.');
+      })
+      .finally(() => {
+        if (current) setLoading(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  return (
+    <section className="mt-6 border-t border-[hsl(var(--border))] pt-5" aria-label="Profils de démonstration ANA">
+      <div className="mb-3">
+        <h3 className="text-sm font-bold">Profils de démonstration ANA</h3>
+        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+          Ouvrez un espace MAXIMUS sans vous connecter.
+        </p>
+      </div>
+      {loading && <p className="py-2 text-xs text-[hsl(var(--muted-foreground))]" role="status">Chargement des profils…</p>}
+      {error && <p className="py-2 text-xs text-[hsl(var(--destructive))]" role="alert">{error}</p>}
+      {!loading && !error && profiles.length === 0 && (
+        <p className="py-2 text-xs text-[hsl(var(--muted-foreground))]">Aucun profil de démonstration n’est configuré.</p>
+      )}
+      {!loading && !error && profiles.length > 0 && (
+        <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+          {profiles.map((profile) => (
+            <a
+              key={profile.id}
+              href={`${buildAnaPreviewHref(import.meta.env.BASE_URL)}?profile=${encodeURIComponent(profile.id)}`}
+              data-testid={`link-preview-ana-profile-${profile.id}`}
+              className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-[hsl(var(--border))] px-3 py-2.5 transition hover:border-[hsl(var(--primary)/.5)] hover:bg-[hsl(var(--primary)/.05)]"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-xs font-bold">{profile.name}</span>
+                <span className="mt-0.5 block truncate text-[11px] text-[hsl(var(--muted-foreground))]">
+                  {profile.roleTitle} · {profile.group}
+                </span>
+              </span>
+              <span className="shrink-0 text-[11px] font-semibold text-[hsl(var(--primary))]">Ouvrir →</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Login({
   onLogin,
   employees,
@@ -1649,20 +1709,7 @@ function Login({
               {pendingEmail ? 'Connexion en cours…' : 'Se connecter'}
             </button>
           </form>
-          {import.meta.env.DEV && !installationProfile?.companyOnly && (
-            <div className="mt-5 rounded-xl border border-border bg-card px-4 py-3 text-center">
-              <a
-                href={buildAnaPreviewHref(import.meta.env.BASE_URL)}
-                data-testid="link-preview-ana"
-                className="text-sm font-bold text-primary hover:underline"
-              >
-                Ouvrir l’aperçu ANA
-              </a>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Profils fictifs, sans identifiants et en lecture seule.
-              </p>
-            </div>
-          )}
+          {import.meta.env.DEV && !installationProfile?.companyOnly && <AnaPreviewLoginProfiles />}
            {!installationProfile?.companyOnly && (
              <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
                Pas encore d’espace ?{' '}
@@ -2846,9 +2893,23 @@ function CompanyEditModal({
   );
 }
 
-function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (path: string) => void }) {
-  const [pendingRequests, setPendingRequests] = useState<number | null>(null);
+export function AdminDashboard({
+  data,
+  onNavigate,
+  preview = false,
+}: {
+  data: StoreData;
+  onNavigate: (path: string) => void;
+  preview?: boolean;
+}) {
+  const [pendingRequests, setPendingRequests] = useState<number | null>(
+    preview ? data.companies.filter((company) => company.status === 'EN ATTENTE').length : null,
+  );
   const refreshPendingRequests = async () => {
+    if (preview) {
+      setPendingRequests(data.companies.filter((company) => company.status === 'EN ATTENTE').length);
+      return;
+    }
     try {
       const result = await companyRequestApi.list();
       setPendingRequests(result.requests.length);
@@ -2857,10 +2918,13 @@ function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (pa
     }
   };
   useEffect(() => {
-    void refreshPendingRequests();
-  }, []);
-  useAutoRefresh(refreshPendingRequests);
+    if (!preview) void refreshPendingRequests();
+  }, [preview]);
+  useAutoRefresh(refreshPendingRequests, { enabled: !preview });
   const pending = pendingRequests ?? data.companies.filter((c) => c.status === 'EN ATTENTE').length;
+  const activeModules = getConfiguredModules(data).filter((module) =>
+    !['INACTIF', 'MAINTENANCE'].includes(data.moduleStatuses?.[module.id] ?? module.status),
+  ).length;
   return (
     <div className="space-y-6">
       <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
@@ -2877,7 +2941,7 @@ function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (pa
           detail="requiert votre attention"
           icon={FileClock}
         />
-        <Metric label="Modules activés" value="05" detail="sur 05 disponibles" icon={LayoutGrid} />
+        <Metric label="Modules activés" value={String(activeModules).padStart(2, '0')} detail="dans le catalogue MAXIMUS" icon={LayoutGrid} />
       </div>
       <div className="grid gap-6 lg:grid-cols-[1.25fr_.75fr]">
         <section className="card-surface overflow-hidden rounded-2xl">
@@ -2953,7 +3017,7 @@ function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (pa
     </div>
   );
 }
-function RoleAwareCompanyDashboard({
+export function RoleAwareCompanyDashboard({
   data,
   onNavigate,
   allowed,
@@ -7911,17 +7975,25 @@ function HumanResourcesWorkspace({
   return <RHPage data={data} companyId={companyId} />;
 }
 
-function App() {
+export function AppRuntimeProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ConfirmDialogProvider>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-            <AppContent />
+            {children}
           </WouterRouter>
         </TooltipProvider>
       </ConfirmDialogProvider>
     </QueryClientProvider>
+  );
+}
+
+function App() {
+  return (
+    <AppRuntimeProviders>
+      <AppContent />
+    </AppRuntimeProviders>
   );
 }
 

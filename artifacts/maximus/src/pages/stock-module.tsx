@@ -43,7 +43,7 @@ const useStockApi = () => {
 };
 const useStockAccess = () => useContext(StockAccessContext);
 
-export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true, stockPermissions, singleModuleNavigation = false, preview = false }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean; stockPermissions?: Record<string, string[]>; singleModuleNavigation?: boolean; preview?: boolean }) {
+export default function StockModulePage({ companyId, companyUsers = [], companyServices = [], canCreate = true, canModify = true, stockPermissions, singleModuleNavigation = false, preview = false, previewData }: { companyId: string; companyUsers?: { id: string; firstName: string; lastName: string; email: string; role: string; status: string }[]; companyServices?: { id: string; name: string }[]; canCreate?: boolean; canModify?: boolean; stockPermissions?: Record<string, string[]>; singleModuleNavigation?: boolean; preview?: boolean; previewData?: StockBootstrap }) {
   const [data, setData] = useState<StockBootstrap | null>(null);
   const [tab, setTab] = useQueryTab({
     tabs: tabs.map(([id]) => id),
@@ -65,6 +65,13 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   };
 
   const load = async (silent = false, requestedScope: StockBootstrapScope = 'core') => {
+    if (preview) {
+      setData(previewData ?? emptyStockBootstrap);
+      setError('');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     if (loadingScopes.current.has(requestedScope)) return;
     loadingScopes.current.add(requestedScope);
     if (requestedScope === 'core' && !data && !silent) setLoading(true);
@@ -84,7 +91,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   };
   useEffect(() => {
     if (preview) {
-      setData(emptyStockBootstrap);
+      setData(previewData ?? emptyStockBootstrap);
       setError('');
       setLoading(false);
       return;
@@ -93,7 +100,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     loadingScopes.current.clear();
     setData(null);
     void load(false, 'core');
-  }, [companyId, preview]);
+  }, [companyId, preview, previewData]);
   useEffect(() => {
     if (preview || !data) return;
     const scope = scopeForTab(tab);
@@ -101,6 +108,10 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   }, [tab, preview, data]);
   useAutoRefresh(() => load(true, scopeForTab(tab)), { enabled: !preview && Boolean(data) });
   const run = async (action: () => Promise<unknown>, success: string) => {
+    if (preview) {
+      showAppToast('Cet aperçu est en lecture seule.', 'info');
+      return;
+    }
     if (pendingAction) return;
     setPendingAction(true);
     showAppToast('Action en cours…', 'info');

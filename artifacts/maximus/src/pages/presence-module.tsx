@@ -130,7 +130,7 @@ function Panel({ title, children, action }: { title: string; children: React.Rea
 }
 function Empty({ text = 'Aucune donnée pour les filtres sélectionnés.' }: { text?: string }) { return <div className="rounded-xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">{text}</div>; }
 
-export default function PresenceModulePage({ companyId, employees, nodes, currentEmployee, canCreate, canEdit, canCorrect, canValidate, canManage, canGenerateQr, canExport, canDelete, canView, visibleFeatureIds, featurePermissions, singleModuleNavigation = false, preview = false, selfOnly = false }: { companyId: string; employees: Employee[]; nodes: OrgNode[]; currentEmployee: Employee | null; canCreate: boolean; canEdit: boolean; canCorrect: boolean; canValidate: boolean; canManage: boolean; canGenerateQr: boolean; canExport: boolean; canDelete: boolean; canView: boolean; visibleFeatureIds?: string[]; featurePermissions?: Partial<Record<string, string[]>>; singleModuleNavigation?: boolean; preview?: boolean; selfOnly?: boolean }) {
+export default function PresenceModulePage({ companyId, employees, nodes, currentEmployee, canCreate, canEdit, canCorrect, canValidate, canManage, canGenerateQr, canExport, canDelete, canView, visibleFeatureIds, featurePermissions, singleModuleNavigation = false, preview = false, previewItems, selfOnly = false }: { companyId: string; employees: Employee[]; nodes: OrgNode[]; currentEmployee: Employee | null; canCreate: boolean; canEdit: boolean; canCorrect: boolean; canValidate: boolean; canManage: boolean; canGenerateQr: boolean; canExport: boolean; canDelete: boolean; canView: boolean; visibleFeatureIds?: string[]; featurePermissions?: Partial<Record<string, string[]>>; singleModuleNavigation?: boolean; preview?: boolean; previewItems?: PresenceItem[]; selfOnly?: boolean }) {
   const { confirm } = useAppDialog();
   const api = useMemo(() => createPresenceApi(companyId), [companyId]);
   const [items, setItems] = useState<PresenceItem[]>([]);
@@ -174,6 +174,12 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const [selectedEmployee, setSelectedEmployee] = useState(currentEmployee?.id ?? employees[0]?.id ?? '');
   const [selected, setSelected] = useState<PresenceItem | null>(null);
   const refresh = async (silent = false) => {
+    if (preview) {
+      setItems(previewItems ?? []);
+      setError('');
+      setLoading(false);
+      return;
+    }
     if (!silent) setLoading(true);
     try {
       const result = await api.bootstrap();
@@ -187,13 +193,13 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   };
   useEffect(() => {
     if (preview) {
-      setItems([]);
+      setItems(previewItems ?? []);
       setError('');
       setLoading(false);
       return;
     }
     void refresh();
-  }, [api, preview]);
+  }, [api, preview, previewItems]);
   useAutoRefresh(() => refresh(true), { enabled: !preview });
   const actor = personName(currentEmployee ?? undefined);
   const employeeById = useMemo(() => new Map(employees.map(employee => [employee.id, employee])), [employees]);
@@ -221,6 +227,10 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   const rows = visibleEmployees.map(employee => dayRow(employee));
   const featureForType: Partial<Record<PresenceItem['type'], string>> = { attendance: 'Pointage', absence: 'Absences', schedule: 'Horaires', leave: 'Congés' };
   const create = async (input: Parameters<typeof api.create>[0]) => {
+    if (preview) {
+      showAppToast('Cet aperçu est en lecture seule.', 'info');
+      return;
+    }
     const allowed = input.type === 'settings'
         ? canManageAsSupervisor
       : input.type === 'attendance'
@@ -233,6 +243,10 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     try { await api.create(input); showAppToast('Enregistrement créé.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Création impossible.', 'error'); }
   };
   const update = async (item: PresenceItem, payload: PresencePayload, status = item.status) => {
+    if (preview) {
+      showAppToast('Cet aperçu est en lecture seule.', 'info');
+      return;
+    }
     const isValidation = status !== item.status && (item.type === 'absence' || item.type === 'leave');
     const allowed = item.type === 'attendance'
       ? canCorrectFeature('Pointage')
@@ -248,6 +262,10 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     try { await api.update(item.id, { payload, status, actor }); setSelected(null); showAppToast('Modification enregistrée.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Modification impossible.', 'error'); }
   };
   const remove = async (item: PresenceItem) => {
+    if (preview) {
+      showAppToast('Cet aperçu est en lecture seule.', 'info');
+      return;
+    }
     const feature = featureForType[item.type];
     const allowed = item.type === 'settings' ? canManage : Boolean(feature && canDeleteFeature(feature));
     if (!allowed) {
@@ -258,6 +276,10 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     try { await api.remove(item.id, actor); showAppToast('Enregistrement supprimé.', 'success'); void refresh(true); } catch (cause) { showAppToast(cause instanceof Error ? cause.message : 'Suppression impossible.', 'error'); }
   };
   const scanClock = async (token: string, action: 'arrival' | 'exit') => {
+    if (preview) {
+      showAppToast('Cet aperçu est en lecture seule.', 'info');
+      return;
+    }
     if (!canCreatePresenceFeature('Pointage')) {
       showAppToast('Votre rôle ne possède pas le droit de créer dans cette fonctionnalité.', 'error');
       return;
@@ -277,7 +299,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
     if (!canView) return <Empty text="Votre rôle ne possède pas la permission Consulter pour les présences." />;
     if (tabs.length === 0) return <Empty text="Aucune fonctionnalité de présence n’est disponible pour ce rôle." />;
      if (tab === 'dashboard') return <Dashboard rows={rows} kpis={kpis} date={date} setDate={setDate} period={period} setPeriod={setPeriod} sector={sector} setSector={setSector} sectors={[...new Set(visibleEmployees.map(employee => meta(employee).unit))]} canExport={canExportFeature('Rapports')} onExport={() => exportRows(rows, `presences-${date}.csv`)} />;
-      if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} date={date} setDate={setDate} settings={settings} selfOnly={selfOnly} canCreate={canCreatePresenceFeature('Pointage')} canGenerateQr={canGenerateQr && canCreatePresenceFeature('Pointage')} onRequestQr={workDate => api.clockQr(workDate)} onScanClock={scanClock} />;
+      if (tab === 'clock') return <ClockPanel rows={rows} selectedEmployee={selectedEmployee} date={date} setDate={setDate} settings={settings} selfOnly={selfOnly} canCreate={canCreatePresenceFeature('Pointage')} canGenerateQr={canGenerateQr && canCreatePresenceFeature('Pointage')} onRequestQr={workDate => preview ? Promise.reject(new Error('Cet aperçu est en lecture seule.')) : api.clockQr(workDate)} onScanClock={scanClock} />;
       if (tab === 'presence') return <PresenceList rows={rows} calendar={['day', 'week', 'month'].map(view => ({ view, days: Array.from({ length: view === 'day' ? 1 : view === 'week' ? 7 : 30 }, (_, index) => { const offset = view === 'day' ? 0 : view === 'week' ? index - 3 : index; const workDate = addDays(date, offset); return { date: workDate, rows: visibleEmployees.map(employee => dayRow(employee, workDate)) }; }) }))} query={query} setQuery={setQuery} canExport={canExportFeature('Rapports')} onExport={() => exportRows(rows, `presences-${date}.csv`)} canCorrect={canCorrectFeature('Pointage')} onSelect={setSelected} />;
       if (tab === 'absence') return <AbsencePanel items={items} employees={visibleEmployees} date={date} actor={actor} canCreate={canCreateFeature('Absences')} canValidate={canValidateFeature('Absences')} canDelete={canDeleteFeature('Absences')} onCreate={create} onUpdate={update} onRemove={remove} />;
       if (tab === 'schedules') return <SchedulesPanel items={items} employees={visibleEmployees} canCreate={canCreatePresenceFeature('Horaires')} canEdit={canEditFeature('Horaires')} canDelete={selfOnly ? false : canDeleteFeature('Horaires')} onCreate={create} onUpdate={update} onRemove={remove} />;
@@ -287,7 +309,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
      return <SettingsPanel item={items.find(item => item.type === 'settings')} settings={settings} canManage={canManageAsSupervisor} onCreate={create} onUpdate={update} />;
   };
   return <div className="space-y-5">
-       <div className="mobile-hero card-surface rounded-2xl p-6 sm:p-8"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Gestion des Présences</p><h1 className="mt-2 text-3xl font-bold tracking-[-.03em] sm:text-4xl">Le rythme de vos équipes, en clair.</h1><p className="mt-2 max-w-2xl text-base leading-6 text-[hsl(var(--muted-foreground))]">Pointage, absences, horaires et temps travaillé dans un seul espace.</p><p className="mt-3 text-xs font-semibold text-[hsl(var(--primary))]">Actualisation automatique active · données vérifiées toutes les 5 secondes.</p></div><div className="flex flex-wrap gap-2"><Field label="Date active" value={date} onChange={setDate} type="date" /><Button onClick={() => void refresh()}><RefreshCw size={14} />Actualiser</Button></div></div>
+        <div className="mobile-hero card-surface rounded-2xl p-6 sm:p-8"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Gestion des Présences</p><h1 className="mt-2 text-3xl font-bold tracking-[-.03em] sm:text-4xl">Le rythme de vos équipes, en clair.</h1><p className="mt-2 max-w-2xl text-base leading-6 text-[hsl(var(--muted-foreground))]">Pointage, absences, horaires et temps travaillé dans un seul espace.</p><p className="mt-3 text-xs font-semibold text-[hsl(var(--primary))]">{preview ? 'Données de prévisualisation · aucune écriture ni synchronisation.' : 'Actualisation automatique active · données vérifiées toutes les 5 secondes.'}</p></div><div className="flex flex-wrap gap-2"><Field label="Date active" value={date} onChange={setDate} type="date" /><Button onClick={() => void refresh()}><RefreshCw size={14} />Actualiser</Button></div></div>
          {!singleModuleNavigation && <WorkspaceTabs
            items={tabs.map(([id, label, icon]) => ({ id, label, icon }))}
            activeId={tab}

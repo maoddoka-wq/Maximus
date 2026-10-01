@@ -47,6 +47,14 @@ class DemoPreviewTest extends TestCase
             'payload' => json_encode([
                 'company' => ['id' => 'demo-ana', 'name' => 'ANA'],
                 'profiles' => [],
+                'storeData' => [
+                    'companies' => [['id' => 'demo-ana']],
+                    'employees' => [],
+                    'roles' => [],
+                    'orgNodes' => [],
+                ],
+                'stockData' => [],
+                'presenceData' => ['items' => []],
             ]),
         ]);
 

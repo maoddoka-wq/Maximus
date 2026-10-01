@@ -36,7 +36,14 @@ class DemoPreviewController
             ? json_decode($row->payload, true)
             : $row->payload;
 
-        if (! is_array($payload) || ! isset($payload['company'], $payload['profiles'])) {
+        if (
+            ! is_array($payload)
+            || ! is_array($payload['company'] ?? null)
+            || ! is_array($payload['profiles'] ?? null)
+            || ! is_array($payload['storeData'] ?? null)
+            || ! is_array($payload['stockData'] ?? null)
+            || ! is_array($payload['presenceData']['items'] ?? null)
+        ) {
             return $this->notFound();
         }
 
