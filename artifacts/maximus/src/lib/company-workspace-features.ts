@@ -1,4 +1,4 @@
-export type CompanyWorkspaceFeatureId = 'controle' | 'organisation' | 'guide-configuration';
+export type CompanyWorkspaceFeatureId = 'controle' | 'organisation' | 'guide-configuration' | 'abonnement';
 
 export type CompanyWorkspaceFeatureDefinition = {
   id: CompanyWorkspaceFeatureId;
@@ -26,10 +26,20 @@ export const companyWorkspaceFeatureDefinitions: CompanyWorkspaceFeatureDefiniti
     description: 'Parcours de configuration et contrôles anti-oubli.',
     path: '/entreprise/guide-configuration',
   },
+  {
+    id: 'abonnement',
+    label: 'Abonnement',
+    description: 'Affichage du forfait, des tarifs et des paiements de l’entreprise.',
+    path: '/entreprise/organisation?tab=subscription',
+  },
 ];
 
 export function companyWorkspaceFeatureForPath(path: string): CompanyWorkspaceFeatureId | null {
-  const pathOnly = path.split(/[?#]/, 1)[0].replace(/\/+$/, '') || '/';
+  const [pathname, query = ''] = path.split(/[?#]/, 2);
+  const pathOnly = pathname.replace(/\/+$/, '') || '/';
+  if (pathOnly === '/entreprise/organisation' && new URLSearchParams(query).get('tab') === 'subscription') {
+    return 'abonnement';
+  }
   return companyWorkspaceFeatureDefinitions.find(feature => feature.path === pathOnly)?.id ?? null;
 }
 

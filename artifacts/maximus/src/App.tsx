@@ -9070,8 +9070,8 @@ function CompanyModulesDetail({
           <div>
             <h2 className="font-bold">Fonctionnalités de l’espace entreprise</h2>
             <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
-              Choisissez les fonctionnalités visibles dans le menu de cette entreprise. Le réglage est
-              enregistré pour tous ses utilisateurs et bloque aussi l’accès direct à la route.
+              Choisissez les fonctionnalités et rubriques visibles dans l’espace de cette entreprise.
+              Le réglage est enregistré pour tous ses utilisateurs et bloque aussi l’accès direct.
             </p>
           </div>
           <span className="mono shrink-0 text-xs text-[hsl(var(--muted-foreground))]">

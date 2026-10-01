@@ -61,13 +61,28 @@ export function CompanyOrganizationAdmin({
           ),
         }
       : data;
+  const subscriptionHidden = company.hiddenWorkspaceFeatures?.includes('abonnement') ?? false;
   const [tab, setTab] = useState<OrganizationTab>(
-    sectorManager && initialTab === 'structure' ? 'roles' : initialTab,
+    sectorManager && initialTab === 'structure'
+      ? 'roles'
+      : subscriptionHidden && initialTab === 'subscription'
+        ? 'structure'
+        : initialTab,
   );
 
   useEffect(() => {
-    setTab(sectorManager && initialTab === 'structure' ? 'roles' : initialTab);
-  }, [initialTab, sectorManager]);
+    setTab(
+      sectorManager && initialTab === 'structure'
+        ? 'roles'
+        : subscriptionHidden && initialTab === 'subscription'
+          ? 'structure'
+          : initialTab,
+    );
+  }, [initialTab, sectorManager, subscriptionHidden]);
+
+  useEffect(() => {
+    if (subscriptionHidden && tab === 'subscription') setTab('structure');
+  }, [subscriptionHidden, tab]);
 
   const organizationNodes = scopedData.orgNodes.filter(
     node => node.companyId === company.id,
@@ -84,6 +99,8 @@ export function CompanyOrganizationAdmin({
       !sectorManager ||
       item.id === 'roles' ||
       item.id === 'employees',
+  ).filter(
+    item => item.id !== 'subscription' || !subscriptionHidden,
   );
 
   return (
@@ -113,7 +130,7 @@ export function CompanyOrganizationAdmin({
       {tab === 'employees' && <EmployeesTab company={company} data={scopedData} mutate={mutate} allowSectorAdmin={!sectorManager} />}
       {tab === 'profile' && !sectorManager && <CompanyProfileSection company={company} data={scopedData} mutate={mutate} />}
       {tab === 'publicSite' && !sectorManager && <OrganizationPublicSite company={company} />}
-      {tab === 'subscription' && !sectorManager && <CompanySubscriptionTab company={company} />}
+      {tab === 'subscription' && !sectorManager && !subscriptionHidden && <CompanySubscriptionTab company={company} />}
     </div>
   );
 }

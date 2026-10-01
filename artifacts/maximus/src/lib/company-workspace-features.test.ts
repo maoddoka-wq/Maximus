@@ -15,14 +15,16 @@ test('normalise les fonctionnalités visibles de l’espace entreprise', () => {
       'ancienne-fonctionnalite',
       null,
       'guide-configuration',
+      'abonnement',
     ]),
-    ['controle', 'organisation', 'guide-configuration'],
+    ['controle', 'organisation', 'guide-configuration', 'abonnement'],
   );
 });
 
 test('reconnaît les routes des fonctionnalités de l’espace entreprise', () => {
   assert.equal(companyWorkspaceFeatureForPath('/entreprise/controle?filtre=ouvert'), 'controle');
   assert.equal(companyWorkspaceFeatureForPath('/entreprise/organisation/'), 'organisation');
+  assert.equal(companyWorkspaceFeatureForPath('/entreprise/organisation?tab=subscription'), 'abonnement');
   assert.equal(companyWorkspaceFeatureForPath('/entreprise/guide-configuration'), 'guide-configuration');
   assert.equal(companyWorkspaceFeatureForPath('/entreprise/dashboard'), null);
 });

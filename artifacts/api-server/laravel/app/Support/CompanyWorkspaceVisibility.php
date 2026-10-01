@@ -6,7 +6,7 @@ use InvalidArgumentException;
 
 final class CompanyWorkspaceVisibility
 {
-    private const FEATURE_IDS = ['controle', 'organisation', 'guide-configuration'];
+    private const FEATURE_IDS = ['controle', 'organisation', 'guide-configuration', 'abonnement'];
 
     /** @return list<string> */
     public static function normalizeHidden(mixed $value): array

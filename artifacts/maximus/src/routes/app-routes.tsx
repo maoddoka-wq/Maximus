@@ -369,6 +369,29 @@ export function CompanyRouter({
       });
     }
     const company = data.companies.find(item => item.id === companyId);
+    if (!company || (!companyAdmin && !sectorManager)) {
+      return renderScreen(screens.empty, {
+        title: 'Accès réservé',
+        text: 'L’Organisation est accessible à l’administrateur de l’entreprise et aux managers de secteur.',
+        action: () => onBack('/entreprise/dashboard'),
+      });
+    }
+    if (routePath === '/entreprise/organisation' && query.get('tab') === 'subscription') {
+      if (!companyAdmin) {
+        return renderScreen(screens.empty, {
+          title: 'Accès réservé à l’administrateur',
+          text: 'La rubrique Abonnement est gérée par l’administrateur de l’entreprise.',
+          action: () => onBack('/entreprise/organisation'),
+        });
+      }
+      if (isWorkspaceFeatureHidden('abonnement')) {
+        return renderScreen(screens.empty, {
+          title: 'Fonctionnalité masquée',
+          text: 'La rubrique Abonnement n’est pas visible pour cette entreprise.',
+          action: () => onBack('/entreprise/organisation'),
+        });
+      }
+    }
     const initialTab =
       routePath === '/entreprise/acces'
       || routePath === '/entreprise/autorisations'
@@ -381,22 +404,14 @@ export function CompanyRouter({
             : routePath === '/entreprise/organisation' && query.get('tab') === 'subscription'
               ? 'subscription'
               : 'structure';
-    return company && (companyAdmin || sectorManager) ? (
-      renderScreen(screens.organization, {
-        company,
-        data,
-        mutate,
-        initialTab,
-        sectorManager: sectorManager && !companyAdmin,
-        scopeNodeId: sectorManager && !companyAdmin ? scopeNodeId : undefined,
-      })
-    ) : (
-      renderScreen(screens.empty, {
-        title: 'Accès réservé',
-        text: 'L’Organisation est accessible à l’administrateur de l’entreprise et aux managers de secteur.',
-        action: () => onBack('/entreprise/dashboard'),
-      })
-    );
+    return renderScreen(screens.organization, {
+      company,
+      data,
+      mutate,
+      initialTab,
+      sectorManager: sectorManager && !companyAdmin,
+      scopeNodeId: sectorManager && !companyAdmin ? scopeNodeId : undefined,
+    });
   }
   if (routePath === '/entreprise/stocks') {
     return renderCompanyModule(screens.stocks, {

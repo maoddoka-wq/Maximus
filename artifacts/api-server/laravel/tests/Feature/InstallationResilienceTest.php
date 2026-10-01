@@ -158,7 +158,7 @@ class InstallationResilienceTest extends TestCase
             'updated_at' => now(),
         ]);
         $payload = $this->payload();
-        $payload['company']['hiddenWorkspaceFeatures'] = ['organisation', 'guide-configuration'];
+        $payload['company']['hiddenWorkspaceFeatures'] = ['organisation', 'guide-configuration', 'abonnement'];
 
         $sync = app(InstallationSyncService::class);
         $sync->apply($payload, true);
@@ -167,7 +167,7 @@ class InstallationResilienceTest extends TestCase
         $state = json_decode((string) $row->payload, true, 512, JSON_THROW_ON_ERROR);
         $companies = collect($state['companies'])->keyBy('id');
         $this->assertSame(
-            ['organisation', 'guide-configuration'],
+            ['organisation', 'guide-configuration', 'abonnement'],
             $companies->get('sync-company')['hiddenWorkspaceFeatures'],
         );
         $this->assertSame(['guide-configuration'], $companies->get('other-company')['hiddenWorkspaceFeatures']);
