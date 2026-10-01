@@ -14,3 +14,9 @@ Un paiement d’abonnement réellement confirmé en XOF crédite intégralement 
 **Pourquoi :** le revenu d’abonnement est distinct des commissions de vente; appliquer leur partage ferait comptabiliser un montant différent de l’abonnement payé.
 
 **Comment appliquer :** créditer seulement depuis le paiement persistant au statut `PAID`, puis vérifier les reprises historiques par le registre avant tout nouvel incrément.
+
+Les souscriptions et factures des entreprises supprimées ou archivées restent conservées pour l’audit, mais ne doivent plus apparaître dans la vue courante ni contribuer à ses indicateurs.
+
+**Pourquoi :** la suppression d’une entreprise révoque son accès, sans effacer les traces financières qui peuvent être nécessaires à la réconciliation.
+
+**Comment appliquer :** filtrer les vues et totaux selon les entreprises encore visibles; ne pas supprimer les souscriptions ou factures historiques lors de l’archivage.

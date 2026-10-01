@@ -59,6 +59,7 @@ import { parseClientPwaPath } from '@/lib/pwa';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
 import { ModulePackDraftForm } from '@/components/module-pack-draft-form';
 import { SubscriptionPricingManagement } from '@/components/subscription-pricing-management';
+import { filterSubscriptionsForVisibleCompanies } from '@/lib/subscription-visibility';
 import {
   ActionButton,
   ActivityRow,
@@ -5122,7 +5123,7 @@ function SubscriptionsPage({
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState(data.subscriptions[0]?.id ?? '');
   const [searchTerm, setSearchTerm] = useState('');
   const [hasActiveBillingSubscriptions, setHasActiveBillingSubscriptions] = useState<boolean | null>(null);
-  const subscriptions = data.subscriptions;
+  const subscriptions = filterSubscriptionsForVisibleCompanies(data.subscriptions, data.companies);
   const catalogModules = useMemo(
     () => getConfiguredModules({
       moduleOverrides: data.moduleOverrides,
