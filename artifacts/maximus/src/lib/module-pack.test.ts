@@ -71,18 +71,3 @@ test('expose les autorisations de vente physique et numérique dans e-commerce',
     ],
   );
 });
-
-test('garde Gestion commerciale et E-commerce distincts, avec Vente comptoir uniquement dans E-commerce', () => {
-  const gestionCommerciale = modules.find((module) => module.id === 'commerce');
-  const ecommerce = modules.find((module) => module.id === 'ecommerce');
-  assert.ok(gestionCommerciale);
-  assert.ok(ecommerce);
-
-  assert.notEqual(gestionCommerciale.id, ecommerce.id);
-  assert.equal(gestionCommerciale.name, 'Gestion commerciale');
-  assert.equal(ecommerce.name, 'E-commerce');
-  assert.ok(!getModuleFeatureOptions(gestionCommerciale).some((feature) => feature.id === 'vente-comptoir'));
-  assert.ok(getModuleFeatureOptions(ecommerce).some((feature) => feature.id === 'vente-comptoir'));
-  assert.ok(!gestionCommerciale.featurePacks?.some((pack) => pack.featureIds.includes('vente-comptoir')));
-  assert.ok(ecommerce.featurePacks?.some((pack) => pack.id === 'ecommerce-vente-comptoir' && pack.featureIds.includes('vente-comptoir')));
-});

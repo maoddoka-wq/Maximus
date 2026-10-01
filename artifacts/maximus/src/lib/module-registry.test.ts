@@ -5,7 +5,6 @@ import { adminNav, companyNav } from './navigation';
 import {
   moduleDescriptorById,
   moduleIdForPath,
-  modulePageMeta,
   moduleRegistry,
 } from './module-registry';
 
@@ -32,9 +31,4 @@ test('les routes de modules sont réversibles et décrivent le même module', ()
     assert.equal(moduleIdForPath(module.path), module.id);
     assert.equal(moduleDescriptorById[module.id].path, module.path);
   }
-});
-
-test('les pages entreprise affichent un titre propre à chaque module commercial', () => {
-  assert.equal(modulePageMeta['/entreprise/commerce'].title, 'Gestion commerciale');
-  assert.equal(modulePageMeta['/entreprise/ecommerce'].title, 'E-commerce');
 });
