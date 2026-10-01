@@ -415,12 +415,108 @@ class SubscriptionBillingTest extends TestCase
                 ->where('company_id', $company->id)
                 ->value('id'),
         ]);
+        $paymentId = (string) DB::table('maximus_subscription_payments')
+            ->where('company_id', $company->id)
+            ->value('id');
+        $this->assertDatabaseHas('maximus_wallets', [
+            'id' => 'maximus-main-wallet',
+            'available_balance' => 32000,
+            'total_credited' => 32000,
+        ]);
+        $this->assertDatabaseHas('maximus_wallet_ledger', [
+            'type' => 'SUBSCRIPTION_PAYMENT',
+            'direction' => 'CREDIT',
+            'amount' => 32000,
+            'reference_type' => 'SUBSCRIPTION_PAYMENT',
+            'reference_id' => $paymentId,
+            'idempotency_key' => 'subscription-payment:'.$paymentId,
+        ]);
+
+        $this->call(
+            'POST',
+            '/api/payments/diamanopay/subscription-webhook',
+            [],
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_DIAMANOPAY_SIGNATURE' => $signature,
+            ],
+            $body,
+        )->assertOk();
+        $this->assertDatabaseCount('maximus_wallet_ledger', 1);
+
+        $maximusAdmin = $this->createAdmin('subscription-wallet-admin');
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($maximusAdmin))
+            ->getJson('/api/platform-settings/maximus-wallet')
+            ->assertOk()
+            ->assertJsonPath('wallet.availableBalance', 32000)
+            ->assertJsonPath('ledger.0.type', 'SUBSCRIPTION_PAYMENT')
+            ->assertJsonPath('ledger.0.amount', 32000);
+
         $this->assertTrue(
             \Carbon\CarbonImmutable::parse(DB::table('maximus_company_subscriptions')
                 ->where('company_id', $company->id)
                 ->value('current_period_ends_at'))
                 ->isFuture(),
         );
+    }
+
+    public function test_maximus_wallet_reconciles_historical_paid_subscriptions_once(): void
+    {
+        $company = $this->createCompany('subscription-wallet-history');
+        $now = now();
+        DB::table('maximus_subscription_payments')->insert([
+            [
+                'id' => 'subscription-paid-history',
+                'company_id' => $company->id,
+                'reference' => 'SUB-HISTORY-PAID',
+                'amount' => 24500,
+                'currency' => 'XOF',
+                'status' => 'PAID',
+                'provider_charge_id' => 'charge-history-paid',
+                'checkout_url' => null,
+                'provider' => 'WAVE',
+                'failure_reason' => null,
+                'paid_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            [
+                'id' => 'subscription-pending-history',
+                'company_id' => $company->id,
+                'reference' => 'SUB-HISTORY-PENDING',
+                'amount' => 12000,
+                'currency' => 'XOF',
+                'status' => 'PENDING',
+                'provider_charge_id' => 'charge-history-pending',
+                'checkout_url' => null,
+                'provider' => 'WAVE',
+                'failure_reason' => null,
+                'paid_at' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+        ]);
+        $session = MaximusAuth::issueSession($this->createAdmin('subscription-wallet-history-admin'));
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $session)
+            ->getJson('/api/platform-settings/maximus-wallet')
+            ->assertOk()
+            ->assertJsonPath('wallet.availableBalance', 24500)
+            ->assertJsonPath('wallet.totalCredited', 24500)
+            ->assertJsonPath('ledger.0.referenceId', 'subscription-paid-history');
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $session)
+            ->getJson('/api/platform-settings/maximus-wallet')
+            ->assertOk()
+            ->assertJsonPath('wallet.availableBalance', 24500)
+            ->assertJsonPath('wallet.totalCredited', 24500);
+
+        $this->assertDatabaseCount('maximus_wallet_ledger', 1);
     }
 
     private function createCompany(string $id): Company

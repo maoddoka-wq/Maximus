@@ -5451,22 +5451,36 @@ function MaximusWalletPanel({ formatAmount }: { formatAmount: (value: number) =>
           </div>
 
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(340px,.8fr)]">
-            <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.2)] p-4">
+            <div className="rounded-xl border border-[hsl(var(--border))] p-4">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-bold">Frais retenus sur une vente en ligne</p>
-                <span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{bootstrap.commissionPolicy.providerPercent} % de frais</span>
+                <p className="text-xs font-bold">Mouvements du compte MAXIMUS</p>
+                <span className="text-[10px] text-[hsl(var(--muted-foreground))]">{Math.min(bootstrap.ledger.length, 5)} affiché(s)</span>
               </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                {[
-                  ['DiamanoPay', bootstrap.commissionPolicy.providerPercent],
-                  ['MAXIMUS', bootstrap.commissionPolicy.maximusPercent],
-                  ['Vendeur', bootstrap.commissionPolicy.sellerPercent],
-                ].map(([label, percent]) => (
-                  <div key={label} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background)/.65)] p-3">
-                    <p className="text-[10px] text-[hsl(var(--muted-foreground))]">{label}</p>
-                    <strong className="mt-1 block text-lg">{percent} %</strong>
-                  </div>
-                ))}
+              <div className="mt-3 space-y-2">
+                {bootstrap.ledger.slice(0, 5).map((entry) => {
+                  const isCredit = entry.direction === 'CREDIT';
+                  const isSubscription = entry.type === 'SUBSCRIPTION_PAYMENT';
+                  return (
+                    <div key={entry.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-[hsl(var(--border))] px-3 py-2.5">
+                      {isCredit
+                        ? <ArrowDownToLine size={14} className="text-[hsl(var(--primary))]" />
+                        : <ArrowUpFromLine size={14} className="text-[hsl(var(--muted-foreground))]" />}
+                      <div className="min-w-0 flex-1">
+                        <strong className="block text-xs">{isSubscription ? 'Abonnement payé' : entry.type.replaceAll('_', ' ').toLowerCase()}</strong>
+                        <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                          {entry.referenceId ? `Réf. ${entry.referenceId} · ` : ''}
+                          {new Date(entry.createdAt).toLocaleDateString('fr-FR')}
+                        </span>
+                      </div>
+                      <strong className={`text-xs ${isCredit ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--muted-foreground))]'}`}>
+                        {isCredit ? '+' : '−'}{formatAmount(entry.amount)}
+                      </strong>
+                    </div>
+                  );
+                })}
+                {bootstrap.ledger.length === 0 && (
+                  <p className="rounded-lg border border-dashed p-4 text-center text-xs text-[hsl(var(--muted-foreground))]">Aucun mouvement n’est encore enregistré.</p>
+                )}
               </div>
             </div>
 

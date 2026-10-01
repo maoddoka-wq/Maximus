@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Services\CompanySubscriptionEntitlement;
 use App\Services\DiamanoPayService;
+use App\Services\MaximusWalletService;
 use App\Services\SubscriptionPricing;
 use App\Support\ModuleCatalog;
 use Carbon\CarbonImmutable;
@@ -25,6 +26,7 @@ final class SubscriptionBillingController extends Controller
         private readonly DiamanoPayService $diamanoPay,
         private readonly SubscriptionPricing $pricing,
         private readonly CompanySubscriptionEntitlement $entitlement,
+        private readonly MaximusWalletService $wallet,
     ) {}
 
     public function platformIndex(Request $request): JsonResponse
@@ -488,6 +490,7 @@ final class SubscriptionBillingController extends Controller
                     $paymentId,
                     $paidAt,
                 );
+                $this->wallet->creditSubscriptionPayment((string) $payment->id);
 
                 return;
             }

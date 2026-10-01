@@ -8,3 +8,9 @@ Un abonnement doit être modélisé comme une entité métier distincte des modu
 **Pourquoi :** une vue calculée à partir des entreprises et de leurs modules ne donne ni échéance, ni état de paiement, ni facture; le rattachement du POS à E-commerce évite aussi de créer une tarification séparée sans décision de prix.
 
 **Comment appliquer :** conserver cette séparation dans l’interface, le store local de démonstration et la future API PostgreSQL. Rattacher le POS au module E-commerce dans les accès et le forfait, sans nouvelle ligne d’abonnement. Ne jamais présenter les droits de module comme preuve de facturation ou de paiement réel.
+
+Un paiement d’abonnement réellement confirmé en XOF crédite intégralement le compte MAXIMUS, sans appliquer les pourcentages des ventes e-commerce. Chaque paiement utilise une clé d’idempotence liée à son identifiant; les anciens paiements `PAID` sans écriture sont réconciliés une seule fois.
+
+**Pourquoi :** le revenu d’abonnement est distinct des commissions de vente; appliquer leur partage ferait comptabiliser un montant différent de l’abonnement payé.
+
+**Comment appliquer :** créditer seulement depuis le paiement persistant au statut `PAID`, puis vérifier les reprises historiques par le registre avant tout nouvel incrément.

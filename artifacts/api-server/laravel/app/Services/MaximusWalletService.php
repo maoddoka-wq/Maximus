@@ -18,6 +18,7 @@ final class MaximusWalletService
 
     public function bootstrap(): array
     {
+        $this->reconcilePaidSubscriptionPayments();
         $wallet = $this->wallet();
 
         return [
@@ -26,6 +27,60 @@ final class MaximusWalletService
             'ledger' => $this->ledger(),
             'commissionPolicy' => $this->commissionPolicy->payload(),
         ];
+    }
+
+    public function creditSubscriptionPayment(string $paymentId): void
+    {
+        DB::transaction(function () use ($paymentId): void {
+            $payment = DB::table('maximus_subscription_payments')
+                ->where('id', $paymentId)
+                ->lockForUpdate()
+                ->first();
+            if (! $payment || $payment->status !== 'PAID') {
+                return;
+            }
+            $amount = (int) $payment->amount;
+            $currency = (string) $payment->currency;
+            if ($amount <= 0) {
+                return;
+            }
+            if ($currency !== 'XOF') {
+                throw new RuntimeException('MAXIMUS_SUBSCRIPTION_CURRENCY_NOT_SUPPORTED');
+            }
+
+            $key = 'subscription-payment:'.$paymentId;
+            $wallet = DB::table('maximus_wallets')->where('id', self::WALLET_ID)->lockForUpdate()->first();
+            if (! $wallet) {
+                $this->createWallet();
+                $wallet = DB::table('maximus_wallets')->where('id', self::WALLET_ID)->lockForUpdate()->first();
+            }
+            if (! $wallet) {
+                throw new RuntimeException('MAXIMUS_WALLET_NOT_FOUND');
+            }
+            if (DB::table('maximus_wallet_ledger')->where('idempotency_key', $key)->exists()) {
+                return;
+            }
+
+            DB::table('maximus_wallets')->where('id', self::WALLET_ID)->update([
+                'available_balance' => DB::raw('available_balance + '.$amount),
+                'total_credited' => DB::raw('total_credited + '.$amount),
+                'updated_at' => now(),
+            ]);
+            $this->ledgerInsert(
+                $wallet,
+                'SUBSCRIPTION_PAYMENT',
+                'CREDIT',
+                $amount,
+                'SUBSCRIPTION_PAYMENT',
+                $paymentId,
+                $key,
+                [
+                    'companyId' => (string) $payment->company_id,
+                    'paymentReference' => (string) $payment->reference,
+                    'currency' => $currency,
+                ],
+            );
+        });
     }
 
     public function updatePayoutAccount(string $mobile, string $beneficiaryName): array
@@ -320,6 +375,28 @@ final class MaximusWalletService
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function reconcilePaidSubscriptionPayments(): void
+    {
+        DB::transaction(function (): void {
+            $creditedPaymentIds = DB::table('maximus_wallet_ledger')
+                ->select('reference_id')
+                ->where('type', 'SUBSCRIPTION_PAYMENT')
+                ->where('reference_type', 'SUBSCRIPTION_PAYMENT')
+                ->whereNotNull('reference_id');
+            $payments = DB::table('maximus_subscription_payments')
+                ->where('status', 'PAID')
+                ->where('currency', 'XOF')
+                ->where('amount', '>', 0)
+                ->whereNotIn('id', $creditedPaymentIds)
+                ->orderBy('id')
+                ->get(['id']);
+
+            foreach ($payments as $payment) {
+                $this->creditSubscriptionPayment((string) $payment->id);
+            }
+        });
     }
 
     private function wallet(): object
