@@ -26,3 +26,9 @@ Un retrait demande un montant reçu par le vendeur et ajoute un frais fixe confi
 **Why:** Un solde disponible de 1 000 XOF ne doit pas permettre un retrait de 1 000 XOF si le prestataire facture 100 XOF : les frais ne doivent jamais créer un solde négatif.
 
 **How to apply:** Calculer et contrôler le frais uniquement côté serveur, exposer le maximum retirable, enregistrer séparément le frais dans le registre, puis restituer le montant total réservé en cas d’échec du payout.
+
+Ne pas afficher au vendeur les pourcentages de frais ou de répartition des ventes dans le portefeuille.
+
+**Why:** L’utilisateur a demandé que ces pourcentages restent invisibles dans cette interface.
+
+**How to apply:** Garder les taux côté calcul/comptabilité et afficher seulement les montants et états utiles au vendeur.

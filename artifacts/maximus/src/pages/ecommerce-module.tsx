@@ -868,7 +868,7 @@ function WalletPanel({ data, currency, canModify, run, pendingAction }: { data: 
        Règle de maturation active : <strong className="text-[hsl(var(--foreground))]">{data.maturityPolicy.label}</strong>
      </div>
      <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.28)] px-4 py-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-       Frais et répartition : <strong className="text-[hsl(var(--foreground))]">{data.commissionPolicy.providerPercent} % de frais DiamanoPay</strong>, <strong className="text-[hsl(var(--foreground))]">{data.commissionPolicy.maximusPercent} % de commission MAXIMUS</strong> et <strong className="text-[hsl(var(--foreground))]">{data.commissionPolicy.sellerPercent} % vendeur</strong>. Le module E-commerce, y compris Vente comptoir, relève de l’abonnement de l’entreprise.
+        La répartition des ventes est gérée automatiquement. Le module E-commerce, y compris Vente comptoir, relève de l’abonnement de l’entreprise.
      </div>
     <div className="grid gap-5 xl:grid-cols-[.9fr_1.1fr]">
        <Panel title="Demander un retrait" description="Les retraits sont envoyés vers un compte Wave vérifié. Les frais sont ajoutés au montant débité. Minimum : 1 000 XOF.">
