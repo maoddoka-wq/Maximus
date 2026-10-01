@@ -57,7 +57,7 @@ export const ecommerceFeaturePacks = [
   {
     id: 'ecommerce-vente-comptoir',
     name: 'Vente comptoir',
-    description: 'Enregistrer les ventes en magasin et suivre les encaissements en espèces.',
+    description: 'Vente comptoir incluse dans le forfait mensuel MAXIMUS via le module E-commerce, sans commission par vente.',
     featureIds: ['dashboard', 'catalogue', 'vente-physique', 'vente-comptoir'],
     featurePermissions: {
       dashboard: ['voir'],

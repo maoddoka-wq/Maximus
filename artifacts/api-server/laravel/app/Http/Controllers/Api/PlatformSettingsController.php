@@ -111,10 +111,10 @@ final class PlatformSettingsController extends Controller
 
         $input = $request->validate([
             'providerPercent' => ['required', 'integer', 'min:0', 'max:100'],
-            'maximusPercent' => ['required', 'integer', 'min:0', 'max:100'],
+            'maximusPercent' => ['required', 'integer', 'in:0'],
         ]);
         if ((int) $input['providerPercent'] + (int) $input['maximusPercent'] > 100) {
-            return response()->json(['error' => 'La commission totale ne peut pas dépasser 100 %.'], 422);
+            return response()->json(['error' => 'Le total des frais ne peut pas dépasser 100 %.'], 422);
         }
 
         return response()->json($this->commissionPolicy->payloadForUpdate(

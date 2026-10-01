@@ -80,20 +80,26 @@ class SellerWalletTest extends TestCase
         ]);
     }
 
-    public function test_ecommerce_sales_split_three_percent_to_diamanopay_two_percent_to_maximus_and_ninety_five_percent_to_seller(): void
+    public function test_ecommerce_sales_keep_provider_fees_without_maximus_commission(): void
     {
         $this->asActor()
             ->getJson('/api/platform-settings/ecommerce-commission')
             ->assertForbidden();
 
+        DB::table('maximus_platform_settings')
+            ->where('key', 'ecommerce_commission')
+            ->update([
+                'value' => json_encode(['providerPercent' => 3, 'maximusPercent' => 2], JSON_THROW_ON_ERROR),
+            ]);
+
         $this->asMaximusAdmin()
             ->getJson('/api/platform-settings/ecommerce-commission')
             ->assertOk()
             ->assertJsonPath('providerPercent', 3)
-            ->assertJsonPath('maximusPercent', 2)
-            ->assertJsonPath('totalPercent', 5)
-            ->assertJsonPath('sellerPercent', 95)
-            ->assertJsonPath('label', '3 % DiamanoPay, 2 % MAXIMUS, 95 % vendeur.');
+            ->assertJsonPath('maximusPercent', 0)
+            ->assertJsonPath('totalPercent', 3)
+            ->assertJsonPath('sellerPercent', 97)
+            ->assertJsonPath('label', '3 % de frais DiamanoPay, 0 % de commission MAXIMUS, 97 % vendeur.');
 
         $this->configureDiamano();
         $this->createOrder('order-commission-split', 'kora', 5000, 'charge-commission-split');
@@ -101,21 +107,15 @@ class SellerWalletTest extends TestCase
 
         $this->assertDatabaseHas('seller_wallets', [
             'company_id' => 'kora',
-            'pending_balance' => 4750,
-            'total_credited' => 4750,
+            'pending_balance' => 4850,
+            'total_credited' => 4850,
         ]);
         $this->assertDatabaseHas('maximus_wallets', [
             'id' => 'maximus-main-wallet',
-            'available_balance' => 100,
-            'total_credited' => 100,
+            'available_balance' => 0,
+            'total_credited' => 0,
         ]);
-        $this->assertDatabaseHas('maximus_wallet_ledger', [
-            'type' => 'SALE_COMMISSION',
-            'amount' => 100,
-            'reference_type' => 'ORDER',
-            'reference_id' => 'order-commission-split',
-        ]);
-        $this->assertDatabaseCount('maximus_wallet_ledger', 1);
+        $this->assertDatabaseCount('maximus_wallet_ledger', 0);
     }
 
     public function test_maximus_wallet_bootstrap_repairs_a_paid_order_without_financial_ledger_entries(): void
@@ -129,33 +129,36 @@ class SellerWalletTest extends TestCase
         $this->asMaximusAdmin()
             ->getJson('/api/platform-settings/maximus-wallet')
             ->assertOk()
-            ->assertJsonPath('wallet.availableBalance', 50)
-            ->assertJsonPath('wallet.totalCredited', 50);
+            ->assertJsonPath('wallet.availableBalance', 0)
+            ->assertJsonPath('wallet.totalCredited', 0);
 
         $this->assertDatabaseHas('seller_wallet_ledger', [
             'company_id' => 'kora',
             'reference_id' => 'order-maximus-reconcile',
             'type' => 'SALE_CREDIT',
-            'amount' => 2375,
+            'amount' => 2425,
         ]);
-        $this->assertDatabaseHas('maximus_wallet_ledger', [
-            'reference_id' => 'order-maximus-reconcile',
-            'type' => 'SALE_COMMISSION',
-            'amount' => 50,
-            'idempotency_key' => 'sale-commission:order-maximus-reconcile',
-        ]);
+        $this->assertDatabaseCount('maximus_wallet_ledger', 0);
     }
 
-    public function test_maximus_commission_is_idempotent_and_configuration_is_validated(): void
+    public function test_maximus_commission_is_disabled_and_cannot_be_reenabled(): void
     {
         $this->asMaximusAdmin()
             ->putJson('/api/platform-settings/ecommerce-commission', [
                 'providerPercent' => 4,
-                'maximusPercent' => 6,
+                'maximusPercent' => 0,
             ])
             ->assertOk()
-            ->assertJsonPath('totalPercent', 10)
-            ->assertJsonPath('sellerPercent', 90);
+            ->assertJsonPath('maximusPercent', 0)
+            ->assertJsonPath('totalPercent', 4)
+            ->assertJsonPath('sellerPercent', 96);
+
+        $this
+            ->putJson('/api/platform-settings/ecommerce-commission', [
+                'providerPercent' => 4,
+                'maximusPercent' => 6,
+            ])
+            ->assertStatus(422);
 
         $this
             ->putJson('/api/platform-settings/ecommerce-commission', [
@@ -170,9 +173,9 @@ class SellerWalletTest extends TestCase
         $this->postSignedWebhook($payload)->assertOk();
         $this->postSignedWebhook($payload)->assertOk();
 
-        $this->assertDatabaseHas('seller_wallets', ['company_id' => 'kora', 'pending_balance' => 900]);
-        $this->assertDatabaseHas('maximus_wallets', ['available_balance' => 60]);
-        $this->assertDatabaseCount('maximus_wallet_ledger', 1);
+        $this->assertDatabaseHas('seller_wallets', ['company_id' => 'kora', 'pending_balance' => 960]);
+        $this->assertDatabaseHas('maximus_wallets', ['available_balance' => 0]);
+        $this->assertDatabaseCount('maximus_wallet_ledger', 0);
     }
 
     public function test_maximus_wallet_is_admin_only_and_failed_withdrawal_restores_reserved_balance(): void
@@ -204,7 +207,7 @@ class SellerWalletTest extends TestCase
             ->assertOk()
             ->assertJsonPath('wallet.availableBalance', 5000)
             ->assertJsonPath('commissionPolicy.providerPercent', 3)
-            ->assertJsonPath('commissionPolicy.maximusPercent', 2);
+            ->assertJsonPath('commissionPolicy.maximusPercent', 0);
 
         $first = $this
             ->postJson('/api/platform-settings/maximus-wallet/withdrawals', $payload)
@@ -254,9 +257,9 @@ class SellerWalletTest extends TestCase
         ]);
         $this->assertDatabaseHas('seller_wallets', [
             'company_id' => 'kora',
-            'pending_balance' => 4750,
+            'pending_balance' => 4850,
             'available_balance' => 0,
-            'total_credited' => 4750,
+            'total_credited' => 4850,
         ]);
         $this->assertDatabaseCount('seller_wallet_ledger', 1);
     }
@@ -288,7 +291,7 @@ class SellerWalletTest extends TestCase
         $this->assertDatabaseHas('seller_wallets', [
             'company_id' => 'kora',
             'pending_balance' => 0,
-            'available_balance' => 4750,
+            'available_balance' => 4850,
         ]);
     }
 
@@ -301,13 +304,13 @@ class SellerWalletTest extends TestCase
         $this->createOrder('order-matures', 'kora', 7000, 'charge-matures');
 
         $this->postSignedWebhook(['data' => ['id' => 'charge-matures', 'status' => 'SUCCEEDED']])->assertOk();
-        $this->assertDatabaseHas('seller_wallets', ['company_id' => 'kora', 'pending_balance' => 6650, 'available_balance' => 0]);
+        $this->assertDatabaseHas('seller_wallets', ['company_id' => 'kora', 'pending_balance' => 6790, 'available_balance' => 0]);
 
         $this->travel(4)->days();
         $this->asActor()->getJson('/api/ecommerce/wallet?companyId=kora')
             ->assertOk()
             ->assertJsonPath('wallet.pendingBalance', 0)
-            ->assertJsonPath('wallet.availableBalance', 6650);
+            ->assertJsonPath('wallet.availableBalance', 6790);
         $this->assertDatabaseHas('seller_wallet_ledger', [
             'company_id' => 'kora',
             'type' => 'SALE_RELEASE',
@@ -327,7 +330,7 @@ class SellerWalletTest extends TestCase
         $this->asActor();
         $this->getJson('/api/ecommerce/wallet?companyId=kora')
             ->assertOk()
-            ->assertJsonPath('wallet.pendingBalance', 6745)
+            ->assertJsonPath('wallet.pendingBalance', 6887)
             ->assertJsonPath('wallet.availableBalance', 0);
 
         $this->travel(2)->days();
@@ -335,7 +338,7 @@ class SellerWalletTest extends TestCase
         $this->getJson('/api/ecommerce/wallet?companyId=kora')
             ->assertOk()
             ->assertJsonPath('wallet.pendingBalance', 0)
-            ->assertJsonPath('wallet.availableBalance', 6745);
+            ->assertJsonPath('wallet.availableBalance', 6887);
     }
 
     public function test_automatic_mode_waits_for_delivery_instead_of_using_a_fixed_delay(): void
@@ -350,7 +353,7 @@ class SellerWalletTest extends TestCase
         $this->travel(30)->days();
         $this->asActor()->getJson('/api/ecommerce/wallet?companyId=kora')
             ->assertOk()
-            ->assertJsonPath('wallet.pendingBalance', 6840)
+            ->assertJsonPath('wallet.pendingBalance', 6984)
             ->assertJsonPath('wallet.availableBalance', 0)
             ->assertJsonPath('maturityPolicy.mode', 'AUTOMATIC');
     }
@@ -365,7 +368,7 @@ class SellerWalletTest extends TestCase
         $this->assertDatabaseHas('seller_wallets', [
             'company_id' => 'kora',
             'pending_balance' => 0,
-            'available_balance' => 3990,
+            'available_balance' => 4074,
         ]);
     }
 
@@ -433,9 +436,9 @@ class SellerWalletTest extends TestCase
         ]);
         $this->assertDatabaseHas('seller_wallets', [
             'company_id' => 'kora',
-            'pending_balance' => 6175,
+            'pending_balance' => 6305,
             'available_balance' => 0,
-            'total_credited' => 6175,
+            'total_credited' => 6305,
         ]);
         $this->assertDatabaseCount('seller_wallet_ledger', 1);
     }
@@ -481,7 +484,7 @@ class SellerWalletTest extends TestCase
             ->assertJsonPath('sync.checked', 1)
             ->assertJsonPath('sync.updated', 1)
             ->assertJsonPath('sync.failed', 0)
-            ->assertJsonPath('wallet.pendingBalance', 6935);
+            ->assertJsonPath('wallet.pendingBalance', 7081);
 
         $this->assertDatabaseHas('ecommerce_orders', [
             'id' => 'order-reconcile',
@@ -528,9 +531,9 @@ class SellerWalletTest extends TestCase
 
         $this->assertDatabaseHas('seller_wallets', [
             'company_id' => 'kora',
-            'pending_balance' => 190,
+            'pending_balance' => 194,
             'available_balance' => 0,
-            'total_credited' => 190,
+            'total_credited' => 194,
         ]);
         $this->assertDatabaseCount('seller_wallet_ledger', 1);
     }

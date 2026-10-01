@@ -100,6 +100,8 @@ class EcommerceTest extends TestCase
         $this->assertDatabaseHas('ecommerce_products', ['id' => 'ecommerce-pos-product', 'stock' => 3]);
         $this->assertDatabaseHas('ecommerce_pos_sales', ['id' => $saleId, 'status' => 'PAID']);
         $this->assertDatabaseHas('ecommerce_pos_sale_items', ['sale_id' => $saleId, 'product_id' => 'ecommerce-pos-product']);
+        $this->assertDatabaseCount('seller_wallet_ledger', 0);
+        $this->assertDatabaseCount('maximus_wallet_ledger', 0);
 
         $request
             ->withHeader('Idempotency-Key', 'pos-test-sale-001')

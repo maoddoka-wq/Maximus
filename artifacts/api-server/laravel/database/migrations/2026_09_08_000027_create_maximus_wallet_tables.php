@@ -71,7 +71,7 @@ return new class extends Migration
 
         DB::table('maximus_platform_settings')->insertOrIgnore([
             'key' => 'ecommerce_commission',
-            'value' => json_encode(['providerPercent' => 3, 'maximusPercent' => 2], JSON_THROW_ON_ERROR),
+            'value' => json_encode(['providerPercent' => 3, 'maximusPercent' => 0], JSON_THROW_ON_ERROR),
             'created_at' => now(),
             'updated_at' => now(),
         ]);

@@ -5352,9 +5352,9 @@ function MaximusWalletPanel({ formatAmount }: { formatAmount: (value: number) =>
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
             <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Compte plateforme</p>
-            <h2 className="mt-2 text-xl font-bold">Solde MAXIMUS et commissions e-commerce</h2>
+            <h2 className="mt-2 text-xl font-bold">Compte MAXIMUS et modèle d’abonnement</h2>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-              Chaque vente est répartie automatiquement : {bootstrap?.commissionPolicy.label ?? '3 % DiamanoPay, 2 % MAXIMUS, 95 % vendeur.'}
+              Le point de vente est inclus dans l’abonnement de l’entreprise via E-commerce. Les ventes ne génèrent aucune commission MAXIMUS; l’historique des commissions reste conservé.
             </p>
           </div>
           <WalletCards size={22} className="text-[hsl(var(--primary))]" />
@@ -5369,7 +5369,7 @@ function MaximusWalletPanel({ formatAmount }: { formatAmount: (value: number) =>
             {[
               { label: 'Disponible', value: bootstrap.wallet.availableBalance, icon: CircleDollarSign },
               { label: 'Réservé', value: bootstrap.wallet.reservedBalance, icon: ShieldCheck },
-              { label: 'Commissions cumulées', value: bootstrap.wallet.totalCredited, icon: TrendingUp },
+              { label: 'Total déjà crédité', value: bootstrap.wallet.totalCredited, icon: TrendingUp },
             ].map((metric) => {
               const Icon = metric.icon;
               return (
@@ -5387,8 +5387,8 @@ function MaximusWalletPanel({ formatAmount }: { formatAmount: (value: number) =>
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(340px,.8fr)]">
             <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.2)] p-4">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-bold">Répartition appliquée</p>
-                <span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{bootstrap.commissionPolicy.totalPercent} % de commission</span>
+                <p className="text-xs font-bold">Frais retenus sur une vente en ligne</p>
+                <span className="rounded-full bg-[hsl(var(--primary)/.1)] px-2 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">{bootstrap.commissionPolicy.providerPercent} % de frais</span>
               </div>
               <div className="mt-4 grid gap-2 sm:grid-cols-3">
                 {[

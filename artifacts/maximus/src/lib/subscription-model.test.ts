@@ -17,6 +17,18 @@ test('crée une souscription initiale cohérente avec le nombre de modules', () 
   assert.equal(subscription.invoices.length, 0);
 });
 
+test('inclut le module E-commerce qui porte la Vente comptoir dans le forfait mensuel', () => {
+  const subscription = buildSubscriptionForCompany({
+    companyId: 'pos-company',
+    createdAt: '2026-10-01',
+    moduleIds: ['ecommerce'],
+  });
+
+  assert.deepEqual(subscription.moduleIds, ['ecommerce']);
+  assert.equal(subscription.amount, 45000);
+  assert.equal(subscription.interval, 'MENSUEL');
+});
+
 test('le catalogue expose les limites et les prix de chaque plan', () => {
   assert.deepEqual(subscriptionPlans.map(plan => plan.id), ['essential', 'growth', 'scale']);
   assert.ok(subscriptionPlans.every(plan => plan.monthlyAmount > 0));

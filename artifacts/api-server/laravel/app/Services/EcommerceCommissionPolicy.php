@@ -10,7 +10,7 @@ final class EcommerceCommissionPolicy
 
     private const DEFAULT_PROVIDER_PERCENT = 3;
 
-    private const DEFAULT_MAXIMUS_PERCENT = 2;
+    private const DEFAULT_MAXIMUS_PERCENT = 0;
 
     public function current(): array
     {
@@ -76,7 +76,7 @@ final class EcommerceCommissionPolicy
             'totalPercent' => $totalPercent,
             'sellerPercent' => 100 - $totalPercent,
             'label' => sprintf(
-                '%d %% DiamanoPay, %d %% MAXIMUS, %d %% vendeur.',
+                '%d %% de frais DiamanoPay, %d %% de commission MAXIMUS, %d %% vendeur.',
                 $setting['providerPercent'],
                 $setting['maximusPercent'],
                 100 - $totalPercent,
@@ -89,20 +89,13 @@ final class EcommerceCommissionPolicy
         $providerPercent = isset($setting['providerPercent']) && is_numeric($setting['providerPercent'])
             ? (int) $setting['providerPercent']
             : self::DEFAULT_PROVIDER_PERCENT;
-        $maximusPercent = isset($setting['maximusPercent']) && is_numeric($setting['maximusPercent'])
-            ? (int) $setting['maximusPercent']
-            : self::DEFAULT_MAXIMUS_PERCENT;
-
-        if ($providerPercent < 0 || $maximusPercent < 0 || $providerPercent + $maximusPercent > 100) {
-            return [
-                'providerPercent' => self::DEFAULT_PROVIDER_PERCENT,
-                'maximusPercent' => self::DEFAULT_MAXIMUS_PERCENT,
-            ];
+        if ($providerPercent < 0 || $providerPercent > 100) {
+            $providerPercent = self::DEFAULT_PROVIDER_PERCENT;
         }
 
         return [
             'providerPercent' => min($providerPercent, 100),
-            'maximusPercent' => min($maximusPercent, 100),
+            'maximusPercent' => self::DEFAULT_MAXIMUS_PERCENT,
         ];
     }
 }

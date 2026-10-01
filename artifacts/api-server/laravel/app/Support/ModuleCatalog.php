@@ -98,7 +98,7 @@ final class ModuleCatalog
                     [
                         'id' => 'ecommerce-vente-comptoir',
                         'name' => 'Vente comptoir',
-                        'description' => 'Enregistrer les ventes en magasin et suivre les encaissements en espèces.',
+                        'description' => 'Vente comptoir incluse dans le forfait mensuel MAXIMUS via le module E-commerce, sans commission par vente.',
                         'feature_ids' => ['dashboard', 'catalogue', 'vente-physique', 'vente-comptoir'],
                         'feature_permissions' => [
                             'dashboard' => ['voir'],
