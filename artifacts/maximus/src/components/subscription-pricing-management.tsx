@@ -27,7 +27,13 @@ function parseAmount(value: string): { valid: boolean; amount: number | null } {
 
 type CatalogModule = Pick<SubscriptionModulePrice, 'id' | 'name'>;
 
-export function SubscriptionPricingManagement({ catalogModules }: { catalogModules: CatalogModule[] }) {
+export function SubscriptionPricingManagement({
+  catalogModules,
+  onActiveSubscriptionAvailabilityChange,
+}: {
+  catalogModules: CatalogModule[];
+  onActiveSubscriptionAvailabilityChange?: (available: boolean | null) => void;
+}) {
   const fallbackModules = useMemo(
     () => catalogModules.map(module => ({ ...module, monthlyAmount: null })),
     [catalogModules],
@@ -51,11 +57,15 @@ export function SubscriptionPricingManagement({ catalogModules }: { catalogModul
         if (cancelled) return;
         setModules(result.modules);
         setCompanies(result.companies);
+        onActiveSubscriptionAvailabilityChange?.(
+          result.companies.some(company => company.modules.length > 0 || company.customAmount !== null),
+        );
         setLoadError('');
       } catch (error) {
         if (cancelled) return;
         setModules(fallbackModules);
         setCompanies([]);
+        onActiveSubscriptionAvailabilityChange?.(null);
         setLoadError(error instanceof Error ? error.message : 'La grille tarifaire est indisponible.');
       } finally {
         if (!cancelled && showLoading) setLoading(false);
@@ -70,7 +80,7 @@ export function SubscriptionPricingManagement({ catalogModules }: { catalogModul
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [fallbackModules, retry]);
+  }, [fallbackModules, onActiveSubscriptionAvailabilityChange, retry]);
 
   const visibleCompanies = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('fr');

@@ -5072,6 +5072,7 @@ function SubscriptionsPage({
 }) {
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState(data.subscriptions[0]?.id ?? '');
   const [searchTerm, setSearchTerm] = useState('');
+  const [hasActiveBillingSubscriptions, setHasActiveBillingSubscriptions] = useState<boolean | null>(null);
   const subscriptions = data.subscriptions;
   const catalogModules = useMemo(
     () => getConfiguredModules({
@@ -5113,12 +5114,17 @@ function SubscriptionsPage({
     return (
       <div className="space-y-6">
         <MaximusWalletPanel formatAmount={formatAmount} />
-        <SubscriptionPricingManagement catalogModules={catalogModules} />
-        <EmptyState
-          title="Aucun abonnement enregistré"
-          text="Les souscriptions apparaîtront ici avec leur plan, leur cycle de paiement et leurs factures."
-          action={() => onNavigate('/maximus/demandes')}
+        <SubscriptionPricingManagement
+          catalogModules={catalogModules}
+          onActiveSubscriptionAvailabilityChange={setHasActiveBillingSubscriptions}
         />
+        {hasActiveBillingSubscriptions === false && (
+          <EmptyState
+            title="Aucun abonnement enregistré"
+            text="Aucune souscription mensuelle active n’a été trouvée pour les entreprises."
+            action={() => onNavigate('/maximus/demandes')}
+          />
+        )}
       </div>
     );
   }
