@@ -11,6 +11,7 @@ export class AppStateRequestError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly code: string | null = null,
   ) {
     super(message);
     this.name = 'AppStateRequestError';
@@ -32,7 +33,7 @@ async function request<T>(path: string, init?: RequestInit, options: { timeoutMs
         continue;
       }
       if (cause instanceof ApiRequestError) {
-        throw new AppStateRequestError(cause.message, cause.status);
+        throw new AppStateRequestError(cause.message, cause.status, cause.code);
       }
       throw cause;
     }

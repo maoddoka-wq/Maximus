@@ -115,6 +115,15 @@ class AppStateRecoveryTest extends TestCase
     public function test_bootstrap_recovers_company_and_employee_modules_when_state_is_missing(): void
     {
         ModuleCatalog::ensureCompanyAccess('recovery-company', ['stocks']);
+        DB::table('maximus_company_subscription_prices')->updateOrInsert(
+            ['company_id' => 'recovery-company'],
+            [
+                'custom_monthly_amount' => 0,
+                'updated_by' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
         $user = AuthUser::query()->create([
             'id' => 'recovery-employee',
             'email' => 'recovery.employee@example.test',

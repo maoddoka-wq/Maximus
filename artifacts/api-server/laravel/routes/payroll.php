@@ -3,7 +3,7 @@
 use App\Http\Controllers\Api\PayrollController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:paie'])->prefix('payroll')->group(function (): void {
+Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription', 'maximus.module:paie'])->prefix('payroll')->group(function (): void {
     Route::get('/bootstrap', [PayrollController::class, 'bootstrap']);
     Route::post('/beneficiaries', [PayrollController::class, 'createBeneficiary']);
     Route::patch('/beneficiaries/{id}', [PayrollController::class, 'updateBeneficiary']);

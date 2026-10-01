@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Services\CompanySubscriptionEntitlement;
 use App\Services\DiamanoPayService;
 use App\Services\SubscriptionPricing;
 use App\Support\ModuleCatalog;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +24,7 @@ final class SubscriptionBillingController extends Controller
     public function __construct(
         private readonly DiamanoPayService $diamanoPay,
         private readonly SubscriptionPricing $pricing,
+        private readonly CompanySubscriptionEntitlement $entitlement,
     ) {}
 
     public function platformIndex(Request $request): JsonResponse
@@ -414,6 +417,7 @@ final class SubscriptionBillingController extends Controller
             'companyId' => $companyId,
             'companyName' => (string) ($company?->name ?? ''),
             ...$this->pricing->calculate($activeIds, $modulePrices, $customAmount),
+            'subscription' => $this->entitlement->statusForCompany($companyId),
             'paymentReady' => $this->diamanoPay->isConfigured(),
             'payments' => $payments,
         ];
@@ -452,12 +456,18 @@ final class SubscriptionBillingController extends Controller
             }
 
             if (in_array($status, self::PAID_STATUSES, true)) {
+                $paidAt = CarbonImmutable::now();
                 DB::table('maximus_subscription_payments')->where('id', $paymentId)->update([
                     'status' => 'PAID',
                     'failure_reason' => null,
-                    'paid_at' => now(),
+                    'paid_at' => $paidAt,
                     'updated_at' => now(),
                 ]);
+                $this->entitlement->grantOneMonth(
+                    (string) $payment->company_id,
+                    $paymentId,
+                    $paidAt,
+                );
 
                 return;
             }

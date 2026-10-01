@@ -103,6 +103,7 @@ class SubscriptionBillingTest extends TestCase
     public function test_removed_catalog_modules_are_excluded_from_the_grid_and_company_total(): void
     {
         $company = $this->createCompany('subscription-removed-module');
+        $this->setCompanyPaid($company->id);
         $admin = $this->createAdmin('subscription-removed-module-admin');
         $this->activateModule($company->id, 'commerce');
         $this->activateModule($company->id, 'stocks');
@@ -167,13 +168,15 @@ class SubscriptionBillingTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        DB::table('maximus_company_subscription_prices')->insert([
-            'company_id' => $company->id,
-            'custom_monthly_amount' => 22000,
-            'updated_by' => null,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        DB::table('maximus_company_subscription_prices')->updateOrInsert(
+            ['company_id' => $company->id],
+            [
+                'custom_monthly_amount' => 22000,
+                'updated_by' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
 
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($admin))
@@ -191,17 +194,111 @@ class SubscriptionBillingTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_paid_company_without_an_active_period_is_blocked_but_can_reach_billing(): void
+    {
+        $company = $this->createCompany('subscription-expired-company');
+        $this->setCompanyPaid($company->id);
+        $admin = $this->createCompanyAdmin('subscription-expired-admin', $company->id);
+        $session = MaximusAuth::issueSession($admin);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $session)
+            ->getJson('/api/modules/bootstrap')
+            ->assertStatus(402)
+            ->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED')
+            ->assertJsonPath('subscription.status', 'UNPAID');
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $session)
+            ->getJson('/api/company-subscription')
+            ->assertOk()
+            ->assertJsonPath('subscription.status', 'UNPAID');
+    }
+
+    public function test_free_and_currently_paid_companies_can_use_protected_routes(): void
+    {
+        $freeCompany = $this->createCompany('subscription-free-company');
+        $freeAdmin = $this->createCompanyAdmin('subscription-free-admin', $freeCompany->id);
+        DB::table('maximus_company_subscription_prices')->updateOrInsert(
+            ['company_id' => $freeCompany->id],
+            [
+                'custom_monthly_amount' => 0,
+                'updated_by' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($freeAdmin))
+            ->getJson('/api/modules/bootstrap')
+            ->assertOk();
+
+        $paidCompany = $this->createCompany('subscription-current-company');
+        $this->setCompanyPaid($paidCompany->id);
+        $paidAdmin = $this->createCompanyAdmin('subscription-current-admin', $paidCompany->id);
+        DB::table('maximus_company_subscriptions')->insert([
+            'company_id' => $paidCompany->id,
+            'last_payment_id' => 'paid-period-'.$paidCompany->id,
+            'current_period_started_at' => now()->subDays(5),
+            'current_period_ends_at' => now()->addDays(25),
+            'created_at' => now()->subDays(5),
+            'updated_at' => now()->subDays(5),
+        ]);
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($paidAdmin))
+            ->getJson('/api/modules/bootstrap')
+            ->assertOk();
+    }
+
+    public function test_expired_paid_company_is_denied_even_though_it_has_a_previous_period(): void
+    {
+        $company = $this->createCompany('subscription-period-expired');
+        $this->setCompanyPaid($company->id);
+        $admin = $this->createCompanyAdmin('subscription-period-expired-admin', $company->id);
+        DB::table('maximus_company_subscriptions')->insert([
+            'company_id' => $company->id,
+            'last_payment_id' => 'old-period-payment',
+            'current_period_started_at' => now()->subMonths(2),
+            'current_period_ends_at' => now()->subSecond(),
+            'created_at' => now()->subMonths(2),
+            'updated_at' => now()->subMonths(2),
+        ]);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($admin))
+            ->getJson('/api/modules/bootstrap')
+            ->assertStatus(402)
+            ->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED')
+            ->assertJsonPath('subscription.status', 'EXPIRED');
+    }
+
+    public function test_expired_company_employee_is_blocked_too(): void
+    {
+        $company = $this->createCompany('subscription-employee-expired');
+        $this->setCompanyPaid($company->id);
+        $employee = $this->createUser('subscription-expired-employee', 'employee', $company->id);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($employee))
+            ->getJson('/api/app-state/bootstrap')
+            ->assertStatus(402)
+            ->assertJsonPath('code', 'SUBSCRIPTION_REQUIRED')
+            ->assertJsonPath('subscription.status', 'UNPAID');
+    }
+
     public function test_diamanopay_charge_uses_the_server_calculated_custom_amount_and_webhook_confirms_it(): void
     {
         $company = $this->createCompany('subscription-payment-acme');
         $admin = $this->createCompanyAdmin('subscription-payment-admin', $company->id);
-        DB::table('maximus_company_subscription_prices')->insert([
-            'company_id' => $company->id,
-            'custom_monthly_amount' => 32000,
-            'updated_by' => null,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        DB::table('maximus_company_subscription_prices')->updateOrInsert(
+            ['company_id' => $company->id],
+            [
+                'custom_monthly_amount' => 32000,
+                'updated_by' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
         config([
             'services.diamanopay.access_token' => 'test-access-token',
             'services.diamanopay.client_id' => '',
@@ -271,6 +368,18 @@ class SubscriptionBillingTest extends TestCase
             'provider_charge_id' => 'subscription-charge-acme',
             'status' => 'PAID',
         ]);
+        $this->assertDatabaseHas('maximus_company_subscriptions', [
+            'company_id' => $company->id,
+            'last_payment_id' => DB::table('maximus_subscription_payments')
+                ->where('company_id', $company->id)
+                ->value('id'),
+        ]);
+        $this->assertTrue(
+            \Carbon\CarbonImmutable::parse(DB::table('maximus_company_subscriptions')
+                ->where('company_id', $company->id)
+                ->value('current_period_ends_at'))
+                ->isFuture(),
+        );
     }
 
     private function createCompany(string $id): Company
@@ -323,6 +432,19 @@ class SubscriptionBillingTest extends TestCase
                 'status' => 'ACTIF',
                 'feature_ids' => '[]',
                 'configuration' => '{}',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+    }
+
+    private function setCompanyPaid(string $companyId): void
+    {
+        DB::table('maximus_company_subscription_prices')->updateOrInsert(
+            ['company_id' => $companyId],
+            [
+                'custom_monthly_amount' => null,
+                'updated_by' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],

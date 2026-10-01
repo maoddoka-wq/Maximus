@@ -5,6 +5,7 @@ export class ApiRequestError extends Error {
     message: string,
     public readonly status: number,
     public readonly kind: RequestErrorKind,
+    public readonly code: string | null = null,
   ) {
     super(message);
     this.name = 'ApiRequestError';
@@ -58,6 +59,9 @@ async function executeRequest<T>(path: string, init: RequestInit, options: Reque
         errorMessage(body, options.fallbackMessage ?? 'Une erreur est survenue.'),
         response.status,
         'http',
+        body && typeof body === 'object' && typeof (body as Record<string, unknown>).code === 'string'
+          ? (body as Record<string, string>).code
+          : null,
       );
     }
     return body as T;

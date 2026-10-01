@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/payments/diamanopay/webhook', [SellerWalletController::class, 'webhook']);
 
-Route::middleware(['maximus.auth', 'maximus.company', 'maximus.module:ecommerce'])
+Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription', 'maximus.module:ecommerce'])
     ->prefix('ecommerce')
     ->group(function (): void {
         Route::get('/bootstrap', [EcommerceController::class, 'bootstrap']);

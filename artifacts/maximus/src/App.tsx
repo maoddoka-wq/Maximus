@@ -200,6 +200,9 @@ const SystemHealthPage = lazy(() =>
   import('@/pages/system-health').then((module) => ({ default: module.SystemHealthPage })),
 );
 const PlatformSettingsPage = lazy(() => import('@/pages/platform-settings'));
+const SubscriptionAccessGate = lazy(() =>
+  import('@/pages/subscription-access-gate').then((module) => ({ default: module.SubscriptionAccessGate })),
+);
 function sessionFromAuthUser(user: AuthUser): Session {
   return user.role === 'maximus_admin'
     ? 'admin'
@@ -423,6 +426,7 @@ function AppContent() {
   const [installationRetry, setInstallationRetry] = useState(0);
   const [appStateVersion, setAppStateVersion] = useState(0);
   const [appStateError, setAppStateError] = useState('');
+  const [subscriptionBlocked, setSubscriptionBlocked] = useState(false);
   const [appStateReady, setAppStateReady] = useState(
     () => !localStorage.getItem('maximus-session'),
   );
@@ -600,13 +604,22 @@ function AppContent() {
         dataRef.current = nextData;
         setData(nextData);
         setAppStateError('');
+        setSubscriptionBlocked(false);
+        setAppStateReady(true);
         appStateVersionRef.current = version;
         setAppStateVersion(version);
         return true;
       })
       .catch((error) => {
         if (sessionRef.current !== requestSession) return false;
+        if (error instanceof AppStateRequestError && error.code === 'SUBSCRIPTION_REQUIRED') {
+          setSubscriptionBlocked(true);
+          setAppStateReady(false);
+          setAppStateError(error.message);
+          return false;
+        }
         if (error instanceof AppStateRequestError && [401, 403].includes(error.status)) {
+          setSubscriptionBlocked(false);
           setSession(null);
           localStorage.removeItem('maximus-session');
           localStorage.removeItem(companyLoginContextStorageKey);
@@ -615,6 +628,7 @@ function AppContent() {
           notify('Votre session MAXIMUS n’est plus active.', 'warning');
           return false;
         }
+        setSubscriptionBlocked(false);
         const message = error instanceof Error ? error.message : 'Les données métier sont indisponibles.';
         setAppStateError(message);
         return false;
@@ -885,6 +899,7 @@ function AppContent() {
     appStateVersionRef.current = 0;
     setAppStateVersion(0);
     setAppStateError('');
+    setSubscriptionBlocked(false);
     moduleAccessCacheRef.current.clear();
     loginTransitionRef.current = true;
     setAppStateReady(false);
@@ -1050,6 +1065,7 @@ function AppContent() {
     appStateVersionRef.current = 0;
     setAppStateVersion(0);
     setAppStateError('');
+    setSubscriptionBlocked(false);
     moduleAccessCacheRef.current.clear();
     setAppStateReady(true);
     setSession(null);
@@ -1205,6 +1221,18 @@ function AppContent() {
     return <PublicShopPage slug={decodeURIComponent(publicShopMatch[1])} />;
   }
   if (session && !appStateReady) {
+    if (subscriptionBlocked) {
+      return (
+        <Suspense fallback={<div className="min-h-screen bg-[hsl(var(--background))]" />}>
+          <SubscriptionAccessGate
+            isCompanyAdmin={session.startsWith('company:')}
+            message={appStateError}
+            onRetryAccess={refreshAppState}
+            onLogout={logout}
+          />
+        </Suspense>
+      );
+    }
     return <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--background))] p-6">
       <section className="card-surface w-full max-w-md rounded-2xl p-7 text-center">
         <h1 className="text-lg font-bold">{appStateError ? 'Les données métier ne sont pas accessibles' : 'Chargement de l’espace…'}</h1>

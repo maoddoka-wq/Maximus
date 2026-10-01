@@ -38,11 +38,20 @@ export type SubscriptionPayment = {
   paidAt: string | null;
 };
 
+export type CompanySubscriptionEntitlement = {
+  billingMode: CompanySubscriptionBillingMode;
+  status: 'FREE' | 'ACTIVE' | 'UNPAID' | 'EXPIRED';
+  currentPeriodStartsAt: string | null;
+  currentPeriodEndsAt: string | null;
+  remainingSeconds: number;
+};
+
 export type CompanySubscriptionBilling = SubscriptionPriceBreakdown & {
   companyId: string;
   companyName: string;
   paymentReady: boolean;
   payments: SubscriptionPayment[];
+  subscription: CompanySubscriptionEntitlement;
 };
 
 export type CompanySubscriptionBillingMode = 'FREE' | 'PAID';
@@ -221,12 +230,30 @@ export async function loadCompanySubscription(): Promise<CompanySubscriptionBill
   ) {
     throw new Error('Les informations d’abonnement reçues sont incomplètes.');
   }
+  const subscription = record(response.subscription, 'Le statut d’abonnement reçu est invalide.');
+  if (
+    !['FREE', 'PAID'].includes(String(subscription.billingMode))
+    || !['FREE', 'ACTIVE', 'UNPAID', 'EXPIRED'].includes(String(subscription.status))
+    || (subscription.currentPeriodStartsAt !== null && typeof subscription.currentPeriodStartsAt !== 'string')
+    || (subscription.currentPeriodEndsAt !== null && typeof subscription.currentPeriodEndsAt !== 'string')
+    || !Number.isInteger(subscription.remainingSeconds)
+    || (subscription.remainingSeconds as number) < 0
+  ) {
+    throw new Error('Le statut d’abonnement reçu est invalide.');
+  }
   return {
     ...parseBreakdown(response),
     companyId: response.companyId,
     companyName: response.companyName,
     paymentReady: response.paymentReady,
     payments: response.payments.map(parsePayment),
+    subscription: {
+      billingMode: subscription.billingMode as CompanySubscriptionBillingMode,
+      status: subscription.status as CompanySubscriptionEntitlement['status'],
+      currentPeriodStartsAt: subscription.currentPeriodStartsAt as string | null,
+      currentPeriodEndsAt: subscription.currentPeriodEndsAt as string | null,
+      remainingSeconds: subscription.remainingSeconds as number,
+    },
   };
 }
 

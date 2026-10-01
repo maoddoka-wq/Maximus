@@ -112,7 +112,7 @@ Route::middleware(['maximus.central', 'maximus.auth'])->prefix('companies')->gro
     Route::delete('/{companyId}', [CompanyController::class, 'destroy']);
 });
 
-Route::middleware('maximus.auth')->prefix('companies')->group(function (): void {
+Route::middleware(['maximus.auth', 'maximus.subscription'])->prefix('companies')->group(function (): void {
     Route::patch('/{companyId}', [CompanyController::class, 'update']);
     Route::post('/{companyId}/profile-photo', [CompanyController::class, 'uploadProfilePhoto']);
     Route::delete('/{companyId}/profile-photo', [CompanyController::class, 'deleteProfilePhoto']);
@@ -127,12 +127,12 @@ Route::get('/company-profile-images/{companyId}/{filename}', [CompanyController:
     ->middleware('maximus.installation.public')
     ->where(['companyId' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 
-Route::middleware('maximus.auth')->prefix('auth/accounts')->group(function (): void {
+Route::middleware(['maximus.auth', 'maximus.subscription'])->prefix('auth/accounts')->group(function (): void {
     Route::post('/', [AuthController::class, 'createAccount']);
     Route::delete('/{employeeId}', [AuthController::class, 'deleteAccount']);
 });
 
-Route::middleware(['maximus.auth', 'maximus.company'])
+Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription'])
     ->prefix('company-public-site')
     ->group(function (): void {
         Route::get('/', [CompanyPublicSiteSettingsController::class, 'show']);
@@ -152,12 +152,12 @@ Route::middleware('maximus.auth')->prefix('auth/company-admins')->group(function
 
 Route::middleware('maximus.auth')->patch('/auth/company-password', [AuthController::class, 'updateCompanyPassword']);
 
-Route::middleware(['maximus.auth', 'maximus.company'])->prefix('modules')->group(function (): void {
+Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription'])->prefix('modules')->group(function (): void {
     Route::get('/bootstrap', [ModuleController::class, 'bootstrap']);
     Route::patch('/{moduleId}/access', [ModuleController::class, 'setAccess']);
 });
 
-Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void {
+Route::middleware(['maximus.auth', 'maximus.subscription'])->prefix('app-state')->group(function (): void {
     Route::get('/bootstrap', [AppStateController::class, 'bootstrap']);
     Route::put('/', [AppStateController::class, 'save']);
 });

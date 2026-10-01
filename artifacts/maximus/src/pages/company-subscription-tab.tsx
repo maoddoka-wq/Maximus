@@ -9,6 +9,7 @@ import {
   type CompanySubscriptionBilling,
   type SubscriptionPayment,
 } from '@/lib/subscription-billing-api';
+import { getSubscriptionCountdown } from '@/lib/subscription-countdown';
 import type { Company } from '@/lib/store';
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 
@@ -37,20 +38,21 @@ function dateText(value: string | null) {
       }).format(date);
 }
 
-export function CompanySubscriptionTab({ company }: { company: Company }) {
+export function CompanySubscriptionTab({ company }: { company?: Pick<Company, 'id'> }) {
   const [billing, setBilling] = useState<CompanySubscriptionBilling | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [savingPayment, setSavingPayment] = useState(false);
   const [refreshingPaymentId, setRefreshingPaymentId] = useState('');
   const [retry, setRetry] = useState(0);
+  const [clockMs, setClockMs] = useState(() => Date.now());
 
   useEffect(() => {
     let cancelled = false;
     void loadCompanySubscription()
       .then(result => {
         if (cancelled) return;
-        if (result.companyId !== company.id) {
+        if (company && result.companyId !== company.id) {
           throw new Error('Les informations de facturation reçues ne correspondent pas à cette entreprise.');
         }
         setBilling(result);
@@ -67,7 +69,13 @@ export function CompanySubscriptionTab({ company }: { company: Company }) {
     return () => {
       cancelled = true;
     };
-  }, [company.id, retry]);
+  }, [company?.id, retry]);
+
+  useEffect(() => {
+    if (billing?.subscription.status !== 'ACTIVE' || !billing.subscription.currentPeriodEndsAt) return;
+    const interval = window.setInterval(() => setClockMs(Date.now()), 1_000);
+    return () => window.clearInterval(interval);
+  }, [billing?.subscription.currentPeriodEndsAt, billing?.subscription.status]);
 
   const pendingPaymentId = billing?.payments.find(payment => payment.status === 'PENDING')?.id ?? '';
   useEffect(() => {
@@ -80,7 +88,12 @@ export function CompanySubscriptionTab({ company }: { company: Company }) {
         setBilling(current => current
           ? { ...current, payments: current.payments.map(payment => payment.id === updated.id ? updated : payment) }
           : current);
-        if (updated.status === 'PAID') showAppToast('Paiement de l’abonnement confirmé.', 'success');
+        if (updated.status === 'PAID') {
+          const refreshedBilling = await loadCompanySubscription().catch(() => null);
+          if (cancelled) return;
+          if (refreshedBilling) setBilling(refreshedBilling);
+          showAppToast('Paiement de l’abonnement confirmé.', 'success');
+        }
       } catch {
         // Keep the pending status visible; the user can retry manually.
       }
@@ -117,6 +130,10 @@ export function CompanySubscriptionTab({ company }: { company: Company }) {
       setBilling(current => current
         ? { ...current, payments: current.payments.map(entry => entry.id === updated.id ? updated : entry) }
         : current);
+      if (updated.status === 'PAID') {
+        const refreshedBilling = await loadCompanySubscription();
+        setBilling(refreshedBilling);
+      }
       showAppToast(
         updated.status === 'PAID'
           ? 'Paiement confirmé.'
@@ -155,6 +172,15 @@ export function CompanySubscriptionTab({ company }: { company: Company }) {
   }
 
   const latestPayment = billing.payments[0];
+  const countdown = getSubscriptionCountdown(billing.subscription.currentPeriodEndsAt, clockMs);
+  const subscriptionActive = billing.subscription.status === 'ACTIVE' && !countdown.expired;
+  const subscriptionStatusLabel = subscriptionActive
+    ? 'ACTIF'
+    : billing.subscription.status === 'FREE'
+      ? 'GRATUIT'
+      : billing.subscription.status === 'EXPIRED' || (billing.subscription.status === 'ACTIVE' && countdown.expired)
+        ? 'EXPIRÉ'
+        : 'À PAYER';
 
   return (
     <div className="space-y-5" data-testid="company-subscription-tab">
@@ -167,7 +193,29 @@ export function CompanySubscriptionTab({ company }: { company: Company }) {
               Le montant mensuel défini pour votre entreprise et son paiement.
             </p>
           </div>
-          <StatusBadge status={latestPayment?.status === 'PAID' ? 'PAYÉE' : latestPayment?.status === 'FAILED' ? 'IMPAYÉ' : latestPayment?.status === 'PENDING' ? 'EN ATTENTE' : billing.customAmount === null ? 'ACTIF' : 'PERSONNALISÉ'} />
+          <StatusBadge status={subscriptionStatusLabel} />
+        </div>
+
+        <div
+          className={`mt-5 rounded-xl border p-4 ${
+            subscriptionActive
+              ? 'border-[hsl(var(--primary)/.28)] bg-[hsl(var(--primary)/.06)]'
+              : 'border-[hsl(var(--destructive)/.28)] bg-[hsl(var(--destructive)/.06)]'
+          }`}
+          data-testid="status-subscription-countdown"
+          aria-live="polite"
+        >
+          <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">
+            {subscriptionActive ? 'Temps restant avant l’échéance' : 'Accès entreprise suspendu'}
+          </p>
+          <p className={`mt-1 text-lg font-bold ${subscriptionActive ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--destructive))]'}`}>
+            {subscriptionActive ? countdown.label : 'Aucun abonnement actif'}
+          </p>
+          <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+            {subscriptionActive
+              ? `Échéance : ${dateText(billing.subscription.currentPeriodEndsAt)}. Le paiement mensuel renouvelle l’accès pour un mois.`
+              : 'Réglez l’abonnement ci-dessous pour rétablir l’accès aux services de l’entreprise.'}
+          </p>
         </div>
 
         <div className="mt-5 rounded-xl border border-[hsl(var(--primary)/.28)] bg-[hsl(var(--primary)/.06)] p-4">
