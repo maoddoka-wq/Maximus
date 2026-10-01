@@ -8,6 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('maximus_subscription_module_prices')) {
+            Schema::create('maximus_subscription_module_prices', function (Blueprint $table): void {
+                $table->string('module_id')->primary();
+                $table->unsignedBigInteger('monthly_amount')->nullable();
+                $table->string('updated_by')->nullable();
+                $table->timestampsTz();
+            });
+        }
+
         if (! Schema::hasTable('maximus_company_subscription_prices')) {
             Schema::create('maximus_company_subscription_prices', function (Blueprint $table): void {
                 $table->string('company_id')->primary();
@@ -39,5 +48,6 @@ return new class extends Migration
     {
         Schema::dropIfExists('maximus_subscription_payments');
         Schema::dropIfExists('maximus_company_subscription_prices');
+        Schema::dropIfExists('maximus_subscription_module_prices');
     }
 };

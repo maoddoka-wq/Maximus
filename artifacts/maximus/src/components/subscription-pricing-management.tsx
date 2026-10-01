@@ -129,10 +129,10 @@ export function SubscriptionPricingManagement() {
     <section className="card-surface overflow-hidden rounded-2xl" data-testid="section-subscription-pricing">
       <div className="border-b border-[hsl(var(--border))] p-5 sm:p-6">
         <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Tarification MAXIMUS</p>
-        <h2 className="mt-2 text-xl font-bold">Tarifs des modules et prix par entreprise</h2>
+        <h2 className="mt-2 text-xl font-bold">Tarifs des modules et ajustement par entreprise</h2>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-          Configurez le prix mensuel de chaque module, puis ajustez si nécessaire le montant calculé pour une entreprise.
-          Un prix personnalisé remplace le forfait automatique; laissez le champ vide pour revenir à ce forfait.
+          Configurez le tarif mensuel des modules. Le montant de chaque entreprise est calculé à partir de ses modules actifs;
+          un prix personnalisé le remplace. Laissez le champ vide pour revenir au montant calculé.
         </p>
       </div>
 
@@ -158,7 +158,7 @@ export function SubscriptionPricingManagement() {
         <div className="space-y-6 p-5 sm:p-6">
           <div>
             <h3 className="text-sm font-bold">Grille mensuelle par module</h3>
-            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Les montants sont affichés dans le détail des entreprises. Aucun tarif n’est présumé.</p>
+            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Ces tarifs déterminent le montant calculé pour chaque entreprise. Un tarif manquant empêche le calcul complet.</p>
             <div className="mt-3 divide-y divide-[hsl(var(--border))] rounded-xl border border-[hsl(var(--border))]">
               {modules.map(module => {
                 const key = `module:${module.id}`;
@@ -203,7 +203,7 @@ export function SubscriptionPricingManagement() {
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
               <div>
                 <h3 className="text-sm font-bold">Montant final par entreprise</h3>
-                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Le prix saisi remplace le forfait automatique; vide signifie « utiliser le forfait ».</p>
+                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Le montant calculé peut être modifié pour une entreprise; vide signifie « utiliser le montant calculé ».</p>
               </div>
               <label className="relative block sm:w-72">
                 <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
@@ -235,16 +235,10 @@ export function SubscriptionPricingManagement() {
                           <StatusBadge status={company.customAmount === null ? 'ACTIF' : 'PERSONNALISÉ'} />
                         </div>
                         <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-                          {company.autoPlan.name} · automatique {amountText(company.autoPlan.monthlyAmount)} / mois
-                        </p>
-                        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
                           {company.modules.length} module(s) actif(s)
-                          {company.moduleTotalComplete
-                            ? ` · total module ${amountText(company.moduleTotal)}`
-                            : ' · certains prix module restent à définir'}
                         </p>
                         <p className="mt-1 text-xs font-semibold">
-                          À payer : <span className="text-[hsl(var(--primary))]">{amountText(company.payableAmount)} / mois</span>
+                          Montant mensuel : <span className="text-[hsl(var(--primary))]">{amountText(company.payableAmount)}</span>
                         </p>
                       </div>
                       <label className="text-xs font-semibold">
@@ -257,7 +251,9 @@ export function SubscriptionPricingManagement() {
                           value={value}
                           onChange={event => setCompanyDrafts(previous => ({ ...previous, [company.companyId]: event.target.value }))}
                           aria-label={`Prix mensuel personnalisé pour ${company.companyName}`}
-                          placeholder={`Automatique : ${company.autoPlan.monthlyAmount}`}
+                          placeholder={company.moduleTotalComplete
+                            ? `Calculé : ${company.moduleTotal}`
+                            : 'Tarifs de module incomplets'}
                           className="mt-1.5 w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 text-sm outline-none focus:border-[hsl(var(--primary))]"
                         />
                       </label>

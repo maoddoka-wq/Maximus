@@ -27,10 +27,11 @@ final class SubscriptionBillingController extends Controller
     public function platformIndex(Request $request): JsonResponse
     {
         if (! $this->isMaximusAdmin($request)) {
-            return response()->json(['error' => 'Seul MAXIMUS peut consulter la grille tarifaire.'], 403);
+            return response()->json(['error' => 'Seul MAXIMUS peut consulter les tarifs d’abonnement.'], 403);
         }
 
         $definitions = collect(ModuleCatalog::publishedDefinitionsWithCustom());
+        $modulePrices = $this->modulePriceMap($definitions->pluck('id')->map(strval(...))->all());
         $companies = Company::query()
             ->whereNull('deleted_at')
             ->orderBy('name')
@@ -51,6 +52,7 @@ final class SubscriptionBillingController extends Controller
             'companies' => $companies->map(function (Company $company) use (
                 $activeRows,
                 $definitionsById,
+                $modulePrices,
                 $overrides,
             ): array {
                 $modules = collect($activeRows->get($company->id, []))
@@ -71,10 +73,53 @@ final class SubscriptionBillingController extends Controller
                 return [
                     'companyId' => (string) $company->id,
                     'companyName' => (string) $company->name,
-                    ...$this->pricing->calculate($modules, $customAmount),
+                    ...$this->pricing->calculate($modules, $modulePrices, $customAmount),
                     'updatedAt' => $override?->updated_at,
                 ];
             })->values(),
+            'modules' => $definitions->map(fn (array $definition): array => [
+                'id' => (string) $definition['id'],
+                'name' => (string) $definition['name'],
+                'monthlyAmount' => $modulePrices[(string) $definition['id']] ?? null,
+            ])->values(),
+        ]);
+    }
+
+    public function updateModulePrice(Request $request, string $moduleId): JsonResponse
+    {
+        if (! $this->isMaximusAdmin($request)) {
+            return response()->json(['error' => 'Seul MAXIMUS peut modifier les tarifs des modules.'], 403);
+        }
+
+        $input = $request->validate([
+            'monthlyAmount' => ['present', 'nullable', 'integer', 'min:0', 'max:2147483647'],
+        ]);
+        $definition = collect(ModuleCatalog::publishedDefinitionsWithCustom())
+            ->firstWhere('id', $moduleId);
+        if (! $definition) {
+            return response()->json(['error' => 'Module introuvable dans le catalogue publié.'], 404);
+        }
+
+        $existing = DB::table('maximus_subscription_module_prices')
+            ->where('module_id', $moduleId)
+            ->first();
+        $now = now();
+        DB::table('maximus_subscription_module_prices')->updateOrInsert(
+            ['module_id' => $moduleId],
+            [
+                'monthly_amount' => $input['monthlyAmount'],
+                'updated_by' => $request->attributes->get('authUser')?->id,
+                'created_at' => $existing?->created_at ?? $now,
+                'updated_at' => $now,
+            ],
+        );
+
+        return response()->json([
+            'module' => [
+                'id' => $moduleId,
+                'name' => (string) $definition['name'],
+                'monthlyAmount' => $input['monthlyAmount'] === null ? null : (int) $input['monthlyAmount'],
+            ],
         ]);
     }
 
@@ -146,10 +191,10 @@ final class SubscriptionBillingController extends Controller
                     throw new \RuntimeException('COMPANY_NOT_FOUND');
                 }
                 $companyPayload = $this->companyPayload($companyId);
-                $amount = (int) $companyPayload['payableAmount'];
-                if ($amount <= 0) {
+                if (! is_int($companyPayload['payableAmount']) || $companyPayload['payableAmount'] <= 0) {
                     throw new \RuntimeException('SUBSCRIPTION_AMOUNT_ZERO');
                 }
+                $amount = $companyPayload['payableAmount'];
 
                 $existing = DB::table('maximus_subscription_payments')
                     ->where('company_id', $companyId)
@@ -194,7 +239,7 @@ final class SubscriptionBillingController extends Controller
             });
         } catch (Throwable $error) {
             if ($error->getMessage() === 'SUBSCRIPTION_AMOUNT_ZERO') {
-                return response()->json(['error' => 'Le montant à payer doit être supérieur à zéro.'], 422);
+                return response()->json(['error' => 'Définissez les tarifs des modules actifs ou un montant personnalisé supérieur à zéro.'], 422);
             }
             if ($error->getMessage() === 'COMPANY_NOT_FOUND') {
                 return response()->json(['error' => 'Entreprise introuvable.'], 404);
@@ -350,7 +395,8 @@ final class SubscriptionBillingController extends Controller
             ->map(fn (mixed $id): array => [
                 'id' => (string) $id,
                 'name' => (string) ($definitions->get($id)['name'] ?? $id),
-            ])->all();
+            ])->values()->all();
+        $modulePrices = $this->modulePriceMap($definitions->keys()->map(strval(...))->all());
         $customAmount = DB::table('maximus_company_subscription_prices')
             ->where('company_id', $companyId)
             ->value('custom_monthly_amount');
@@ -367,10 +413,25 @@ final class SubscriptionBillingController extends Controller
         return [
             'companyId' => $companyId,
             'companyName' => (string) ($company?->name ?? ''),
-            ...$this->pricing->calculate($activeIds, $customAmount),
+            ...$this->pricing->calculate($activeIds, $modulePrices, $customAmount),
             'paymentReady' => $this->diamanoPay->isConfigured(),
             'payments' => $payments,
         ];
+    }
+
+    private function modulePriceMap(array $moduleIds): array
+    {
+        if ($moduleIds === []) {
+            return [];
+        }
+
+        return DB::table('maximus_subscription_module_prices')
+            ->whereIn('module_id', $moduleIds)
+            ->get(['module_id', 'monthly_amount'])
+            ->mapWithKeys(static fn (object $row): array => [
+                (string) $row->module_id => $row->monthly_amount === null ? null : (int) $row->monthly_amount,
+            ])
+            ->all();
     }
 
     private function applyProviderStatus(string $paymentId, array $providerResponse): void

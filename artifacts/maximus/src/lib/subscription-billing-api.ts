@@ -12,20 +12,12 @@ export type SubscriptionPriceLine = {
   monthlyAmount: number | null;
 };
 
-export type AutomaticSubscriptionPlan = {
-  id: string;
-  name: string;
-  monthlyAmount: number;
-  moduleLimit: number;
-};
-
 export type SubscriptionPriceBreakdown = {
   modules: SubscriptionPriceLine[];
   moduleTotal: number | null;
   moduleTotalComplete: boolean;
-  autoPlan: AutomaticSubscriptionPlan;
   customAmount: number | null;
-  payableAmount: number;
+  payableAmount: number | null;
 };
 
 export type SubscriptionBillingCompany = SubscriptionPriceBreakdown & {
@@ -68,26 +60,6 @@ function nullableAmount(value: unknown, errorMessage: string): number | null {
   return value;
 }
 
-function parsePlan(value: unknown): AutomaticSubscriptionPlan {
-  const plan = record(value, 'Le forfait automatique est invalide.');
-  if (
-    typeof plan.id !== 'string'
-    || typeof plan.name !== 'string'
-    || typeof plan.monthlyAmount !== 'number'
-    || !Number.isSafeInteger(plan.monthlyAmount)
-    || typeof plan.moduleLimit !== 'number'
-    || !Number.isSafeInteger(plan.moduleLimit)
-  ) {
-    throw new Error('Le forfait automatique est incomplet.');
-  }
-  return {
-    id: plan.id,
-    name: plan.name,
-    monthlyAmount: plan.monthlyAmount,
-    moduleLimit: plan.moduleLimit,
-  };
-}
-
 function parseBreakdown(value: unknown): SubscriptionPriceBreakdown {
   const breakdown = record(value, 'Le détail des tarifs est invalide.');
   if (!Array.isArray(breakdown.modules) || typeof breakdown.moduleTotalComplete !== 'boolean') {
@@ -107,13 +79,11 @@ function parseBreakdown(value: unknown): SubscriptionPriceBreakdown {
   const moduleTotal = nullableAmount(breakdown.moduleTotal, 'Le total des modules est invalide.');
   const customAmount = nullableAmount(breakdown.customAmount, 'Le montant personnalisé est invalide.');
   const payableAmount = nullableAmount(breakdown.payableAmount, 'Le montant à payer est invalide.');
-  if (payableAmount === null) throw new Error('Le montant à payer est manquant.');
 
   return {
     modules,
     moduleTotal,
     moduleTotalComplete: breakdown.moduleTotalComplete,
-    autoPlan: parsePlan(breakdown.autoPlan),
     customAmount,
     payableAmount,
   };

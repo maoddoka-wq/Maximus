@@ -58,7 +58,6 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { parseClientPwaPath } from '@/lib/pwa';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
 import { ModulePackDraftForm } from '@/components/module-pack-draft-form';
-import { EcommerceSubscriptionManagement } from '@/components/ecommerce-subscription-management';
 import { SubscriptionPricingManagement } from '@/components/subscription-pricing-management';
 import {
   ActionButton,
@@ -5107,7 +5106,6 @@ function SubscriptionsPage({
       <div className="space-y-6">
         <MaximusWalletPanel formatAmount={formatAmount} />
         <SubscriptionPricingManagement />
-        <EcommerceSubscriptionManagement companies={data.companies} onRefresh={onRefresh} />
         <EmptyState
           title="Aucun abonnement enregistré"
           text="Les souscriptions apparaîtront ici avec leur plan, leur cycle de paiement et leurs factures."
@@ -5141,7 +5139,6 @@ function SubscriptionsPage({
 
       <MaximusWalletPanel formatAmount={formatAmount} />
       <SubscriptionPricingManagement />
-      <EcommerceSubscriptionManagement companies={data.companies} onRefresh={onRefresh} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[

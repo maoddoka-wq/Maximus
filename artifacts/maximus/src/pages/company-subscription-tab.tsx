@@ -164,61 +164,20 @@ export function CompanySubscriptionTab({ company }: { company: Company }) {
             <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Abonnement mensuel</p>
             <h2 className="mt-2 text-xl font-bold">Tarifs et paiement</h2>
             <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
-              Le montant automatique, le détail des modules et le prix personnalisé défini par MAXIMUS restent visibles.
+              Le montant mensuel défini pour votre entreprise et son paiement.
             </p>
           </div>
           <StatusBadge status={latestPayment?.status === 'PAID' ? 'PAYÉE' : latestPayment?.status === 'FAILED' ? 'IMPAYÉ' : latestPayment?.status === 'PENDING' ? 'EN ATTENTE' : billing.customAmount === null ? 'ACTIF' : 'PERSONNALISÉ'} />
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.24)] p-4">
-            <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Forfait automatique · {billing.autoPlan.name}</p>
-            <p className="mt-1 text-lg font-bold">{amountText(billing.autoPlan.monthlyAmount)} <span className="text-xs font-normal text-[hsl(var(--muted-foreground))]">/ mois</span></p>
-          </div>
-          <div className="rounded-xl border border-[hsl(var(--primary)/.28)] bg-[hsl(var(--primary)/.06)] p-4">
-            <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">
-              {billing.customAmount === null ? 'Montant mensuel à payer' : 'Prix personnalisé fixé par MAXIMUS'}
-            </p>
-            <p className="mt-1 text-lg font-bold text-[hsl(var(--primary))]">
-              {amountText(billing.payableAmount)} <span className="text-xs font-normal text-[hsl(var(--muted-foreground))]">/ mois</span>
-            </p>
-            {billing.customAmount !== null && (
-              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-                Le prix personnalisé remplace le forfait automatique pour le paiement.
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-bold">Détail des modules actifs</h3>
-              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Tarifs mensuels renseignés par MAXIMUS.</p>
-            </div>
-            <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{billing.modules.length} module(s)</span>
-          </div>
-          {billing.modules.length === 0 ? (
-            <p className="mt-3 rounded-lg border border-dashed border-[hsl(var(--border))] p-4 text-sm text-[hsl(var(--muted-foreground))]">
-              Aucun module actif n’est associé à cette entreprise.
-            </p>
-          ) : (
-            <div className="mt-3 divide-y divide-[hsl(var(--border))] rounded-xl border border-[hsl(var(--border))]">
-              {billing.modules.map(module => (
-                <div key={module.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                  <span className="font-medium">{module.name}</span>
-                  <span className="shrink-0 font-semibold">{amountText(module.monthlyAmount)} <span className="text-xs font-normal text-[hsl(var(--muted-foreground))]">/ mois</span></span>
-                </div>
-              ))}
-              <div className="flex items-center justify-between gap-3 bg-[hsl(var(--muted)/.24)] px-4 py-3 text-sm font-bold">
-                <span>Total des modules</span>
-                <span>{billing.moduleTotalComplete ? amountText(billing.moduleTotal) : 'Tarif incomplet'}</span>
-              </div>
-            </div>
-          )}
-          {!billing.moduleTotalComplete && billing.modules.length > 0 && (
-            <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
-              Le total des modules sera calculé après la définition des tarifs manquants; le forfait automatique reste affiché séparément.
+        <div className="mt-5 rounded-xl border border-[hsl(var(--primary)/.28)] bg-[hsl(var(--primary)/.06)] p-4">
+          <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Montant mensuel à payer</p>
+          <p className="mt-1 text-lg font-bold text-[hsl(var(--primary))]">
+            {amountText(billing.payableAmount)} <span className="text-xs font-normal text-[hsl(var(--muted-foreground))]">/ mois</span>
+          </p>
+          {billing.payableAmount === null && billing.modules.length > 0 && (
+            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+              Le montant sera disponible lorsque les tarifs des modules actifs auront été définis.
             </p>
           )}
         </div>
@@ -235,11 +194,11 @@ export function CompanySubscriptionTab({ company }: { company: Company }) {
             primary
             icon={CreditCard}
             testId="button-pay-subscription"
-            disabled={!billing.paymentReady || billing.payableAmount <= 0 || savingPayment}
+            disabled={!billing.paymentReady || billing.payableAmount === null || billing.payableAmount <= 0 || savingPayment}
             loading={savingPayment}
             onClick={startPayment}
           >
-            Payer {amountText(billing.payableAmount)}
+            Payer l’abonnement
           </ActionButton>
         </div>
       </section>

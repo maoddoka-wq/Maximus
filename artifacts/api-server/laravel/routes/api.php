@@ -164,6 +164,7 @@ Route::middleware('maximus.auth')->prefix('app-state')->group(function (): void 
 
 Route::middleware(['maximus.central', 'maximus.auth'])->prefix('platform-settings')->group(function (): void {
     Route::get('/subscription-billing', [SubscriptionBillingController::class, 'platformIndex']);
+    Route::put('/subscription-billing/modules/{moduleId}', [SubscriptionBillingController::class, 'updateModulePrice']);
     Route::put('/subscription-billing/companies/{companyId}', [SubscriptionBillingController::class, 'updateCompanyPrice']);
     Route::get('/ecommerce-subscriptions', [EcommerceSubscriptionController::class, 'index']);
     Route::put('/ecommerce-subscriptions/{companyId}', [EcommerceSubscriptionController::class, 'update']);

@@ -7,7 +7,7 @@ use PHPUnit\Framework\TestCase;
 
 class SubscriptionPricingTest extends TestCase
 {
-    public function test_module_total_and_automatic_plan_remain_visible_when_a_company_price_is_customized(): void
+    public function test_module_grid_total_is_used_unless_a_company_price_is_customized(): void
     {
         $result = (new SubscriptionPricing())->calculate(
             [
@@ -20,12 +20,21 @@ class SubscriptionPricingTest extends TestCase
 
         $this->assertSame(20000, $result['moduleTotal']);
         $this->assertTrue($result['moduleTotalComplete']);
-        $this->assertSame(45000, $result['autoPlan']['monthlyAmount']);
         $this->assertSame(27000, $result['customAmount']);
         $this->assertSame(27000, $result['payableAmount']);
+
+        $withoutOverride = (new SubscriptionPricing())->calculate(
+            [
+                ['id' => 'commerce', 'name' => 'Commerce'],
+                ['id' => 'stocks', 'name' => 'Stocks'],
+            ],
+            ['commerce' => 12000, 'stocks' => 8000],
+            null,
+        );
+        $this->assertSame(20000, $withoutOverride['payableAmount']);
     }
 
-    public function test_missing_module_prices_are_explicit_without_changing_the_automatic_plan(): void
+    public function test_missing_module_price_leaves_the_calculated_total_unavailable(): void
     {
         $result = (new SubscriptionPricing())->calculate(
             [
@@ -38,16 +47,22 @@ class SubscriptionPricingTest extends TestCase
 
         $this->assertNull($result['moduleTotal']);
         $this->assertFalse($result['moduleTotalComplete']);
-        $this->assertSame(45000, $result['payableAmount']);
+        $this->assertNull($result['payableAmount']);
         $this->assertNull($result['modules'][1]['monthlyAmount']);
     }
 
-    public function test_automatic_plan_uses_existing_module_count_thresholds(): void
+    public function test_custom_amount_can_be_used_while_a_module_price_is_missing(): void
     {
-        $pricing = new SubscriptionPricing();
+        $result = (new SubscriptionPricing())->calculate(
+            [
+                ['id' => 'commerce', 'name' => 'Commerce'],
+                ['id' => 'stocks', 'name' => 'Stocks'],
+            ],
+            ['commerce' => 12000],
+            18000,
+        );
 
-        $this->assertSame(45000, $pricing->calculate(array_fill(0, 4, ['id' => 'x']), [], null)['payableAmount']);
-        $this->assertSame(95000, $pricing->calculate(array_fill(0, 5, ['id' => 'x']), [], null)['payableAmount']);
-        $this->assertSame(185000, $pricing->calculate(array_fill(0, 9, ['id' => 'x']), [], null)['payableAmount']);
+        $this->assertNull($result['moduleTotal']);
+        $this->assertSame(18000, $result['payableAmount']);
     }
 }

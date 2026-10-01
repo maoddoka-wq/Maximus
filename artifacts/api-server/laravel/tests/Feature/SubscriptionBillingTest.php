@@ -15,7 +15,7 @@ class SubscriptionBillingTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_maximus_can_set_module_prices_and_a_company_specific_monthly_amount(): void
+    public function test_maximus_can_set_module_grid_prices_and_adjust_the_company_amount(): void
     {
         $company = $this->createCompany('subscription-price-acme');
         $admin = $this->createAdmin('subscription-price-admin');
@@ -30,6 +30,15 @@ class SubscriptionBillingTest extends TestCase
             ->assertOk()
             ->assertJsonPath('module.monthlyAmount', 18000);
 
+        $this->activateModule($company->id, 'stocks');
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $session)
+            ->putJson('/api/platform-settings/subscription-billing/modules/stocks', [
+                'monthlyAmount' => 8000,
+            ])
+            ->assertOk()
+            ->assertJsonPath('module.monthlyAmount', 8000);
+
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $session)
             ->putJson('/api/platform-settings/subscription-billing/companies/'.$company->id, [
@@ -43,8 +52,8 @@ class SubscriptionBillingTest extends TestCase
             ->getJson('/api/platform-settings/subscription-billing')
             ->assertOk()
             ->assertJsonFragment(['id' => 'commerce', 'monthlyAmount' => 18000])
-            ->assertJsonPath('companies.0.moduleTotal', 18000)
-            ->assertJsonPath('companies.0.autoPlan.monthlyAmount', 45000)
+            ->assertJsonFragment(['id' => 'stocks', 'monthlyAmount' => 8000])
+            ->assertJsonPath('companies.0.moduleTotal', 26000)
             ->assertJsonPath('companies.0.customAmount', 27000)
             ->assertJsonPath('companies.0.payableAmount', 27000);
 
@@ -53,6 +62,60 @@ class SubscriptionBillingTest extends TestCase
             'custom_monthly_amount' => 27000,
             'updated_by' => $admin->id,
         ]);
+    }
+
+    public function test_removed_catalog_modules_are_excluded_from_the_grid_and_company_total(): void
+    {
+        $company = $this->createCompany('subscription-removed-module');
+        $admin = $this->createAdmin('subscription-removed-module-admin');
+        $this->activateModule($company->id, 'commerce');
+        $this->activateModule($company->id, 'stocks');
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'company_id' => null,
+            'payload' => json_encode([
+                'removedModules' => ['commerce'],
+                'moduleStatuses' => [],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('maximus_subscription_module_prices')->insert([
+            [
+                'module_id' => 'commerce',
+                'monthly_amount' => 12000,
+                'updated_by' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'module_id' => 'stocks',
+                'monthly_amount' => 8000,
+                'updated_by' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $session = MaximusAuth::issueSession($admin);
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $session)
+            ->getJson('/api/platform-settings/subscription-billing')
+            ->assertOk()
+            ->assertJsonMissing(['id' => 'commerce'])
+            ->assertJsonFragment(['id' => 'stocks', 'monthlyAmount' => 8000]);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession(
+                $this->createCompanyAdmin('subscription-removed-module-company-admin', $company->id),
+            ))
+            ->getJson('/api/company-subscription')
+            ->assertOk()
+            ->assertJsonCount(1, 'modules')
+            ->assertJsonPath('modules.0.id', 'stocks')
+            ->assertJsonPath('moduleTotal', 8000)
+            ->assertJsonPath('payableAmount', 8000);
     }
 
     public function test_company_admin_sees_own_pricing_but_sector_manager_is_forbidden(): void
@@ -83,7 +146,6 @@ class SubscriptionBillingTest extends TestCase
             ->assertJsonPath('companyId', $company->id)
             ->assertJsonPath('modules.0.monthlyAmount', 15000)
             ->assertJsonPath('moduleTotal', 15000)
-            ->assertJsonPath('autoPlan.monthlyAmount', 45000)
             ->assertJsonPath('customAmount', 22000)
             ->assertJsonPath('payableAmount', 22000);
 
