@@ -590,57 +590,6 @@ test('plafonne les droits des rôles au choix de l’entreprise', () => {
   });
 });
 
-test('sélectionne les rubriques Stock depuis les permissions détaillées du rôle', () => {
-  const stockModule = modules.find(module => module.id === 'stocks')!;
-  const role: Role = {
-    id: 'role-stock-detail',
-    name: 'Gestionnaire Stock',
-    description: '',
-    companyId: 'company-stock-detail',
-    sectorId: 'unit-stock-detail',
-    modulePermissions: {
-      'stocks:entries': ['voir'],
-      'stocks:reports': ['voir'],
-    },
-  };
-
-  assert.deepEqual([...getSelectedFeatureIds(role, stockModule)], ['entries', 'reports']);
-});
-
-test('ignore les propriétés natives quand les permissions détaillées entreprise sont une liste vide', () => {
-  const company: Company = {
-    id: 'company-stock-entries',
-    name: 'Entreprise Stock',
-    manager: 'Admin',
-    email: 'admin@example.test',
-    phone: '',
-    country: 'Sénégal',
-    sector: 'Commerce',
-    status: 'ACTIF',
-    requestedModules: ['stocks'],
-    requestedModuleFeatures: { stocks: ['entries'] },
-    requestedModulePermissions: JSON.parse('{"stocks":[]}'),
-    allowedModules: ['stocks'],
-    refusedModules: [],
-    createdAt: '2026-01-01',
-  };
-  const role: Role = {
-    id: 'role-stock-entries',
-    name: 'Gestionnaire Stock',
-    description: '',
-    companyId: company.id,
-    sectorId: 'unit-stock',
-    modulePermissions: {
-      stocks: ['voir'],
-      'stocks:entries': ['voir'],
-    },
-  };
-
-  assert.deepEqual(restrictRoleToCompany(role, company)?.modulePermissions, {
-    'stocks:entries': ['voir'],
-  });
-});
-
 test('conserve les droits généraux créer et modifier quand le module les autorise', () => {
   const company: Company = {
     id: 'company-2',

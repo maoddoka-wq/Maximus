@@ -52,7 +52,6 @@ import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { TooltipProvider } from '@workspace/maximus-design-system/components/ui/tooltip';
 import { ActionButton as DesignSystemActionButton } from '@workspace/maximus-design-system/components/ui/action-button';
 import { Badge } from '@workspace/maximus-design-system/components/ui/badge';
-import { Button } from '@workspace/maximus-design-system/components/ui/button';
 import { Card } from '@workspace/maximus-design-system/components/ui/card';
 import { Checkbox } from '@workspace/maximus-design-system/components/ui/checkbox';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -167,40 +166,7 @@ import {
 const queryClient = new QueryClient();
 const companyLoginContextStorageKey = 'maximus-company-login-context';
 type DemoAccount = { id: string; label: string; email: string; password: string };
-const defaultDemoAccounts: DemoAccount[] = import.meta.env.DEV
-  ? [
-      {
-        id: 'maximus-admin',
-        label: 'Administrateur MAXIMUS',
-        email: 'maximus.demo@example.test',
-        password: 'MaximusLocal!2026',
-      },
-      {
-        id: 'ana-company-admin',
-        label: 'Administrateur entreprise ANA',
-        email: 'ana.demo@example.test',
-        password: 'DirectionANA!2026',
-      },
-      {
-        id: 'ana-direction-general',
-        label: 'Direction générale ANA · Awa Ndiaye',
-        email: 'awa.ndiaye@example.test',
-        password: 'AwaNdiaye!2026',
-      },
-      {
-        id: 'ana-manager',
-        label: 'Manager ANA · Gestion de stock',
-        email: 'manager.ana@example.test',
-        password: 'ManagerANA!2026',
-      },
-      {
-        id: 'ana-employee',
-        label: 'Employée ANA · Gestion de stock',
-        email: 'employee.ana@example.test',
-        password: 'EmployeANA!2026',
-      },
-    ]
-  : [];
+const defaultDemoAccounts: DemoAccount[] = [];
 
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
@@ -1248,6 +1214,9 @@ function AppContent() {
       </section>
     </div>;
   }
+  const loginEmployees = [
+    ...data.employees,
+  ];
   if (location === '/' || !session) {
     if (installationProfile?.companyOnly && installationProfile.company) {
       return <CompanyLoginPage installationCompany={installationProfile.company} onAuthenticated={applyAuthenticatedUser} />;
@@ -1255,6 +1224,7 @@ function AppContent() {
     return (
       <Login
         onLogin={login}
+        employees={loginEmployees}
         registrationEnabled={intelligentRegistrationEnabled}
         installationProfile={installationProfile}
       />
@@ -1531,14 +1501,16 @@ function AppContent() {
 
 function Login({
   onLogin,
+  employees,
   registrationEnabled,
   installationProfile,
 }: {
   onLogin: (space: 'admin' | 'company', email: string, password: string) => Promise<void>;
+  employees: StoreData['employees'];
   registrationEnabled: boolean;
   installationProfile: InstallationProfile | null;
 }) {
-  const showDemoAccounts = import.meta.env.DEV && !installationProfile?.companyOnly;
+  const showDemoAccounts = false;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -1553,7 +1525,24 @@ function Login({
       .finally(() => setPendingEmail(''));
   };
   const submitLogin = (space: 'admin' | 'company') => loginWithCredentials(space, email, password);
-  const demoAccounts = showDemoAccounts ? defaultDemoAccounts : [];
+  const demoAccounts = showDemoAccounts
+    ? [
+        ...defaultDemoAccounts,
+        ...employees
+          .filter(
+            (account) =>
+              account.status === 'ACTIF' &&
+              Boolean(account.loginPassword) &&
+              !defaultDemoAccounts.some((demoAccount) => demoAccount.email === account.email.toLowerCase()),
+          )
+          .map((account) => ({
+            id: account.id,
+            label: `${account.firstName} ${account.lastName} · ${account.position}`,
+            email: account.email,
+            password: account.loginPassword ?? '',
+          })),
+      ]
+    : [];
   const selectDemoAccount = (account: (typeof demoAccounts)[number]) => {
     setEmail(account.email);
     setPassword(account.password);
@@ -1678,28 +1667,25 @@ function Login({
               <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">
                 Les accès ci-dessous sont prêts à l’emploi. Cliquez sur un compte pour vous connecter directement.
               </p>
-                <div className="mt-3 grid gap-2">
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {demoAccounts.map((account) => (
-                    <Button
+                  <button
                     type="button"
-                      variant="outline"
-                      size="lg"
                     disabled={Boolean(pendingEmail)}
                     data-testid={`button-demo-account-${account.id}`}
                     key={account.id}
                     onClick={() => selectDemoAccount(account)}
-                      className={`h-auto min-h-14 w-full justify-between rounded-xl px-4 py-3 text-left ${email === account.email ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'bg-[hsl(var(--background))]'}`}
+                    className={`rounded-lg border px-3 py-2 text-left transition hover:border-[hsl(var(--primary)/.55)] hover:bg-[hsl(var(--primary)/.06)] disabled:cursor-wait disabled:opacity-60 ${email === account.email ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''}`}
                   >
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-left text-sm font-semibold text-[hsl(var(--foreground))]">
-                          {pendingEmail === account.email ? 'Ouverture en cours…' : account.label}
-                        </span>
-                        <span className="mt-0.5 block truncate text-left text-xs font-normal text-[hsl(var(--muted-foreground))]">
-                          {account.email}
-                        </span>
-                      </span>
-                      <LogIn aria-hidden="true" size={16} />
-                    </Button>
+                    <span className="block text-xs font-bold">{account.label}</span>
+                    <span className="mt-0.5 block text-[11px] text-[hsl(var(--muted-foreground))]">{account.email}</span>
+                    <span
+                      data-testid={`demo-account-password-${account.id}`}
+                      className="mt-1 block text-[10px] font-semibold text-[hsl(var(--primary))]"
+                    >
+                      Mot de passe : {account.password}
+                    </span>
+                  </button>
                 ))}
               </div>
             </div>
@@ -2845,23 +2831,9 @@ function CompanyEditModal({
   );
 }
 
-export function AdminDashboard({
-  data,
-  onNavigate,
-  preview = false,
-}: {
-  data: StoreData;
-  onNavigate: (path: string) => void;
-  preview?: boolean;
-}) {
-  const [pendingRequests, setPendingRequests] = useState<number | null>(
-    preview ? data.companies.filter((company) => company.status === 'EN ATTENTE').length : null,
-  );
+function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (path: string) => void }) {
+  const [pendingRequests, setPendingRequests] = useState<number | null>(null);
   const refreshPendingRequests = async () => {
-    if (preview) {
-      setPendingRequests(data.companies.filter((company) => company.status === 'EN ATTENTE').length);
-      return;
-    }
     try {
       const result = await companyRequestApi.list();
       setPendingRequests(result.requests.length);
@@ -2870,13 +2842,10 @@ export function AdminDashboard({
     }
   };
   useEffect(() => {
-    if (!preview) void refreshPendingRequests();
-  }, [preview]);
-  useAutoRefresh(refreshPendingRequests, { enabled: !preview });
+    void refreshPendingRequests();
+  }, []);
+  useAutoRefresh(refreshPendingRequests);
   const pending = pendingRequests ?? data.companies.filter((c) => c.status === 'EN ATTENTE').length;
-  const activeModules = getConfiguredModules(data).filter((module) =>
-    !['INACTIF', 'MAINTENANCE'].includes(data.moduleStatuses?.[module.id] ?? module.status),
-  ).length;
   return (
     <div className="space-y-6">
       <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
@@ -2893,7 +2862,7 @@ export function AdminDashboard({
           detail="requiert votre attention"
           icon={FileClock}
         />
-        <Metric label="Modules activés" value={String(activeModules).padStart(2, '0')} detail="dans le catalogue MAXIMUS" icon={LayoutGrid} />
+        <Metric label="Modules activés" value="05" detail="sur 05 disponibles" icon={LayoutGrid} />
       </div>
       <div className="grid gap-6 lg:grid-cols-[1.25fr_.75fr]">
         <section className="card-surface overflow-hidden rounded-2xl">
@@ -2969,7 +2938,7 @@ export function AdminDashboard({
     </div>
   );
 }
-export function RoleAwareCompanyDashboard({
+function RoleAwareCompanyDashboard({
   data,
   onNavigate,
   allowed,
@@ -7927,25 +7896,17 @@ function HumanResourcesWorkspace({
   return <RHPage data={data} companyId={companyId} />;
 }
 
-export function AppRuntimeProviders({ children }: { children: ReactNode }) {
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ConfirmDialogProvider>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-            {children}
+            <AppContent />
           </WouterRouter>
         </TooltipProvider>
       </ConfirmDialogProvider>
     </QueryClientProvider>
-  );
-}
-
-function App() {
-  return (
-    <AppRuntimeProviders>
-      <AppContent />
-    </AppRuntimeProviders>
   );
 }
 

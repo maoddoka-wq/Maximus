@@ -115,23 +115,10 @@ export function restrictRoleToCompany(role: Role | null | undefined, company: Co
   const enabledModules = new Set(company.allowedModules.length ? company.allowedModules : company.requestedModules);
   const hasFeatureLimit = (moduleId: ModuleId) => Object.prototype.hasOwnProperty.call(requestedFeatures ?? {}, moduleId);
   const featureIds = (moduleId: ModuleId) => new Set(requestedFeatures?.[moduleId] ?? []);
-  const featurePermissions = (moduleId: ModuleId, featureId: string) => {
-    const modulePermissions = requestedPermissions?.[moduleId];
-    if (!modulePermissions || typeof modulePermissions !== 'object' || Array.isArray(modulePermissions)) {
-      return ['voir'];
-    }
-
-    const legacyFeatureId = featureId.replace(`${moduleId}:menu:`, '');
-    for (const key of new Set([featureId, legacyFeatureId])) {
-      if (!Object.prototype.hasOwnProperty.call(modulePermissions, key)) continue;
-      const permissions = modulePermissions[key];
-      if (permissions !== null && permissions !== undefined) {
-        return Array.isArray(permissions) ? permissions : [];
-      }
-    }
-
-    return ['voir'];
-  };
+  const featurePermissions = (moduleId: ModuleId, featureId: string) =>
+    requestedPermissions?.[moduleId]?.[featureId]
+    ?? requestedPermissions?.[moduleId]?.[featureId.replace(`${moduleId}:menu:`, '')]
+    ?? ['voir'];
 
   const boundedEntries: [string, string[]][] = [];
   Object.entries(role.modulePermissions).forEach(([key, permissions]) => {
@@ -504,11 +491,7 @@ export function getSelectedFeatureIds(
     return packFeatureIds;
   }
   const permissionKeyFor = (featureId: string) =>
-    module.id === 'presences'
-      ? `presence.${featureId}`
-      : module.id === 'stocks'
-        ? `stocks:${featureId}`
-        : permissionFeatureKey(module.id, featureId);
+    module.id === 'presences' ? `presence.${featureId}` : permissionFeatureKey(module.id, featureId);
   const hasDetailedPermissions = featureIds.some(featureId => permissionKeyFor(featureId) in role.modulePermissions);
 
   if (module.id === 'presences' && !hasDetailedPermissions) {

@@ -15,7 +15,6 @@ export interface StockProduct {
   unit: string;
   purchasePrice: number;
   salePrice: number;
-  priceDataMissing?: boolean;
   minStock: number;
   maxStock: number;
   supplierId: string | null;
@@ -39,26 +38,7 @@ export interface StockMovement { id: string; companyId: string; productId: strin
 export interface StockRequest { id: string; companyId: string; productId: string; warehouseId: string; quantity: number; reason: string; status: 'EN ATTENTE' | 'APPROUVÉE' | 'REJETÉE'; createdBy: string; createdAt: string; updatedAt: string; }
 export interface StockInventory { id: string; companyId: string; warehouseId: string; status: string; inventoryDate: string; notes: string; createdBy: string; validatedAt: string | null; }
 export interface StockInventoryLine { id: string; inventoryId: string; productId: string; theoreticalQuantity: number; actualQuantity: number; difference: number; }
-export interface StockProductLookup { id: string; name: string; sku?: string; unit?: string; supplierId?: string | null; archived: boolean; }
-export interface StockWarehouseLookup { id: string; name: string; archived: boolean; }
-export interface StockSupplierLookup { id: string; name: string; archived: boolean; }
-export interface StockReportProduct { id: string; name: string; sku: string; category: string; minStock: number; archived: boolean; }
-export interface StockReportWarehouse { id: string; name: string; manager: string; archived: boolean; }
-export interface StockReportBalance { productId: string; warehouseId: string; quantity: number; }
-export interface StockReportMovement { productId: string; productName: string | null; warehouseId: string; warehouseName: string | null; type: StockMovementType; quantity: number; reason: string; movementDate: string; reference: string; userName: string; }
-export interface StockDashboardSummary {
-  totalQuantity: number; activeProducts: number; outOfStock: number; lowStock: number; stockValue: number; stockValueMissing: boolean;
-  entries: number; exits: number; transfers: number; losses: number;
-  recentMovements: { type: StockMovementType; quantity: number; movementDate: string }[];
-  warehouses: { name: string; quantity: number }[];
-}
-export interface StockBootstrap {
-  products: StockProduct[]; warehouses: StockWarehouse[]; locations: StockLocation[]; suppliers: StockSupplier[]; balances: StockBalance[];
-  movements: StockMovement[]; requests: StockRequest[]; inventories: StockInventory[]; inventoryLines: StockInventoryLine[];
-  productLookups: StockProductLookup[]; warehouseLookups: StockWarehouseLookup[]; supplierLookups: StockSupplierLookup[];
-  reportProducts: StockReportProduct[]; reportWarehouses: StockReportWarehouse[]; reportBalances: StockReportBalance[]; reportMovements: StockReportMovement[];
-  dashboardSummary: StockDashboardSummary;
-}
+export interface StockBootstrap { products: StockProduct[]; warehouses: StockWarehouse[]; locations: StockLocation[]; suppliers: StockSupplier[]; balances: StockBalance[]; movements: StockMovement[]; requests: StockRequest[]; inventories: StockInventory[]; inventoryLines: StockInventoryLine[]; }
 export type StockBootstrapScope = 'all' | 'core' | 'operations' | 'inventory';
 
 type StockProductInput = Omit<StockProduct, 'id' | 'companyId' | 'archived'> & { imageFile?: File | null };

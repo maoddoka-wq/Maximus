@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Http;
 class TransportMobileReleaseController extends Controller
 {
     private const APK_ASSET_NAME = 'maximus-chauffeur.apk';
-
     private const APK_MAX_BYTES = 157286400;
 
     public function latest(Request $request): JsonResponse
@@ -77,7 +76,6 @@ class TransportMobileReleaseController extends Controller
 
             if (! $download->successful() || filesize($temporaryPath) < 1 || filesize($temporaryPath) > self::APK_MAX_BYTES) {
                 @unlink($temporaryPath);
-
                 return response()->json(['error' => 'GitHub n’a pas fourni un APK valide.'], 502);
             }
 

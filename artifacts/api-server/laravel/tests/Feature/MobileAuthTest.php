@@ -129,15 +129,6 @@ class MobileAuthTest extends TestCase
                         'size' => 4096,
                     ]],
                 ],
-                [
-                    'tag_name' => 'chauffeur-v1.0.100',
-                    'draft' => true,
-                    'assets' => [[
-                        'name' => 'maximus-chauffeur.apk',
-                        'url' => 'https://api.github.com/repos/maoddoka-wq/Maximus/releases/assets/1100',
-                        'size' => 8192,
-                    ]],
-                ],
             ]),
         ]);
         $this->getJson('/api/transport/mobile/releases/latest', $headers)

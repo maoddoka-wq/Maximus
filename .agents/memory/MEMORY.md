@@ -1,5 +1,6 @@
 - [GPS et annulation Taxi publics](public-taxi-gps-cancellation.md) — agréger plusieurs relevés GPS et annuler avec un jeton chiffré lié à la course, jamais avec le seul identifiant.
 - [Isolation des releases APK Chauffeur](chauffeur-release-isolation.md) — repartir du dernier APK publié si la branche de travail contient des changements GPS non approuvés.
+- [Ordre des releases Chauffeur](chauffeur-release-order.md) — sélectionner la release stable au numéro sémantique maximal, jamais le premier résultat GitHub.
 - [Sérialisation GPS Chauffeur](chauffeur-gps-lifecycle.md) — GPS au premier plan, disponibilité mise en pause à l’arrière-plan, consentement conservé à la suspension.
 - [Navigation Gestion de stock](stock-navigation.md) — reprendre exactement les dix rubriques de la référence, dans une barre horizontale et sans rubrique supplémentaire.
 - [Champs vides des mouvements Stock](stock-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel les convertit en null alors que référence et commentaire sont non nullables.
@@ -8,7 +9,7 @@
 - [Persistance des présences](presence-storage.md) — les workflows Présences sont stockés dans PostgreSQL via des éléments typés, payload extensible et historique.
 - [Pointage par QR code](presence-qr-clock.md) — le gérant affiche le QR du jour ; chaque employé scanne avec son propre compte pour enregistrer arrivée puis sortie.
 - [Montage du scanner caméra](presence-camera-portal.md) — relier le démarrage au nœud vidéo monté; un portail Radix conditionnel peut sinon laisser le scanner bloqué.
-- [Parcours Organisation](organization-workflow.md) — distinguer le compte administrateur entreprise des employés Direction générale; créer unités, rôles et comptes selon leurs périmètres.
+- [Parcours Organisation](organization-workflow.md) — construire la hiérarchie, configurer les rôles, puis créer les employés et désigner les managers.
 - [Validation des vues authentifiées](authenticated-preview.md) — pour contrôler les écrans connectés, conserver une session locale via le navigateur CDP avant les captures.
 - [Frontière des données Commerce](commerce-data-boundary.md) — les workflows Commerce doivent synchroniser explicitement l’état local entreprise et le StoreData partagé lorsqu’ils touchent au stock.
 - [Routage avec paramètres](query-routing.md) — les routeurs d’espace doivent comparer le chemin sans query string, car les onglets internes modifient l’URL courante.

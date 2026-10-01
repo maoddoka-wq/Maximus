@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -30,133 +29,30 @@ class StockController extends Controller
         $includeCore = in_array($scope, ['all', 'core'], true);
         $includeOperations = in_array($scope, ['all', 'operations'], true);
         $includeInventory = in_array($scope, ['all', 'inventory'], true);
-        $actor = $request->attributes->get('authActor');
-        $isAdministrator = is_array($actor) && in_array($actor['role'] ?? null, ['company_admin', 'maximus_admin'], true);
+
+        $inventories = $includeInventory
+            ? $where('stock_inventories')->orderByDesc('inventory_date')->get()
+            : collect();
+        $inventoryIds = $inventories->pluck('id')->all();
+        $lines = $inventoryIds
+            ? DB::table('stock_inventory_lines')->whereIn('inventory_id', $inventoryIds)->get()
+            : collect();
+
         $payload = [];
-
         if ($includeCore) {
-            $canViewProducts = $this->allowed($request, 'view', 'products');
-            $canViewReferences = $this->allowed($request, 'view', 'references');
-            $canViewDashboard = $this->allowed($request, 'view', 'dashboard');
-
-            $payload['products'] = $canViewProducts
-                ? $where('stock_products')->orderBy('name')->get()->map(fn ($row) => $this->product($row))->values()
-                : collect();
-            $payload['warehouses'] = $canViewReferences
-                ? $where('stock_warehouses')->orderBy('name')->get()->map(fn ($row) => $this->warehouse($row))->values()
-                : collect();
-            $payload['locations'] = $canViewReferences
-                ? $where('stock_locations')->orderBy('name')->get()->map(fn ($row) => $this->location($row))->values()
-                : collect();
-            $payload['suppliers'] = $canViewReferences
-                ? $where('stock_suppliers')->orderBy('name')->get()->map(fn ($row) => $this->supplier($row))->values()
-                : collect();
-            $payload['balances'] = $canViewProducts
-                ? $where('stock_balances')->get()->map(fn ($row) => $this->balance($row))->values()
-                : collect();
-            $payload['dashboardSummary'] = $canViewDashboard
-                ? $this->dashboardSummary($companyId, $canViewProducts, $canViewReferences)
-                : $this->emptyDashboardSummary();
+            $payload['products'] = $where('stock_products')->orderBy('name')->get()->map(fn ($row) => $this->product($row))->values();
+            $payload['warehouses'] = $where('stock_warehouses')->orderBy('name')->get()->map(fn ($row) => $this->warehouse($row))->values();
+            $payload['locations'] = $where('stock_locations')->orderBy('name')->get()->map(fn ($row) => $this->location($row))->values();
+            $payload['suppliers'] = $where('stock_suppliers')->orderBy('name')->get()->map(fn ($row) => $this->supplier($row))->values();
+            $payload['balances'] = $where('stock_balances')->get()->map(fn ($row) => $this->balance($row))->values();
         }
-
         if ($includeOperations) {
-            $canViewEntries = $this->allowed($request, 'view', 'entries');
-            $canViewExits = $this->allowed($request, 'view', 'exits');
-            $canViewRequests = $this->allowed($request, 'view', 'requests');
-            $canViewReports = $this->allowed($request, 'view', 'reports');
-
-            $payload['movements'] = $this->operationalMovements($where('stock_movements'), $canViewEntries, $canViewExits, $isAdministrator);
-            $payload['requests'] = $canViewRequests
-                ? $where('stock_requests')->orderByDesc('created_at')->get()->map(fn ($row) => $this->requestRow($row))->values()
-                : collect();
-
-            $canUseOperationalLookups = $canViewEntries || $canViewExits || $canViewRequests;
-            $needsMovementLookups = $canViewEntries || $canViewExits;
-            $productLookupFields = $needsMovementLookups
-                ? ['id', 'name', 'sku', 'unit', 'supplier_id', 'archived']
-                : ['id', 'name', 'archived'];
-            $payload['products'] = $this->allowed($request, 'view', 'products')
-                ? $where('stock_products')->orderBy('name')->get()->map(fn ($row) => $this->product($row))->values()
-                : ($canUseOperationalLookups
-                    ? $where('stock_products')->orderBy('name')->get($productLookupFields)->map(fn ($row) => $this->productLookup($row, $needsMovementLookups))->values()
-                    : collect());
-            $payload['warehouses'] = $this->allowed($request, 'view', 'references')
-                ? $where('stock_warehouses')->orderBy('name')->get()->map(fn ($row) => $this->warehouse($row))->values()
-                : ($canUseOperationalLookups
-                    ? $where('stock_warehouses')->orderBy('name')->get(['id', 'name', 'archived'])->map(fn ($row) => $this->warehouseLookup($row))->values()
-                    : collect());
-            $payload['suppliers'] = $this->allowed($request, 'view', 'references')
-                ? $where('stock_suppliers')->orderBy('name')->get()->map(fn ($row) => $this->supplier($row))->values()
-                : ($canUseOperationalLookups
-                    ? $where('stock_suppliers')->orderBy('name')->get(['id', 'name', 'archived'])->map(fn ($row) => $this->supplierLookup($row))->values()
-                    : collect());
-            $payload['productLookups'] = $canUseOperationalLookups
-                ? $where('stock_products')->orderBy('name')->get($productLookupFields)->map(fn ($row) => $this->productLookup($row, $needsMovementLookups))->values()
-                : collect();
-            $payload['warehouseLookups'] = $canUseOperationalLookups
-                ? $where('stock_warehouses')->orderBy('name')->get(['id', 'name', 'archived'])->map(fn ($row) => $this->warehouseLookup($row))->values()
-                : collect();
-            $payload['supplierLookups'] = $needsMovementLookups
-                ? $where('stock_suppliers')->orderBy('name')->get(['id', 'name', 'archived'])->map(fn ($row) => $this->supplierLookup($row))->values()
-                : collect();
-
-            $payload['reportMovements'] = $canViewReports
-                ? $this->reportMovements(DB::table('stock_movements')->where('stock_movements.company_id', $companyId))
-                : collect();
-            $payload['reportProducts'] = $canViewReports
-                ? $where('stock_products')->orderBy('name')->get(['id', 'name', 'sku', 'category', 'min_stock', 'archived'])->map(fn ($row) => $this->reportProduct($row))->values()
-                : collect();
-            $payload['reportWarehouses'] = $canViewReports
-                ? $where('stock_warehouses')->orderBy('name')->get(['id', 'name', 'manager', 'archived'])->map(fn ($row) => $this->reportWarehouse($row))->values()
-                : collect();
-            $payload['reportBalances'] = $canViewReports
-                ? $where('stock_balances')->get(['product_id', 'warehouse_id', 'quantity'])->map(fn ($row) => [
-                    'productId' => $row->product_id,
-                    'warehouseId' => $row->warehouse_id,
-                    'quantity' => $row->quantity,
-                ])->values()
-                : collect();
+            $payload['movements'] = $where('stock_movements')->orderByDesc('movement_date')->limit(250)->get()->map(fn ($row) => $this->movement($row))->values();
+            $payload['requests'] = $where('stock_requests')->orderByDesc('created_at')->get()->map(fn ($row) => $this->requestRow($row))->values();
         }
-
         if ($includeInventory) {
-            $canViewInventory = $this->allowed($request, 'view', 'inventory');
-            $inventories = $canViewInventory
-                ? $where('stock_inventories')->orderByDesc('inventory_date')->get()
-                : collect();
-            $inventoryIds = $inventories->pluck('id')->all();
-            $lines = $inventoryIds
-                ? DB::table('stock_inventory_lines')->whereIn('inventory_id', $inventoryIds)->get()
-                : collect();
-
             $payload['inventories'] = $inventories->map(fn ($row) => $this->inventory($row))->values();
             $payload['inventoryLines'] = $lines->map(fn ($row) => $this->inventoryLine($row))->values();
-            $payload['products'] = $this->allowed($request, 'view', 'products')
-                ? $where('stock_products')->orderBy('name')->get()->map(fn ($row) => $this->product($row))->values()
-                : ($canViewInventory
-                    ? $where('stock_products')->orderBy('name')->get(['id', 'name', 'archived'])->map(fn ($row) => $this->productLookup($row, false))->values()
-                    : collect());
-            $payload['warehouses'] = $this->allowed($request, 'view', 'references')
-                ? $where('stock_warehouses')->orderBy('name')->get()->map(fn ($row) => $this->warehouse($row))->values()
-                : ($canViewInventory
-                    ? $where('stock_warehouses')->orderBy('name')->get(['id', 'name', 'archived'])->map(fn ($row) => $this->warehouseLookup($row))->values()
-                    : collect());
-            $payload['productLookups'] = $payload['products'];
-            $payload['warehouseLookups'] = $payload['warehouses'];
-            $payload['supplierLookups'] = collect();
-            $canViewProducts = $this->allowed($request, 'view', 'products');
-            $payload['balances'] = $canViewProducts
-                ? $where('stock_balances')->get()->map(fn ($row) => $this->balance($row))->values()
-                : ($canViewInventory
-                    ? $where('stock_balances')->get(['product_id', 'warehouse_id', 'location_id', 'quantity'])->map(fn ($row) => [
-                        'productId' => $row->product_id,
-                        'warehouseId' => $row->warehouse_id,
-                        'locationId' => $row->location_id,
-                        'quantity' => $row->quantity,
-                    ])->values()
-                    : collect());
-            $payload['suppliers'] = $this->allowed($request, 'view', 'references')
-                ? $where('stock_suppliers')->orderBy('name')->get()->map(fn ($row) => $this->supplier($row))->values()
-                : collect();
         }
 
         return response()->json($payload);
@@ -806,191 +702,6 @@ class StockController extends Controller
         return is_array($actor) && ModuleAuthorization::allows($actor, 'stocks', $action, $feature);
     }
 
-    private function operationalMovements($query, bool $canViewEntries, bool $canViewExits, bool $isAdministrator): Collection
-    {
-        $entryTypes = ['ENTRÉE', 'ACHAT', 'AJUSTEMENT+', 'RETOUR CLIENT'];
-        $exitTypes = ['SORTIE', 'VENTE', 'AJUSTEMENT-', 'PERTE', 'RETOUR FOURNISSEUR'];
-        $visibleTypes = [
-            ...($canViewEntries ? $entryTypes : []),
-            ...($canViewExits ? $exitTypes : []),
-            ...($canViewEntries && $canViewExits ? ['TRANSFERT'] : []),
-        ];
-        if ($visibleTypes === []) {
-            return collect();
-        }
-
-        return $query->whereIn('type', $visibleTypes)
-            ->orderByDesc('movement_date')
-            ->limit(250)
-            ->get()
-            ->map(fn ($row) => $isAdministrator
-                ? $this->movement($row)
-                : $this->movementForFeature($row, in_array($row->type, $exitTypes, true) ? 'exits' : 'entries'))
-            ->values();
-    }
-
-    private function reportMovements($query): Collection
-    {
-        return $query->leftJoin('stock_products', function ($join): void {
-            $join->on('stock_products.id', '=', 'stock_movements.product_id')
-                ->on('stock_products.company_id', '=', 'stock_movements.company_id');
-        })->leftJoin('stock_warehouses', function ($join): void {
-            $join->on('stock_warehouses.id', '=', 'stock_movements.warehouse_id')
-                ->on('stock_warehouses.company_id', '=', 'stock_movements.company_id');
-        })->orderByDesc('stock_movements.movement_date')
-            ->limit(250)
-            ->get([
-                'stock_movements.product_id',
-                'stock_movements.warehouse_id',
-                'stock_movements.type',
-                'stock_movements.quantity',
-                'stock_movements.reason',
-                'stock_movements.movement_date',
-                'stock_movements.reference',
-                'stock_movements.user_name',
-                'stock_products.name as product_name',
-                'stock_warehouses.name as warehouse_name',
-            ])
-            ->map(fn ($row) => [
-                'productId' => $row->product_id,
-                'productName' => $row->product_name,
-                'warehouseId' => $row->warehouse_id,
-                'warehouseName' => $row->warehouse_name,
-                'type' => $row->type,
-                'quantity' => $row->quantity,
-                'reason' => $row->reason,
-                'movementDate' => $this->date($row->movement_date),
-                'reference' => $row->reference,
-                'userName' => $row->user_name,
-            ])->values();
-    }
-
-    private function dashboardSummary(string $companyId, bool $canViewProducts, bool $canViewReferences): array
-    {
-        $products = DB::table('stock_products')->where('company_id', $companyId)->where('archived', false)->get([
-            'id', 'min_stock', 'max_stock', 'purchase_price', 'sale_price', 'description',
-        ]);
-        $balances = DB::table('stock_balances')->where('company_id', $companyId)->get(['product_id', 'warehouse_id', 'quantity']);
-        $quantities = $balances->groupBy('product_id')->map(fn ($items) => (int) $items->sum('quantity'));
-        $byWarehouse = $balances->groupBy('warehouse_id')->map(fn ($items) => (int) $items->sum('quantity'));
-        $lowStock = 0;
-        $outOfStock = 0;
-        $stockValue = 0;
-        $stockValueMissing = false;
-        foreach ($products as $product) {
-            $quantity = $quantities->get($product->id, 0);
-            if ($quantity <= 0) {
-                $outOfStock++;
-            } elseif ($quantity <= $product->min_stock) {
-                $lowStock++;
-            }
-            $stockValue += $quantity * $product->purchase_price;
-            $stockValueMissing = $stockValueMissing || (
-                (float) $product->purchase_price === 0.0
-                && (float) $product->sale_price === 0.0
-                && preg_match('/\bprix\b.*\bnon renseign/iu', (string) $product->description) === 1
-                && $quantity > 0
-            );
-        }
-        $movementTotals = DB::table('stock_movements')->where('company_id', $companyId)
-            ->selectRaw("SUM(CASE WHEN type IN ('ENTRÉE', 'ACHAT', 'RETOUR CLIENT', 'AJUSTEMENT+') THEN quantity ELSE 0 END) as entries")
-            ->selectRaw("SUM(CASE WHEN type IN ('SORTIE', 'VENTE', 'AJUSTEMENT-', 'PERTE', 'RETOUR FOURNISSEUR') THEN quantity ELSE 0 END) as exits")
-            ->selectRaw("SUM(CASE WHEN type = 'TRANSFERT' THEN 1 ELSE 0 END) as transfers")
-            ->selectRaw("SUM(CASE WHEN type = 'PERTE' THEN quantity ELSE 0 END) as losses")
-            ->first();
-        $recentMovements = DB::table('stock_movements')->where('company_id', $companyId)
-            ->orderByDesc('movement_date')->limit(6)->get(['type', 'quantity', 'movement_date'])
-            ->map(fn ($row) => [
-                'type' => $row->type,
-                'quantity' => (int) $row->quantity,
-                'movementDate' => $this->date($row->movement_date),
-            ])->values();
-        $warehouseTotals = $canViewReferences && $canViewProducts
-            ? DB::table('stock_warehouses')->where('company_id', $companyId)->where('archived', false)
-                ->get(['id', 'name'])->map(fn ($warehouse) => [
-                    'name' => $warehouse->name,
-                    'quantity' => $byWarehouse->get($warehouse->id, 0),
-                ])->values()
-            : collect();
-
-        return [
-            'totalQuantity' => (int) $balances->sum('quantity'),
-            'activeProducts' => $canViewProducts ? $products->count() : 0,
-            'outOfStock' => $canViewProducts ? $outOfStock : 0,
-            'lowStock' => $canViewProducts ? $lowStock : 0,
-            'stockValue' => $canViewProducts ? $stockValue : 0,
-            'stockValueMissing' => $canViewProducts && $stockValueMissing,
-            'entries' => (int) ($movementTotals->entries ?? 0),
-            'exits' => (int) ($movementTotals->exits ?? 0),
-            'transfers' => (int) ($movementTotals->transfers ?? 0),
-            'losses' => (int) ($movementTotals->losses ?? 0),
-            'recentMovements' => $recentMovements,
-            'warehouses' => $warehouseTotals,
-        ];
-    }
-
-    private function emptyDashboardSummary(): array
-    {
-        return [
-            'totalQuantity' => 0,
-            'activeProducts' => 0,
-            'outOfStock' => 0,
-            'lowStock' => 0,
-            'stockValue' => 0,
-            'stockValueMissing' => false,
-            'entries' => 0,
-            'exits' => 0,
-            'transfers' => 0,
-            'losses' => 0,
-            'recentMovements' => [],
-            'warehouses' => [],
-        ];
-    }
-
-    private function productLookup(object $r, bool $forMovements): array
-    {
-        $lookup = ['id' => $r->id, 'name' => $r->name, 'archived' => (bool) $r->archived];
-        if ($forMovements) {
-            $lookup['sku'] = $r->sku;
-            $lookup['unit'] = $r->unit;
-            $lookup['supplierId'] = $r->supplier_id;
-        }
-
-        return $lookup;
-    }
-
-    private function warehouseLookup(object $r): array
-    {
-        return ['id' => $r->id, 'name' => $r->name, 'archived' => (bool) $r->archived];
-    }
-
-    private function supplierLookup(object $r): array
-    {
-        return ['id' => $r->id, 'name' => $r->name, 'archived' => (bool) $r->archived];
-    }
-
-    private function reportProduct(object $r): array
-    {
-        return ['id' => $r->id, 'name' => $r->name, 'sku' => $r->sku, 'category' => $r->category, 'minStock' => $r->min_stock, 'archived' => (bool) $r->archived];
-    }
-
-    private function reportWarehouse(object $r): array
-    {
-        return ['id' => $r->id, 'name' => $r->name, 'manager' => $r->manager, 'archived' => (bool) $r->archived];
-    }
-
-    private function movementForFeature(object $r, string $feature): array
-    {
-        $movement = $this->movement($r);
-        if ($feature === 'entries') {
-            unset($movement['requesterService'], $movement['beneficiary']);
-        } else {
-            unset($movement['supplierId'], $movement['purchasePrice']);
-        }
-
-        return $movement;
-    }
-
     private function forbidden(): JsonResponse
     {
         return response()->json(['error' => 'Permission Stock insuffisante.'], 403);
@@ -998,33 +709,7 @@ class StockController extends Controller
 
     private function product(object $r): array
     {
-        $description = (string) ($r->description ?? '');
-        $priceDataMissing = (float) $r->purchase_price === 0.0
-            && (float) $r->sale_price === 0.0
-            && preg_match('/\bprix\b.*\bnon renseign/iu', $description) === 1;
-
-        return [
-            'id' => $r->id,
-            'companyId' => $r->company_id,
-            'name' => $r->name,
-            'category' => $r->category,
-            'subcategory' => $r->subcategory,
-            'brand' => $r->brand,
-            'sku' => $r->sku,
-            'barcode' => $r->barcode,
-            'imageUrl' => $r->image_url,
-            'unit' => $r->unit,
-            'purchasePrice' => $r->purchase_price,
-            'salePrice' => $r->sale_price,
-            'priceDataMissing' => $priceDataMissing,
-            'minStock' => $r->min_stock,
-            'maxStock' => $r->max_stock,
-            'supplierId' => $r->supplier_id,
-            'description' => $r->description,
-            'archived' => (bool) $r->archived,
-            'createdAt' => $this->date($r->created_at),
-            'updatedAt' => $this->date($r->updated_at),
-        ];
+        return ['id' => $r->id, 'companyId' => $r->company_id, 'name' => $r->name, 'category' => $r->category, 'subcategory' => $r->subcategory, 'brand' => $r->brand, 'sku' => $r->sku, 'barcode' => $r->barcode, 'imageUrl' => $r->image_url, 'unit' => $r->unit, 'purchasePrice' => $r->purchase_price, 'salePrice' => $r->sale_price, 'minStock' => $r->min_stock, 'maxStock' => $r->max_stock, 'supplierId' => $r->supplier_id, 'description' => $r->description, 'archived' => (bool) $r->archived, 'createdAt' => $this->date($r->created_at), 'updatedAt' => $this->date($r->updated_at)];
     }
 
     private function supplier(object $r): array

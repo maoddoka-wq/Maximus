@@ -21,12 +21,6 @@ L’activation MAXIMUS d’une entreprise doit provisionner son compte `company_
 
 **How to apply:** Toute validation d’entreprise doit appeler l’API protégée de provisioning et ne confirmer l’activation locale qu’après sa réussite. Garder une resynchronisation idempotente pour réparer les demandes activées avant cette règle.
 
-Le compte `company_admin` reste distinct du responsable employé de l’unité Direction générale. Ne pas renommer ou réutiliser le compte administrateur pour représenter cet employé.
-
-**Why:** Le compte administrateur n’a ni identité d’employé, ni rattachement d’unité, ni permissions de rôle; les confondre donne une fausse représentation de la hiérarchie et des accès.
-
-**How to apply:** Pour connecter un employé Direction générale déjà présent, provisionner son compte avec l’identifiant employé, son unité, ses descendants et les permissions de son rôle, puis enregistrer l’adresse dans l’état Organisation. Garder des raccourcis de connexion distincts selon le rôle.
-
 Les choix d’inscription doivent être matérialisés dès l’activation : unité racine, modules autorisés, fonctionnalités, rôles de packs et rôle de secours pour les modules sans pack.
 
 **Why:** Conserver les choix uniquement dans la demande laisse les employés sans unité ni rôle compatible, même si l’entreprise voit correctement ses modules.

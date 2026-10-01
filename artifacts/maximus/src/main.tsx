@@ -12,16 +12,15 @@ import './index.css';
 // Nettoyer les variables globales avant le premier rendu garantit que
 // l'accueil MAXIMUS ne démarre jamais avec la couleur d'un tenant.
 applyCompanyTheme(undefined);
-const root = createRoot(document.getElementById('root')!, {
+if (import.meta.env.PROD) installVitePreloadRecovery();
+initializePwa();
+
+createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.
   onCaughtError: (error, errorInfo) => {
     console.error(error, errorInfo.componentStack);
   },
-});
-
-if (import.meta.env.PROD) installVitePreloadRecovery();
-initializePwa();
-root.render(
+}).render(
   <ErrorBoundary>
     <App />
   </ErrorBoundary>,
