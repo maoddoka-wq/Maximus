@@ -26,6 +26,32 @@ class StockTest extends TestCase
             ->assertJsonMissingPath('inventoryLines');
     }
 
+    public function test_stock_products_only_mark_prices_missing_when_the_description_says_so(): void
+    {
+        $request = $this->asActor();
+        $request->postJson('/api/stock/products', [
+            'companyId' => 'kora',
+            'name' => 'Riz ANA',
+            'sku' => 'ANA-RIZ-001',
+            'purchasePrice' => 0,
+            'salePrice' => 0,
+            'description' => 'Prix et fournisseur non renseignés dans les données locales ANA.',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('priceDataMissing', true);
+
+        $request->postJson('/api/stock/products', [
+            'companyId' => 'kora',
+            'name' => 'Produit offert',
+            'sku' => 'ANA-GIFT-001',
+            'purchasePrice' => 0,
+            'salePrice' => 0,
+            'description' => 'Produit offert dans cette opération.',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('priceDataMissing', false);
+    }
+
     public function test_stock_catalog_and_movements_preserve_the_json_contract(): void
     {
         $request = $this->asActor();

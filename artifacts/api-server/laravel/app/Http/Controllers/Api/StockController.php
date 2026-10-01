@@ -709,7 +709,33 @@ class StockController extends Controller
 
     private function product(object $r): array
     {
-        return ['id' => $r->id, 'companyId' => $r->company_id, 'name' => $r->name, 'category' => $r->category, 'subcategory' => $r->subcategory, 'brand' => $r->brand, 'sku' => $r->sku, 'barcode' => $r->barcode, 'imageUrl' => $r->image_url, 'unit' => $r->unit, 'purchasePrice' => $r->purchase_price, 'salePrice' => $r->sale_price, 'minStock' => $r->min_stock, 'maxStock' => $r->max_stock, 'supplierId' => $r->supplier_id, 'description' => $r->description, 'archived' => (bool) $r->archived, 'createdAt' => $this->date($r->created_at), 'updatedAt' => $this->date($r->updated_at)];
+        $description = (string) ($r->description ?? '');
+        $priceDataMissing = (float) $r->purchase_price === 0.0
+            && (float) $r->sale_price === 0.0
+            && preg_match('/\bprix\b.*\bnon renseign/iu', $description) === 1;
+
+        return [
+            'id' => $r->id,
+            'companyId' => $r->company_id,
+            'name' => $r->name,
+            'category' => $r->category,
+            'subcategory' => $r->subcategory,
+            'brand' => $r->brand,
+            'sku' => $r->sku,
+            'barcode' => $r->barcode,
+            'imageUrl' => $r->image_url,
+            'unit' => $r->unit,
+            'purchasePrice' => $r->purchase_price,
+            'salePrice' => $r->sale_price,
+            'priceDataMissing' => $priceDataMissing,
+            'minStock' => $r->min_stock,
+            'maxStock' => $r->max_stock,
+            'supplierId' => $r->supplier_id,
+            'description' => $r->description,
+            'archived' => (bool) $r->archived,
+            'createdAt' => $this->date($r->created_at),
+            'updatedAt' => $this->date($r->updated_at),
+        ];
     }
 
     private function supplier(object $r): array

@@ -94,7 +94,6 @@ import {
 } from '@/lib/store';
 import { appStateApi, AppStateRequestError } from '@/lib/app-state-api';
 import { appStateScopeMatchesSession } from '@/lib/app-state-scope';
-import { buildAnaPreviewHref } from '@/lib/ana-preview-path';
 import {
   discardCatalogDraft,
   getCatalogImpact,
@@ -133,7 +132,6 @@ import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company
 import { createEcommerceApi, type EcommerceDomain } from '@/lib/ecommerce-api';
 import { registrationCatalogApi } from '@/lib/registration-catalog-api';
 import { isPublicIntelligentRegistrationEnabled } from '@/lib/registration-policy';
-import { loadAnaPreview, type AnaPreviewProfile } from '@/lib/ana-preview-api';
 import { platformSettingsApi, type MaximusWalletBootstrap } from '@/lib/platform-settings-api';
 import {
   loadCompanyModuleAccess,
@@ -1501,65 +1499,6 @@ function AppContent() {
   );
 }
 
-function AnaPreviewLoginProfiles() {
-  const [profiles, setProfiles] = useState<AnaPreviewProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let current = true;
-    void loadAnaPreview()
-      .then((payload) => {
-        if (current) setProfiles(payload.profiles);
-      })
-      .catch(() => {
-        if (current) setError('Les profils ANA sont indisponibles dans le stockage local de prévisualisation.');
-      })
-      .finally(() => {
-        if (current) setLoading(false);
-      });
-    return () => {
-      current = false;
-    };
-  }, []);
-
-  return (
-    <section className="mt-6 border-t border-[hsl(var(--border))] pt-5" aria-label="Profils de démonstration ANA">
-      <div className="mb-3">
-        <h3 className="text-sm font-bold">Profils de démonstration ANA</h3>
-        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-          Ouvrez un espace MAXIMUS sans vous connecter.
-        </p>
-      </div>
-      {loading && <p className="py-2 text-xs text-[hsl(var(--muted-foreground))]" role="status">Chargement des profils…</p>}
-      {error && <p className="py-2 text-xs text-[hsl(var(--destructive))]" role="alert">{error}</p>}
-      {!loading && !error && profiles.length === 0 && (
-        <p className="py-2 text-xs text-[hsl(var(--muted-foreground))]">Aucun profil de démonstration n’est configuré.</p>
-      )}
-      {!loading && !error && profiles.length > 0 && (
-        <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-          {profiles.map((profile) => (
-            <a
-              key={profile.id}
-              href={`${buildAnaPreviewHref(import.meta.env.BASE_URL)}?profile=${encodeURIComponent(profile.id)}`}
-              data-testid={`link-preview-ana-profile-${profile.id}`}
-              className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-[hsl(var(--border))] px-3 py-2.5 transition hover:border-[hsl(var(--primary)/.5)] hover:bg-[hsl(var(--primary)/.05)]"
-            >
-              <span className="min-w-0">
-                <span className="block truncate text-xs font-bold">{profile.name}</span>
-                <span className="mt-0.5 block truncate text-[11px] text-[hsl(var(--muted-foreground))]">
-                  {profile.roleTitle} · {profile.group}
-                </span>
-              </span>
-              <span className="shrink-0 text-[11px] font-semibold text-[hsl(var(--primary))]">Ouvrir →</span>
-            </a>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
 function Login({
   onLogin,
   employees,
@@ -1709,7 +1648,6 @@ function Login({
               {pendingEmail ? 'Connexion en cours…' : 'Se connecter'}
             </button>
           </form>
-          {import.meta.env.DEV && !installationProfile?.companyOnly && <AnaPreviewLoginProfiles />}
            {!installationProfile?.companyOnly && (
              <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
                Pas encore d’espace ?{' '}
