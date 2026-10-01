@@ -25,33 +25,15 @@ final class SubscriptionPricing
         ],
     ];
 
-    public function calculate(array $modules, array $modulePrices, ?int $customAmount): array
+    public function calculate(array $modules, ?int $customAmount): array
     {
         $plan = $this->planForCount(count($modules));
-        $lines = [];
-        $moduleTotal = 0;
-        $moduleTotalIsComplete = true;
-
-        foreach ($modules as $module) {
-            $moduleId = (string) ($module['id'] ?? '');
-            $price = $modulePrices[$moduleId] ?? null;
-            if ($price === null) {
-                $moduleTotalIsComplete = false;
-            } else {
-                $moduleTotal += (int) $price;
-            }
-
-            $lines[] = [
-                'id' => $moduleId,
-                'name' => (string) ($module['name'] ?? $moduleId),
-                'monthlyAmount' => $price === null ? null : (int) $price,
-            ];
-        }
 
         return [
-            'modules' => $lines,
-            'moduleTotal' => $moduleTotalIsComplete ? $moduleTotal : null,
-            'moduleTotalComplete' => $moduleTotalIsComplete,
+            'modules' => array_map(static fn (array $module): array => [
+                'id' => (string) ($module['id'] ?? ''),
+                'name' => (string) ($module['name'] ?? $module['id'] ?? ''),
+            ], $modules),
             'autoPlan' => $plan,
             'customAmount' => $customAmount,
             'payableAmount' => $customAmount ?? $plan['monthlyAmount'],

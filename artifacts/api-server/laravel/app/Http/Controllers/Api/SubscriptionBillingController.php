@@ -30,12 +30,7 @@ final class SubscriptionBillingController extends Controller
             return response()->json(['error' => 'Seul MAXIMUS peut consulter la grille tarifaire.'], 403);
         }
 
-        $definitions = collect(ModuleCatalog::definitionsWithCustom());
-        $modulePrices = DB::table('maximus_subscription_module_prices')
-            ->get()
-            ->mapWithKeys(fn (object $row): array => [
-                (string) $row->module_id => $row->monthly_amount === null ? null : (int) $row->monthly_amount,
-            ])->all();
+        $definitions = collect(ModuleCatalog::publishedDefinitionsWithCustom());
         $companies = Company::query()
             ->whereNull('deleted_at')
             ->orderBy('name')
@@ -53,18 +48,13 @@ final class SubscriptionBillingController extends Controller
         $definitionsById = $definitions->keyBy('id');
 
         return response()->json([
-            'modules' => $definitions->map(fn (array $module): array => [
-                'id' => (string) $module['id'],
-                'name' => (string) $module['name'],
-                'monthlyAmount' => $modulePrices[$module['id']] ?? null,
-            ])->values(),
             'companies' => $companies->map(function (Company $company) use (
                 $activeRows,
                 $definitionsById,
-                $modulePrices,
                 $overrides,
             ): array {
                 $modules = collect($activeRows->get($company->id, []))
+                    ->filter(fn (object $row): bool => $definitionsById->has((string) $row->module_id))
                     ->map(function (object $row) use ($definitionsById): array {
                         $definition = $definitionsById->get($row->module_id);
 
@@ -81,48 +71,10 @@ final class SubscriptionBillingController extends Controller
                 return [
                     'companyId' => (string) $company->id,
                     'companyName' => (string) $company->name,
-                    ...$this->pricing->calculate($modules, $modulePrices, $customAmount),
+                    ...$this->pricing->calculate($modules, $customAmount),
                     'updatedAt' => $override?->updated_at,
                 ];
             })->values(),
-        ]);
-    }
-
-    public function updateModulePrice(Request $request, string $moduleId): JsonResponse
-    {
-        if (! $this->isMaximusAdmin($request)) {
-            return response()->json(['error' => 'Seul MAXIMUS peut modifier les tarifs des modules.'], 403);
-        }
-
-        $module = collect(ModuleCatalog::definitionsWithCustom())->firstWhere('id', $moduleId);
-        if (! $module) {
-            return response()->json(['error' => 'Module introuvable dans le catalogue.'], 404);
-        }
-
-        $input = $request->validate([
-            'monthlyAmount' => ['present', 'nullable', 'integer', 'min:0', 'max:2147483647'],
-        ]);
-        $actorId = $request->attributes->get('authUser')?->id;
-        $existing = DB::table('maximus_subscription_module_prices')->where('module_id', $moduleId)->first();
-        $now = now();
-
-        DB::table('maximus_subscription_module_prices')->updateOrInsert(
-            ['module_id' => $moduleId],
-            [
-                'monthly_amount' => $input['monthlyAmount'],
-                'updated_by' => $actorId,
-                'created_at' => $existing?->created_at ?? $now,
-                'updated_at' => $now,
-            ],
-        );
-
-        return response()->json([
-            'module' => [
-                'id' => (string) $module['id'],
-                'name' => (string) $module['name'],
-                'monthlyAmount' => $input['monthlyAmount'] === null ? null : (int) $input['monthlyAmount'],
-                'updatedAt' => $now->toISOString(),
-            ],
         ]);
     }
 
@@ -388,20 +340,16 @@ final class SubscriptionBillingController extends Controller
 
     private function companyPayload(string $companyId): array
     {
-        $definitions = collect(ModuleCatalog::definitionsWithCustom())->keyBy('id');
+        $definitions = collect(ModuleCatalog::publishedDefinitionsWithCustom())->keyBy('id');
         $activeIds = DB::table('maximus_company_modules')
             ->where('company_id', $companyId)
             ->whereIn('status', self::ACTIVE_MODULE_STATUSES)
             ->orderBy('module_id')
             ->pluck('module_id')
+            ->filter(fn (mixed $id): bool => $definitions->has((string) $id))
             ->map(fn (mixed $id): array => [
                 'id' => (string) $id,
                 'name' => (string) ($definitions->get($id)['name'] ?? $id),
-            ])->all();
-        $modulePrices = DB::table('maximus_subscription_module_prices')
-            ->get()
-            ->mapWithKeys(fn (object $row): array => [
-                (string) $row->module_id => $row->monthly_amount === null ? null : (int) $row->monthly_amount,
             ])->all();
         $customAmount = DB::table('maximus_company_subscription_prices')
             ->where('company_id', $companyId)
@@ -419,7 +367,7 @@ final class SubscriptionBillingController extends Controller
         return [
             'companyId' => $companyId,
             'companyName' => (string) ($company?->name ?? ''),
-            ...$this->pricing->calculate($activeIds, $modulePrices, $customAmount),
+            ...$this->pricing->calculate($activeIds, $customAmount),
             'paymentReady' => $this->diamanoPay->isConfigured(),
             'payments' => $payments,
         ];

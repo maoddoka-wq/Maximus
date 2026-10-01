@@ -453,22 +453,40 @@ final class ModuleCatalog
 
     public static function isPublishedModule(string $moduleId): bool
     {
-        $definition = collect(self::definitionsWithCustom())->firstWhere('id', $moduleId);
-        if (! $definition) {
-            return false;
-        }
+        return collect(self::publishedDefinitionsWithCustom())
+            ->contains(static fn (array $definition): bool => (string) ($definition['id'] ?? '') === $moduleId);
+    }
 
+    /**
+     * Return only modules available in the currently published workspace catalog.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function publishedDefinitionsWithCustom(): array
+    {
+        $definitions = collect(self::definitionsWithCustom());
         $row = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
         $payload = is_string($row?->payload)
             ? json_decode($row->payload, true)
             : ($row?->payload ?? []);
         $state = is_array($payload) ? $payload : [];
-        if (in_array($moduleId, is_array($state['removedModules'] ?? null) ? $state['removedModules'] : [], true)) {
-            return false;
-        }
+        $removedModules = is_array($state['removedModules'] ?? null)
+            ? array_map('strval', $state['removedModules'])
+            : [];
+        $moduleStatuses = is_array($state['moduleStatuses'] ?? null) ? $state['moduleStatuses'] : [];
 
-        $status = $state['moduleStatuses'][$moduleId] ?? ($definition['status'] ?? 'ACTIF');
-        return in_array($status, ['ACTIF', 'BETA'], true);
+        return $definitions
+            ->filter(static function (array $definition) use ($removedModules, $moduleStatuses): bool {
+                $id = (string) ($definition['id'] ?? '');
+                if ($id === '' || in_array($id, $removedModules, true)) {
+                    return false;
+                }
+
+                $status = $moduleStatuses[$id] ?? ($definition['status'] ?? 'ACTIF');
+                return in_array($status, ['ACTIF', 'BETA'], true);
+            })
+            ->values()
+            ->all();
     }
 
     /**
