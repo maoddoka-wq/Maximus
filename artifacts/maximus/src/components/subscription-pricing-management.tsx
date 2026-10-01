@@ -104,15 +104,14 @@ export function SubscriptionPricingManagement({ catalogModules }: { catalogModul
     }
   };
 
-  const saveCompany = async (company: SubscriptionBillingCompany) => {
-    const amount = parseAmount(companyDrafts[company.companyId] ?? (company.customAmount === null ? '' : String(company.customAmount)));
-    if (!amount.valid) {
-      showAppToast('Saisissez un montant entier positif ou nul.', 'warning');
-      return;
-    }
+  const persistCompanyAmount = async (
+    company: SubscriptionBillingCompany,
+    customAmount: number | null,
+    successMessage: string,
+  ) => {
     setSavingKeys(previous => ({ ...previous, [`company:${company.companyId}`]: true }));
     try {
-      await updateCompanySubscriptionPrice(company.companyId, amount.amount);
+      await updateCompanySubscriptionPrice(company.companyId, customAmount);
       setCompanyDrafts(previous => {
         const next = { ...previous };
         delete next[company.companyId];
@@ -120,17 +119,42 @@ export function SubscriptionPricingManagement({ catalogModules }: { catalogModul
       });
       const refreshed = await loadSubscriptionBilling();
       setCompanies(refreshed.companies);
-      showAppToast(
-        amount.amount === null
-          ? `Le tarif automatique est rétabli pour ${company.companyName}.`
-          : `Le prix mensuel de ${company.companyName} est enregistré.`,
-        'success',
-      );
+      showAppToast(successMessage, 'success');
     } catch (error) {
       showAppToast(error instanceof Error ? error.message : 'Le prix personnalisé n’a pas été enregistré.', 'error');
     } finally {
       setSavingKeys(previous => ({ ...previous, [`company:${company.companyId}`]: false }));
     }
+  };
+
+  const saveCompany = async (company: SubscriptionBillingCompany) => {
+    const amount = parseAmount(companyDrafts[company.companyId] ?? (company.customAmount === null ? '' : String(company.customAmount)));
+    if (!amount.valid) {
+      showAppToast('Saisissez un montant entier positif ou nul.', 'warning');
+      return;
+    }
+    await persistCompanyAmount(
+      company,
+      amount.amount,
+      amount.amount === null
+        ? `Le tarif automatique est rétabli pour ${company.companyName}.`
+        : amount.amount === 0
+          ? `${company.companyName} est maintenant en mode gratuit.`
+          : `Le prix mensuel de ${company.companyName} est enregistré.`,
+    );
+  };
+
+  const setCompanyBillingMode = async (company: SubscriptionBillingCompany, mode: 'FREE' | 'PAID') => {
+    const alreadyFree = company.customAmount === 0;
+    if ((mode === 'FREE' && alreadyFree) || (mode === 'PAID' && !alreadyFree)) return;
+
+    await persistCompanyAmount(
+      company,
+      mode === 'FREE' ? 0 : null,
+      mode === 'FREE'
+        ? `${company.companyName} est maintenant en mode gratuit.`
+        : `Le tarif calculé est rétabli pour ${company.companyName}.`,
+    );
   };
 
   return (
@@ -139,8 +163,8 @@ export function SubscriptionPricingManagement({ catalogModules }: { catalogModul
         <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Tarification MAXIMUS</p>
         <h2 className="mt-2 text-xl font-bold">Tarifs des modules et ajustement par entreprise</h2>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-          Configurez le tarif mensuel des modules. Le montant de chaque entreprise est calculé à partir de ses modules actifs;
-          un prix personnalisé le remplace. Laissez le champ vide pour revenir au montant calculé.
+          Choisissez pour chaque entreprise le mode gratuit (0 FCFA) ou payant. En mode payant, le montant est calculé à partir des modules actifs;
+          un prix personnalisé peut le remplacer. Laissez le champ vide pour revenir au calcul.
         </p>
       </div>
 
@@ -248,11 +272,11 @@ export function SubscriptionPricingManagement({ catalogModules }: { catalogModul
                     ?? (company.customAmount === null ? '' : String(company.customAmount));
                   const amount = parseAmount(value);
                   return (
-                    <article key={company.companyId} className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,.7fr)_auto] lg:items-center">
+                      <article key={company.companyId} className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(190px,.55fr)_minmax(220px,.7fr)_auto] lg:items-center">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="truncate text-sm font-bold">{company.companyName}</h4>
-                          <StatusBadge status={company.customAmount === null ? 'ACTIF' : 'PERSONNALISÉ'} />
+                            <StatusBadge status={company.customAmount === 0 ? 'GRATUIT' : 'PAYANT'} />
                         </div>
                         <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
                           {company.modules.length} module(s) actif(s)
@@ -261,6 +285,22 @@ export function SubscriptionPricingManagement({ catalogModules }: { catalogModul
                           Montant mensuel : <span className="text-[hsl(var(--primary))]">{amountText(company.payableAmount)}</span>
                         </p>
                       </div>
+                      <label className="text-xs font-semibold">
+                        Mode de facturation
+                        <select
+                          value={company.customAmount === 0 ? 'FREE' : 'PAID'}
+                          onChange={event => {
+                            const mode = event.target.value === 'FREE' ? 'FREE' : 'PAID';
+                            void setCompanyBillingMode(company, mode);
+                          }}
+                          aria-label={`Mode de facturation de ${company.companyName}`}
+                          disabled={loadError !== '' || savingKeys[key] === true}
+                          className="mt-1.5 w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 text-sm outline-none focus:border-[hsl(var(--primary))] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="FREE">Gratuit · 0 FCFA</option>
+                          <option value="PAID">Payant · tarif calculé ou personnalisé</option>
+                        </select>
+                      </label>
                       <label className="text-xs font-semibold">
                         Prix mensuel personnalisé (FCFA)
                         <input
