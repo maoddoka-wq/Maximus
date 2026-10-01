@@ -29,6 +29,17 @@ test('inclut le module E-commerce qui porte la Vente comptoir dans le forfait me
   assert.equal(subscription.interval, 'MENSUEL');
 });
 
+test('conserve Gestion commerciale et E-commerce comme deux modules distincts dans la souscription', () => {
+  const subscription = buildSubscriptionForCompany({
+    companyId: 'commerce-and-ecommerce-company',
+    createdAt: '2026-10-01',
+    moduleIds: ['commerce', 'ecommerce'],
+  });
+
+  assert.deepEqual(subscription.moduleIds, ['commerce', 'ecommerce']);
+  assert.equal(subscription.moduleIds.length, 2);
+});
+
 test('le catalogue expose les limites et les prix de chaque plan', () => {
   assert.deepEqual(subscriptionPlans.map(plan => plan.id), ['essential', 'growth', 'scale']);
   assert.ok(subscriptionPlans.every(plan => plan.monthlyAmount > 0));
