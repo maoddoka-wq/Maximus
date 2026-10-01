@@ -162,6 +162,7 @@ import { mutationSuccessMessage } from '@/lib/mutation-feedback';
 import {
   companyWorkspaceFeatureDefinitions,
   normalizeCompanyWorkspaceFeatureIds,
+  resolveCompanyWorkspaceHiddenFeatures,
   type CompanyWorkspaceFeatureId,
 } from '@/lib/company-workspace-features';
 
@@ -1239,13 +1240,11 @@ function AppContent() {
   const employee = employeeId ? (data.employees.find((e) => e.id === employeeId) ?? null) : null;
   const companyId = activeCompanyId ?? '';
   const currentCompany = activeCompany;
-  const workspaceFeaturesHiddenForCompany = new Set<CompanyWorkspaceFeatureId>(
-    currentCompany?.hiddenWorkspaceFeatures ?? [],
+  const effectiveHiddenWorkspaceFeatures = resolveCompanyWorkspaceHiddenFeatures(
+    currentCompany?.hiddenWorkspaceFeatures,
+    companyAdmin,
+    subscriptionBillingMode,
   );
-  if (companyAdmin && subscriptionBillingMode !== 'PAID') {
-    workspaceFeaturesHiddenForCompany.add('abonnement');
-  }
-  const effectiveHiddenWorkspaceFeatures = [...workspaceFeaturesHiddenForCompany];
   const {
     accessRole,
     employeeNode,

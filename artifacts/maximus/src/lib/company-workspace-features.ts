@@ -50,3 +50,13 @@ export function normalizeCompanyWorkspaceFeatureIds(value: unknown): CompanyWork
     value.filter((item): item is CompanyWorkspaceFeatureId => typeof item === 'string' && validIds.has(item as CompanyWorkspaceFeatureId)),
   )];
 }
+
+export function resolveCompanyWorkspaceHiddenFeatures(
+  configuredHiddenFeatures: unknown,
+  isCompanyAdmin: boolean,
+  billingMode: 'FREE' | 'PAID' | null,
+): CompanyWorkspaceFeatureId[] {
+  const hiddenFeatures = new Set(normalizeCompanyWorkspaceFeatureIds(configuredHiddenFeatures));
+  if (isCompanyAdmin && billingMode !== 'PAID') hiddenFeatures.add('abonnement');
+  return [...hiddenFeatures];
+}

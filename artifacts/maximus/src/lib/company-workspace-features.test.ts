@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   companyWorkspaceFeatureForPath,
   normalizeCompanyWorkspaceFeatureIds,
+  resolveCompanyWorkspaceHiddenFeatures,
 } from './company-workspace-features';
 
 test('normalise les fonctionnalités visibles de l’espace entreprise', () => {
@@ -27,4 +28,18 @@ test('reconnaît les routes des fonctionnalités de l’espace entreprise', () =
   assert.equal(companyWorkspaceFeatureForPath('/entreprise/organisation?tab=subscription'), 'abonnement');
   assert.equal(companyWorkspaceFeatureForPath('/entreprise/guide-configuration'), 'guide-configuration');
   assert.equal(companyWorkspaceFeatureForPath('/entreprise/dashboard'), null);
+});
+
+test('masque Abonnement en mode gratuit ou tant que le mode payant n’est pas confirmé', () => {
+  assert.deepEqual(resolveCompanyWorkspaceHiddenFeatures([], true, 'FREE'), ['abonnement']);
+  assert.deepEqual(resolveCompanyWorkspaceHiddenFeatures([], true, null), ['abonnement']);
+});
+
+test('affiche Abonnement en mode payant sauf si MAXIMUS l’a masqué', () => {
+  assert.deepEqual(resolveCompanyWorkspaceHiddenFeatures([], true, 'PAID'), []);
+  assert.deepEqual(resolveCompanyWorkspaceHiddenFeatures(['abonnement'], true, 'PAID'), ['abonnement']);
+});
+
+test('ne change pas la visibilité de l’abonnement pour une session sans compte administrateur', () => {
+  assert.deepEqual(resolveCompanyWorkspaceHiddenFeatures([], false, null), []);
 });
