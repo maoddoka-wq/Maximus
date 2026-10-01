@@ -52,6 +52,7 @@ import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { TooltipProvider } from '@workspace/maximus-design-system/components/ui/tooltip';
 import { ActionButton as DesignSystemActionButton } from '@workspace/maximus-design-system/components/ui/action-button';
 import { Badge } from '@workspace/maximus-design-system/components/ui/badge';
+import { Button } from '@workspace/maximus-design-system/components/ui/button';
 import { Card } from '@workspace/maximus-design-system/components/ui/card';
 import { Checkbox } from '@workspace/maximus-design-system/components/ui/checkbox';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -166,7 +167,28 @@ import {
 const queryClient = new QueryClient();
 const companyLoginContextStorageKey = 'maximus-company-login-context';
 type DemoAccount = { id: string; label: string; email: string; password: string };
-const defaultDemoAccounts: DemoAccount[] = [];
+const defaultDemoAccounts: DemoAccount[] = import.meta.env.DEV
+  ? [
+      {
+        id: 'maximus-admin',
+        label: 'Administrateur MAXIMUS',
+        email: 'maximus.demo@example.test',
+        password: 'MaximusLocal!2026',
+      },
+      {
+        id: 'ana-manager',
+        label: 'Manager ANA · Gestion de stock',
+        email: 'manager.ana@example.test',
+        password: 'ManagerANA!2026',
+      },
+      {
+        id: 'ana-employee',
+        label: 'Employée ANA · Gestion de stock',
+        email: 'employee.ana@example.test',
+        password: 'EmployeANA!2026',
+      },
+    ]
+  : [];
 
 const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
@@ -1214,9 +1236,6 @@ function AppContent() {
       </section>
     </div>;
   }
-  const loginEmployees = [
-    ...data.employees,
-  ];
   if (location === '/' || !session) {
     if (installationProfile?.companyOnly && installationProfile.company) {
       return <CompanyLoginPage installationCompany={installationProfile.company} onAuthenticated={applyAuthenticatedUser} />;
@@ -1224,7 +1243,6 @@ function AppContent() {
     return (
       <Login
         onLogin={login}
-        employees={loginEmployees}
         registrationEnabled={intelligentRegistrationEnabled}
         installationProfile={installationProfile}
       />
@@ -1501,16 +1519,14 @@ function AppContent() {
 
 function Login({
   onLogin,
-  employees,
   registrationEnabled,
   installationProfile,
 }: {
   onLogin: (space: 'admin' | 'company', email: string, password: string) => Promise<void>;
-  employees: StoreData['employees'];
   registrationEnabled: boolean;
   installationProfile: InstallationProfile | null;
 }) {
-  const showDemoAccounts = false;
+  const showDemoAccounts = import.meta.env.DEV && !installationProfile?.companyOnly;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -1525,24 +1541,7 @@ function Login({
       .finally(() => setPendingEmail(''));
   };
   const submitLogin = (space: 'admin' | 'company') => loginWithCredentials(space, email, password);
-  const demoAccounts = showDemoAccounts
-    ? [
-        ...defaultDemoAccounts,
-        ...employees
-          .filter(
-            (account) =>
-              account.status === 'ACTIF' &&
-              Boolean(account.loginPassword) &&
-              !defaultDemoAccounts.some((demoAccount) => demoAccount.email === account.email.toLowerCase()),
-          )
-          .map((account) => ({
-            id: account.id,
-            label: `${account.firstName} ${account.lastName} · ${account.position}`,
-            email: account.email,
-            password: account.loginPassword ?? '',
-          })),
-      ]
-    : [];
+  const demoAccounts = showDemoAccounts ? defaultDemoAccounts : [];
   const selectDemoAccount = (account: (typeof demoAccounts)[number]) => {
     setEmail(account.email);
     setPassword(account.password);
@@ -1667,25 +1666,28 @@ function Login({
               <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">
                 Les accès ci-dessous sont prêts à l’emploi. Cliquez sur un compte pour vous connecter directement.
               </p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="mt-3 grid gap-2">
                 {demoAccounts.map((account) => (
-                  <button
+                    <Button
                     type="button"
+                      variant="outline"
+                      size="lg"
                     disabled={Boolean(pendingEmail)}
                     data-testid={`button-demo-account-${account.id}`}
                     key={account.id}
                     onClick={() => selectDemoAccount(account)}
-                    className={`rounded-lg border px-3 py-2 text-left transition hover:border-[hsl(var(--primary)/.55)] hover:bg-[hsl(var(--primary)/.06)] disabled:cursor-wait disabled:opacity-60 ${email === account.email ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : ''}`}
+                      className={`h-auto min-h-14 w-full justify-between rounded-xl px-4 py-3 text-left ${email === account.email ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.06)]' : 'bg-[hsl(var(--background))]'}`}
                   >
-                    <span className="block text-xs font-bold">{account.label}</span>
-                    <span className="mt-0.5 block text-[11px] text-[hsl(var(--muted-foreground))]">{account.email}</span>
-                    <span
-                      data-testid={`demo-account-password-${account.id}`}
-                      className="mt-1 block text-[10px] font-semibold text-[hsl(var(--primary))]"
-                    >
-                      Mot de passe : {account.password}
-                    </span>
-                  </button>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-left text-sm font-semibold text-[hsl(var(--foreground))]">
+                          {pendingEmail === account.email ? 'Ouverture en cours…' : account.label}
+                        </span>
+                        <span className="mt-0.5 block truncate text-left text-xs font-normal text-[hsl(var(--muted-foreground))]">
+                          {account.email}
+                        </span>
+                      </span>
+                      <LogIn aria-hidden="true" size={16} />
+                    </Button>
                 ))}
               </div>
             </div>
