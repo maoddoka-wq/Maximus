@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   ArrowDownToLine,
@@ -5073,6 +5073,14 @@ function SubscriptionsPage({
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState(data.subscriptions[0]?.id ?? '');
   const [searchTerm, setSearchTerm] = useState('');
   const subscriptions = data.subscriptions;
+  const catalogModules = useMemo(
+    () => getConfiguredModules({
+      moduleOverrides: data.moduleOverrides,
+      removedModules: data.removedModules,
+      customModules: data.customModules,
+    }).map(({ id, name }) => ({ id, name })),
+    [data.customModules, data.moduleOverrides, data.removedModules],
+  );
   const formatDate = (value: string | null) => {
     if (!value) return '—';
     return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`));
@@ -5105,7 +5113,7 @@ function SubscriptionsPage({
     return (
       <div className="space-y-6">
         <MaximusWalletPanel formatAmount={formatAmount} />
-        <SubscriptionPricingManagement />
+        <SubscriptionPricingManagement catalogModules={catalogModules} />
         <EmptyState
           title="Aucun abonnement enregistré"
           text="Les souscriptions apparaîtront ici avec leur plan, leur cycle de paiement et leurs factures."
@@ -5138,7 +5146,7 @@ function SubscriptionsPage({
       </section>
 
       <MaximusWalletPanel formatAmount={formatAmount} />
-      <SubscriptionPricingManagement />
+      <SubscriptionPricingManagement catalogModules={catalogModules} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
@@ -5358,10 +5366,7 @@ function MaximusWalletPanel({ formatAmount }: { formatAmount: (value: number) =>
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
             <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Compte plateforme</p>
-            <h2 className="mt-2 text-xl font-bold">Compte MAXIMUS et modèle d’abonnement</h2>
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-              Le point de vente est inclus dans l’abonnement de l’entreprise via E-commerce. Les ventes ne génèrent aucune commission MAXIMUS; l’historique des commissions reste conservé.
-            </p>
+            <h2 className="mt-2 text-xl font-bold">Compte MAXIMUS</h2>
           </div>
           <WalletCards size={22} className="text-[hsl(var(--primary))]" />
         </div>

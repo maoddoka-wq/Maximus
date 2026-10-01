@@ -25,8 +25,14 @@ function parseAmount(value: string): { valid: boolean; amount: number | null } {
   };
 }
 
-export function SubscriptionPricingManagement() {
-  const [modules, setModules] = useState<SubscriptionModulePrice[]>([]);
+type CatalogModule = Pick<SubscriptionModulePrice, 'id' | 'name'>;
+
+export function SubscriptionPricingManagement({ catalogModules }: { catalogModules: CatalogModule[] }) {
+  const fallbackModules = useMemo(
+    () => catalogModules.map(module => ({ ...module, monthlyAmount: null })),
+    [catalogModules],
+  );
+  const [modules, setModules] = useState<SubscriptionModulePrice[]>(fallbackModules);
   const [companies, setCompanies] = useState<SubscriptionBillingCompany[]>([]);
   const [moduleDrafts, setModuleDrafts] = useState<Record<string, string>>({});
   const [companyDrafts, setCompanyDrafts] = useState<Record<string, string>>({});
@@ -48,6 +54,8 @@ export function SubscriptionPricingManagement() {
         setLoadError('');
       } catch (error) {
         if (cancelled) return;
+        setModules(fallbackModules);
+        setCompanies([]);
         setLoadError(error instanceof Error ? error.message : 'La grille tarifaire est indisponible.');
       } finally {
         if (!cancelled && showLoading) setLoading(false);
@@ -62,7 +70,7 @@ export function SubscriptionPricingManagement() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [retry]);
+  }, [fallbackModules, retry]);
 
   const visibleCompanies = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('fr');
@@ -139,6 +147,7 @@ export function SubscriptionPricingManagement() {
       {loadError && (
         <div role="alert" className="m-5 rounded-lg border border-[hsl(var(--destructive)/.35)] bg-[hsl(var(--destructive)/.08)] p-3 text-sm text-[hsl(var(--destructive))]">
           <p>{loadError}</p>
+          <p className="mt-1 text-xs">Les modules publiés restent affichés, mais les tarifs enregistrés et les montants par entreprise ne sont pas disponibles.</p>
           <button
             type="button"
             onClick={() => {
@@ -159,8 +168,13 @@ export function SubscriptionPricingManagement() {
           <div>
             <h3 className="text-sm font-bold">Grille mensuelle par module</h3>
             <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Ces tarifs déterminent le montant calculé pour chaque entreprise. Un tarif manquant empêche le calcul complet.</p>
-            <div className="mt-3 divide-y divide-[hsl(var(--border))] rounded-xl border border-[hsl(var(--border))]">
-              {modules.map(module => {
+            {modules.length === 0 ? (
+              <p className="mt-3 rounded-xl border border-dashed border-[hsl(var(--border))] p-4 text-sm text-[hsl(var(--muted-foreground))]">
+                Aucun module publié à tarifer.
+              </p>
+            ) : (
+              <div className="mt-3 divide-y divide-[hsl(var(--border))] rounded-xl border border-[hsl(var(--border))]">
+                {modules.map(module => {
                 const key = `module:${module.id}`;
                 const value = moduleDrafts[module.id] ?? (module.monthlyAmount === null ? '' : String(module.monthlyAmount));
                 const amount = parseAmount(value);
@@ -178,6 +192,7 @@ export function SubscriptionPricingManagement() {
                         step="1"
                         inputMode="numeric"
                         value={value}
+                        disabled={loading || loadError !== ''}
                         onChange={event => setModuleDrafts(previous => ({ ...previous, [module.id]: event.target.value }))}
                         aria-label={`Prix mensuel du module ${module.name}`}
                         className="mt-1.5 w-full rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-2 text-sm outline-none focus:border-[hsl(var(--primary))]"
@@ -195,8 +210,9 @@ export function SubscriptionPricingManagement() {
                     </ActionButton>
                   </div>
                 );
-              })}
-            </div>
+                })}
+              </div>
+            )}
           </div>
 
           <div>
@@ -216,7 +232,11 @@ export function SubscriptionPricingManagement() {
                 />
               </label>
             </div>
-            {visibleCompanies.length === 0 ? (
+            {loadError ? (
+              <p className="mt-4 rounded-xl border border-dashed border-[hsl(var(--border))] p-5 text-sm text-[hsl(var(--muted-foreground))]">
+                Les entreprises et leurs montants seront affichés lorsque l’API de facturation sera disponible.
+              </p>
+            ) : visibleCompanies.length === 0 ? (
               <p className="mt-4 rounded-xl border border-dashed border-[hsl(var(--border))] p-5 text-sm text-[hsl(var(--muted-foreground))]">
                 Aucune entreprise ne correspond à cette recherche.
               </p>
@@ -249,6 +269,7 @@ export function SubscriptionPricingManagement() {
                           step="1"
                           inputMode="numeric"
                           value={value}
+                          disabled={loading || loadError !== ''}
                           onChange={event => setCompanyDrafts(previous => ({ ...previous, [company.companyId]: event.target.value }))}
                           aria-label={`Prix mensuel personnalisé pour ${company.companyName}`}
                           placeholder={company.moduleTotalComplete
