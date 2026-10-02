@@ -54,6 +54,7 @@ import { ActionButton as DesignSystemActionButton } from '@workspace/maximus-des
 import { Badge } from '@workspace/maximus-design-system/components/ui/badge';
 import { Card } from '@workspace/maximus-design-system/components/ui/card';
 import { Checkbox } from '@workspace/maximus-design-system/components/ui/checkbox';
+import { WorkspaceTabs } from '@workspace/maximus-design-system/components/ui/workspace-tabs';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { parseClientPwaPath } from '@/lib/pwa';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
@@ -8328,6 +8329,12 @@ function CompanyModulesDetail({
   const [domainOperation, setDomainOperation] = useState<'create' | 'verify' | 'delete' | null>(null);
   const [domainError, setDomainError] = useState('');
   const [installationRefreshKey, setInstallationRefreshKey] = useState(0);
+  const [activeCompanySettingsTab, setActiveCompanySettingsTab] = useState('access');
+  const companySettingsTabs = [
+    { id: 'access', label: 'Accès & permissions', icon: ShieldCheck },
+    { id: 'connection', label: 'Connexion publique', icon: LogIn },
+    { id: 'installation', label: 'Installations', icon: KeyRound },
+  ];
 
   useEffect(() => {
     let cancelled = false;
@@ -8870,6 +8877,14 @@ function CompanyModulesDetail({
           </div>
         </div>
       </div>
+      <WorkspaceTabs
+        items={companySettingsTabs}
+        activeId={activeCompanySettingsTab}
+        onChange={setActiveCompanySettingsTab}
+        ariaLabel={`Réglages de ${company.name}`}
+        testIdPrefix="company-settings-tab"
+      />
+      <div className={activeCompanySettingsTab === 'installation' ? 'space-y-5' : 'hidden'}>
       <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.25)] p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-2xl">
@@ -8935,7 +8950,22 @@ function CompanyModulesDetail({
         refreshKey={installationRefreshKey}
         loginUrl={loginSettings?.url}
       />
+      </div>
 
+      <div className={activeCompanySettingsTab === 'access' ? 'space-y-5' : 'hidden'}>
+      <Card className="p-4 sm:p-5">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]">
+            <ShieldCheck size={19} aria-hidden="true" />
+          </span>
+          <div>
+            <h2 className="font-bold">Accès et autorisations</h2>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+              Les modules, les droits de leurs fonctionnalités et les accès transverses sont regroupés ici.
+            </p>
+          </div>
+        </div>
+      </Card>
       <Card className="p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -8996,6 +9026,8 @@ function CompanyModulesDetail({
           </DesignSystemActionButton>
         </div>
       </Card>
+      </div>
+      <div className={activeCompanySettingsTab === 'connection' ? 'space-y-5' : 'hidden'}>
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -9137,6 +9169,8 @@ function CompanyModulesDetail({
           </div>
         </section>
       )}
+      </div>
+      <div className={activeCompanySettingsTab === 'access' ? 'space-y-5' : 'hidden'}>
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -9257,7 +9291,7 @@ function CompanyModulesDetail({
             {configuredModules.filter((module) => moduleStatuses[module.id] !== 'INACTIF').length} / {configuredModules.length}
           </span>
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="mt-5 space-y-4">
           {configuredModules.map((module) => {
             const status = moduleStatuses[module.id] ?? 'INACTIF';
             return (
@@ -9328,12 +9362,18 @@ function CompanyModulesDetail({
                         </div>
                         {module.id === 'ecommerce' && <p className="mb-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Pour autoriser les produits, cochez <strong>Vente de produits physiques</strong>, <strong>Vente de produits numériques</strong>, ou les deux.</p>}
                         <div className="space-y-2">
+                          <div className="hidden grid-cols-[minmax(0,1fr)_repeat(3,5rem)] items-center gap-3 px-3 text-[10px] font-bold uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))] sm:grid">
+                            <span>Fonctionnalité</span>
+                            {permissionActions.map(action => (
+                              <span key={action.id} className="text-center">{action.label}</span>
+                            ))}
+                          </div>
                           {getModuleFeatureOptions(module).filter(feature => normalizeFeatureIdsForSelectedPacks(module, [feature.id], packSelections[module.id] ?? []).length > 0).map((feature) => {
                             const selected = (featureSelections[module.id] ?? []).includes(feature.id);
                             const permissions = featurePermissions[module.id]?.[feature.id] ?? [];
                             return (
-                              <div key={feature.id} className={`rounded-lg border p-3 ${selected ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--card)/.65)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--muted)/.25)] opacity-75'}`}>
-                                <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div key={feature.id} className={`grid gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,1fr)_repeat(3,5rem)] sm:items-center ${selected ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--card)/.65)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--muted)/.25)] opacity-75'}`}>
+                                <div className="min-w-0">
                                   <label className="flex min-w-0 items-center gap-2 text-xs font-semibold">
                                     <input
                                       type="checkbox"
@@ -9344,9 +9384,11 @@ function CompanyModulesDetail({
                                     />
                                     <span>{feature.label}</span>
                                   </label>
-                                  <div className="flex flex-wrap gap-3">
+                                  {!selected && <p className="mt-1 pl-6 text-[10px] text-[hsl(var(--muted-foreground))]">Fonctionnalité non visible dans l’espace entreprise.</p>}
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 sm:contents">
                                     {permissionActions.map((action) => (
-                                      <label key={action.id} className="flex items-center gap-1.5 text-[11px] font-semibold text-[hsl(var(--muted-foreground))]">
+                                      <label key={action.id} className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-[hsl(var(--muted-foreground))]">
                                         <input
                                           type="checkbox"
                                           data-testid={`checkbox-company-permission-${module.id}-${feature.id}-${action.id}`}
@@ -9358,9 +9400,7 @@ function CompanyModulesDetail({
                                         {action.label}
                                       </label>
                                     ))}
-                                  </div>
                                 </div>
-                                {!selected && <p className="mt-1 pl-6 text-[10px] text-[hsl(var(--muted-foreground))]">Fonctionnalité non visible dans l’espace entreprise.</p>}
                               </div>
                             );
                           })}
@@ -9384,6 +9424,7 @@ function CompanyModulesDetail({
           </ActionButton>
         </div>
       </section>
+      </div>
       {editing && <CompanyEditModal company={company} data={data} mutate={mutate} onClose={() => setEditing(false)} />}
     </div>
   );
