@@ -10,14 +10,12 @@ import {
 } from '../lib/auth-storage';
 import { canResumeLocationTracking } from './location-resume-policy';
 import type { LocationSetupFailure } from './location-setup-policy';
+import { FOREGROUND_LOCATION_UPDATE_OPTIONS } from './location-sync-policy';
 import { createSerializedLocationOperations } from './serialized-location-operation-queue';
 import {
   isFreshDriverLocation,
   type DriverLocationSnapshot,
 } from '../lib/trip-map-geometry';
-
-const LOCATION_UPDATE_INTERVAL_MS = 15_000;
-const LOCATION_UPDATE_DISTANCE_METERS = 30;
 
 let foregroundLocationSubscription: Location.LocationSubscription | null = null;
 let foregroundDriverId: string | null = null;
@@ -118,8 +116,7 @@ async function startForegroundLocationUpdates(driverId: string): Promise<void> {
   const subscription = await Location.watchPositionAsync(
     {
       accuracy: Location.Accuracy.High,
-      timeInterval: LOCATION_UPDATE_INTERVAL_MS,
-      distanceInterval: LOCATION_UPDATE_DISTANCE_METERS,
+      ...FOREGROUND_LOCATION_UPDATE_OPTIONS,
     },
     (location) => {
       if (
