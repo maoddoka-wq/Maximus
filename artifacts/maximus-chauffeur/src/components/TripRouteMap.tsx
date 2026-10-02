@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Linking,
@@ -11,15 +11,16 @@ import { Typography } from '@workspace/maximus-chauffeur-design-system/component
 import Svg, { Circle, Polyline } from 'react-native-svg';
 import type { TransportTrip } from '@workspace/api-client-react';
 import { cardRadius, space, type getPalette } from '../theme';
+import { getDriverMapTileUrls } from '../lib/map-tiles';
 
 type Palette = ReturnType<typeof getPalette>;
 type Point = { latitude: number; longitude: number };
 type DriverPosition = { latitude: number | null; longitude: number | null } | null;
 type PixelPoint = { x: number; y: number };
-type Tile = { key: string; uri: string; left: number; top: number };
+type Tile = { key: string; uris: string[]; left: number; top: number };
 
 const TILE_SIZE = 256;
-const TILE_HOSTS = ['a', 'b', 'c', 'd'] as const;
+const TILE_USER_AGENT = 'MAXIMUS-Chauffeur';
 
 function pointFrom(latitude: unknown, longitude: unknown): Point | null {
   if (
@@ -95,6 +96,8 @@ export function TripRouteMap({
 }) {
   const [mapSize, setMapSize] = useState({ width: 0, height: 220 });
   const [navigationError, setNavigationError] = useState<string | null>(null);
+  const [failedTileKeys, setFailedTileKeys] = useState<string[]>([]);
+  const [tileRetry, setTileRetry] = useState(0);
 
   const driver = driverPosition
     ? pointFrom(driverPosition.latitude, driverPosition.longitude)
@@ -138,11 +141,9 @@ export function TripRouteMap({
     for (let tileY = firstTileY; tileY <= lastTileY; tileY += 1) {
       if (tileY < 0 || tileY >= tileCount) continue;
       for (let tileX = firstTileX; tileX <= lastTileX; tileX += 1) {
-        const wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
-        const host = TILE_HOSTS[Math.abs(tileX + tileY) % TILE_HOSTS.length];
         tiles.push({
           key: `${zoom}-${tileX}-${tileY}`,
-          uri: `https://${host}.basemaps.cartocdn.com/light_all/${zoom}/${wrappedX}/${tileY}@2x.png`,
+          uris: getDriverMapTileUrls(zoom, tileX, tileY),
           left: tileX * TILE_SIZE - startX,
           top: tileY * TILE_SIZE - startY,
         });
@@ -162,6 +163,23 @@ export function TripRouteMap({
       height: mapSize.height,
     };
   }, [destination, driver, mapSize, passengerRoute, pickup, pickupRoute]);
+
+  const tileSignature = viewport?.tiles.map((tile) => tile.key).join('|') ?? '';
+  useEffect(() => {
+    setFailedTileKeys([]);
+    setTileRetry((current) => current + 1);
+  }, [tileSignature]);
+
+  const tilesWithFallbackErrors = viewport?.tiles
+    .filter((tile) => failedTileKeys.includes(tile.key)).length ?? 0;
+  const allTilesFailed = !!viewport?.tiles.length && tilesWithFallbackErrors === viewport.tiles.length;
+  const markTileFailed = (tileKey: string) => {
+    setFailedTileKeys((current) => current.includes(tileKey) ? current : [...current, tileKey]);
+  };
+  const retryMapTiles = () => {
+    setFailedTileKeys([]);
+    setTileRetry((current) => current + 1);
+  };
 
   const navigationTarget = trip.status === 'IN_PROGRESS' ? destination : pickup;
   const navigationUrl = navigationTarget
@@ -211,13 +229,41 @@ export function TripRouteMap({
         }}
       >
         {viewport?.tiles.map((tile) => (
-          <Image
-            key={tile.key}
-            source={{ uri: tile.uri }}
-            resizeMode="stretch"
-            style={[styles.tile, { left: tile.left, top: tile.top }]}
+          <RouteMapTile
+            key={`${tile.key}-${tileRetry}`}
+            tile={tile}
+            onFailed={markTileFailed}
           />
         ))}
+        {!viewport ? (
+          <View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, styles.mapPlaceholder, { backgroundColor: colors.card }]}
+          >
+            <Ionicons name="map-outline" size={18} color={colors.mutedForeground} />
+            <Typography colors={colors} size="xs" tone="muted" style={styles.gpsNoticeText}>
+              Les coordonnées de cette course ne sont pas disponibles.
+            </Typography>
+          </View>
+        ) : null}
+        {tilesWithFallbackErrors > 0 ? (
+          <View style={[styles.tileUnavailable, { backgroundColor: colors.card }]}>
+            <Typography colors={colors} size="xs" tone="muted" style={styles.tileUnavailableText}>
+              {allTilesFailed
+                ? 'Le fond de carte est indisponible. Réessayez après avoir vérifié votre connexion.'
+                : 'Certaines tuiles de la carte sont indisponibles. Réessayez si le fond reste incomplet.'}
+            </Typography>
+            <Button
+              colors={colors}
+              accessibilityRole="button"
+              onPress={retryMapTiles}
+              style={styles.retryMapButton}
+              testID="button-retry-driver-map"
+            >
+              Réessayer
+            </Button>
+          </View>
+        ) : null}
         {viewport ? (
           <Svg
             pointerEvents="none"
@@ -318,7 +364,7 @@ export function TripRouteMap({
 
         <View pointerEvents="none" style={[styles.attribution, { backgroundColor: colors.card }]}>
           <Typography colors={colors} size="xs" tone="muted">
-            © OpenStreetMap · CARTO
+            © OpenStreetMap contributors · © CARTO
           </Typography>
         </View>
       </View>
@@ -349,6 +395,36 @@ export function TripRouteMap({
         </Typography>
       ) : null}
     </View>
+  );
+}
+
+function RouteMapTile({
+  tile,
+  onFailed,
+}: {
+  tile: Tile;
+  onFailed: (tileKey: string) => void;
+}) {
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const [failed, setFailed] = useState(false);
+  const uri = tile.uris[sourceIndex];
+
+  if (!uri || failed) return null;
+
+  return (
+    <Image
+      source={{ uri, headers: { 'User-Agent': TILE_USER_AGENT } }}
+      resizeMode="stretch"
+      style={[styles.tile, { left: tile.left, top: tile.top }]}
+      onError={() => {
+        if (sourceIndex + 1 < tile.uris.length) {
+          setSourceIndex((current) => Math.min(current + 1, tile.uris.length - 1));
+        } else {
+          setFailed(true);
+          onFailed(tile.key);
+        }
+      }}
+    />
   );
 }
 
@@ -384,6 +460,25 @@ const styles = StyleSheet.create({
   liveDot: { width: 7, height: 7, borderRadius: 4 },
   map: { height: 220, width: '100%', overflow: 'hidden', borderRadius: cardRadius },
   tile: { position: 'absolute', width: TILE_SIZE, height: TILE_SIZE },
+  mapPlaceholder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.xs,
+    padding: space.md,
+  },
+  tileUnavailable: {
+    position: 'absolute',
+    top: space.sm,
+    left: space.sm,
+    right: space.sm,
+    alignItems: 'center',
+    gap: space.xs,
+    padding: space.sm,
+    borderRadius: cardRadius / 2,
+  },
+  tileUnavailableText: { textAlign: 'center' },
+  retryMapButton: { minHeight: 34, paddingHorizontal: space.sm },
   gpsNotice: { position: 'absolute', top: space.sm, left: space.sm, right: space.sm, flexDirection: 'row', alignItems: 'center', gap: space.xs, padding: space.sm, borderRadius: cardRadius / 2 },
   gpsNoticeText: { flex: 1 },
   attribution: { position: 'absolute', right: space.xs, bottom: space.xs, paddingHorizontal: space.xs, paddingVertical: 2, borderRadius: cardRadius / 3 },
