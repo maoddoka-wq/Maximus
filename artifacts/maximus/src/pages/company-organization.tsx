@@ -8,7 +8,7 @@ import { StructureTab } from './organization-structure';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { CompanySubscriptionTab } from './company-subscription-tab';
 
-type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
+type Mutate = (fn: (data: StoreData) => void, message?: string | null) => void;
 type OrganizationTab = 'structure' | 'roles' | 'employees' | 'profile' | 'publicSite' | 'subscription';
 
 export { CompanyProfileSection } from './company-profile-section';

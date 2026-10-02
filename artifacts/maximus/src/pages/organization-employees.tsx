@@ -18,7 +18,7 @@ import { synchronizeSelectedPackRolesForCompany } from '@/lib/module-role-sync';
 import { repairSelectedPackRolesAndAccounts } from '@/lib/pack-role-repair';
 import { ActionButton, Field, Modal } from './organization-shared';
 
-type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
+type Mutate = (fn: (data: StoreData) => void, message?: string | null) => void;
 type EmployeeFormData = Omit<Employee, 'id' | 'companyId' | 'status' | 'department' | 'subDepartment' | 'role'> & { role: string; loginPassword?: string };
 
 function getSectorDescendantIds(nodes: OrgNode[], rootId: string) {
