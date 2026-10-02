@@ -128,7 +128,6 @@ class TransportMobileReleaseController extends Controller
 
         foreach ($releases as $release) {
             if (! is_array($release)
-                || ! empty($release['draft'])
                 || ! empty($release['prerelease'])
                 || ! preg_match(
                     '/^chauffeur-v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))$/',

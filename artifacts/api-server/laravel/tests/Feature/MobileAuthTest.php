@@ -168,6 +168,7 @@ class MobileAuthTest extends TestCase
             'https://api.github.com/repos/maoddoka-wq/Maximus/releases?per_page=100' => Http::response([
                 [
                     'tag_name' => 'chauffeur-v1.0.20',
+                    'draft' => true,
                     'name' => 'MAXIMUS Chauffeur 1.0.20',
                     'published_at' => '2026-10-02T00:00:00Z',
                     'assets' => [[

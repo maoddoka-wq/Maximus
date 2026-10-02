@@ -87,6 +87,7 @@
 - [Identifiants canoniques des fonctionnalités](canonical-feature-identities.md) — normaliser libellés, slugs et alias avant de filtrer permissions, menu et onglets internes.
 - [Qualification des chauffeurs](transport-driver-organization.md) — créer l’employé dans Organisation, puis ajouter dans Transport uniquement les données Taxi.
 - [Tuiles de carte publiques](map-tile-fallback.md) — les cartes Taxi client/chauffeur restent sur OSM sans clé; les autres cartes gardent leur fournisseur de repli documenté.
+- [Accès aux APK Chauffeur](chauffeur-apk-access.md) — conserver les releases en brouillon et ne distribuer l’APK que par l’API MAXIMUS authentifiée.
 - [Paiement récurrent Transport](transport-recurring-payment-boundary.md) — ne jamais simuler un renouvellement automatique avec le checkout DiamanoPay ponctuel ; il faut un mandat réutilisable documenté.
 - [Contrôle paiement par entreprise](company-payment-control.md) — l’autorisation de paiement est indépendante des modules et de l’abonnement, avec blocage serveur des nouveaux encaissements et retraits.
 - [Synchronisation rôles et comptes](role-auth-permissions-sync.md) — toute modification de rôle doit mettre à jour les permissions du compte authentifié des employés affectés avant confirmation.
