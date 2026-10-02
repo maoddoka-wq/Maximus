@@ -78,6 +78,7 @@
 - [Branche des Blueprints Render](render-blueprint-branch.md) — le PATCH API peut répondre 200 sans changer la branche; la définir dans le Dashboard puis vérifier l’état réel.
 - [Routage des domaines](custom-domain-routing.md) — distinguer ERP, boutique autorisée et hôte inconnu côté serveur, sans détection approximative par suffixe.
 - [Visibilité de l’espace entreprise](company-workspace-visibility.md) — Contrôle, Organisation et Guide sont masquables séparément par entreprise, avec blocage des routes directes.
+- [Design de la page Entreprise centrale](central-company-page-design.md) — conserver le design des modules; limiter une demande sur les autorisations à la zone supérieure.
 - [Frontière Transport Taxi](transport-module-boundary.md) — le cycle Taxi reste séparé de la Location e-commerce, avec ses propres ressources, permissions et données tenant-scoped.
 - [Rapprochement GPS Taxi](transport-gps-matching.md) — sélectionner côté serveur un chauffeur actif, libre et géolocalisé récemment, sans API cartographique externe.
 - [Restauration des courses publiques](public-taxi-trip-persistence.md) — conserver une course active après navigation ou erreur réseau ; ne nettoyer le stockage qu’après état terminal confirmé.

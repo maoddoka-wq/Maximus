@@ -9291,7 +9291,7 @@ function CompanyModulesDetail({
             {configuredModules.filter((module) => moduleStatuses[module.id] !== 'INACTIF').length} / {configuredModules.length}
           </span>
         </div>
-        <div className="mt-5 space-y-4">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
           {configuredModules.map((module) => {
             const status = moduleStatuses[module.id] ?? 'INACTIF';
             return (
@@ -9362,18 +9362,12 @@ function CompanyModulesDetail({
                         </div>
                         {module.id === 'ecommerce' && <p className="mb-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Pour autoriser les produits, cochez <strong>Vente de produits physiques</strong>, <strong>Vente de produits numériques</strong>, ou les deux.</p>}
                         <div className="space-y-2">
-                          <div className="hidden grid-cols-[minmax(0,1fr)_repeat(3,5rem)] items-center gap-3 px-3 text-[10px] font-bold uppercase tracking-[.1em] text-[hsl(var(--muted-foreground))] sm:grid">
-                            <span>Fonctionnalité</span>
-                            {permissionActions.map(action => (
-                              <span key={action.id} className="text-center">{action.label}</span>
-                            ))}
-                          </div>
                           {getModuleFeatureOptions(module).filter(feature => normalizeFeatureIdsForSelectedPacks(module, [feature.id], packSelections[module.id] ?? []).length > 0).map((feature) => {
                             const selected = (featureSelections[module.id] ?? []).includes(feature.id);
                             const permissions = featurePermissions[module.id]?.[feature.id] ?? [];
                             return (
-                              <div key={feature.id} className={`grid gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,1fr)_repeat(3,5rem)] sm:items-center ${selected ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--card)/.65)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--muted)/.25)] opacity-75'}`}>
-                                <div className="min-w-0">
+                              <div key={feature.id} className={`rounded-lg border p-3 ${selected ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--card)/.65)]' : 'border-[hsl(var(--border))] bg-[hsl(var(--muted)/.25)] opacity-75'}`}>
+                                <div className="flex flex-wrap items-center justify-between gap-3">
                                   <label className="flex min-w-0 items-center gap-2 text-xs font-semibold">
                                     <input
                                       type="checkbox"
@@ -9384,11 +9378,9 @@ function CompanyModulesDetail({
                                     />
                                     <span>{feature.label}</span>
                                   </label>
-                                  {!selected && <p className="mt-1 pl-6 text-[10px] text-[hsl(var(--muted-foreground))]">Fonctionnalité non visible dans l’espace entreprise.</p>}
-                                </div>
-                                <div className="grid grid-cols-3 gap-2 sm:contents">
+                                  <div className="flex flex-wrap gap-3">
                                     {permissionActions.map((action) => (
-                                      <label key={action.id} className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-[hsl(var(--muted-foreground))]">
+                                      <label key={action.id} className="flex items-center gap-1.5 text-[11px] font-semibold text-[hsl(var(--muted-foreground))]">
                                         <input
                                           type="checkbox"
                                           data-testid={`checkbox-company-permission-${module.id}-${feature.id}-${action.id}`}
@@ -9400,8 +9392,10 @@ function CompanyModulesDetail({
                                         {action.label}
                                       </label>
                                     ))}
+                                  </div>
                                 </div>
-                              </div>
+                                {!selected && <p className="mt-1 pl-6 text-[10px] text-[hsl(var(--muted-foreground))]">Fonctionnalité non visible dans l’espace entreprise.</p>}
+                                </div>
                             );
                           })}
                        </div>
