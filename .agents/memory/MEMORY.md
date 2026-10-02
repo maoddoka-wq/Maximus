@@ -30,6 +30,7 @@
 - [Publication du catalogue](catalog-workflow.md) — les changements modules, packs et secteurs restent en brouillon jusqu’à validation et publication explicite.
 - [Séparation production et démonstration](production-demo-separation.md) — les fixtures KORA restent locales et le fallback production ne doit contenir aucune donnée fictive.
 - [Espace client e-commerce](ecommerce-customer-space.md) — les sessions, commandes, adresses, favoris et paniers sont toujours bornés par client et entreprise.
+- [Opt-in du rapport des ventes](sales-report-opt-in.md) — réserver l’accès du rapport à une autorisation explicite, sans l’hériter des anciens accès E-commerce.
 - [Stockage des téléversements en production](render-upload-storage.md) — ne pas dépendre du disque local Render pour conserver les ressources publiques.
 - [Limites des téléversements PHP](php-upload-limits.md) — aligner les plafonds client et Laravel sur les directives PHP réelles pour éviter une image omise sans message.
 - [Champs vides du catalogue](catalogue-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel peut les convertir en null.

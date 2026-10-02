@@ -53,6 +53,7 @@ import {
   type EcommerceCarReservationStatus,
   type EcommerceCarTripType,
   type EcommerceStore,
+  type EcommerceSalesReportSource,
   type SellerWalletBootstrap,
 } from '@/lib/ecommerce-api';
 import EcommercePosPanel from '@/pages/ecommerce-pos-panel';
@@ -270,16 +271,11 @@ export default function EcommerceModulePage({
   const [data, setData] = useState<EcommerceBootstrap | null>(null);
   const [walletData, setWalletData] = useState<SellerWalletBootstrap | null>(null);
   const [posData, setPosData] = useState<EcommercePosSalesBootstrap | null>(null);
-  const reportSources = useMemo(() => {
-    const canViewSource = (featureId: 'commandes' | 'vente-comptoir') =>
-      (!allowedFeatureIds || allowedFeatureIds.includes(featureId))
-      && (!featurePermissions || Boolean(featurePermissions[featureId]?.includes('voir')));
-    return [
-      ...(canViewSource('commandes') ? ['ONLINE' as const] : []),
-      ...(canViewSource('vente-comptoir') ? ['COUNTER' as const] : []),
-    ];
-  }, [allowedFeatureIds, featurePermissions]);
-  const visibleTabs = tabs.filter(item => isEcommerceTabVisible(item.id, allowedFeatureIds));
+  const reportSources = useMemo<EcommerceSalesReportSource[]>(
+    () => preview ? ['ONLINE', 'COUNTER'] : [],
+    [preview],
+  );
+  const visibleTabs = tabs.filter(item => isEcommerceTabVisible(item.id, allowedFeatureIds, featurePermissions));
   const visibleTabIds = visibleTabs.map(item => item.id);
   const [tab, setTab] = useQueryTab({ tabs: visibleTabIds, defaultTab: visibleTabIds[0] ?? 'dashboard' });
   const [loading, setLoading] = useState(true);
@@ -382,11 +378,7 @@ export default function EcommerceModulePage({
   const store = data.store;
   const publicShopUrl = `/shop/${encodeURIComponent(store.slug || slugify(store.name) || 'boutique')}`;
   const navigate = (next: EcommerceTab) => setTab(next);
-  const permissionFeatureId = tab === 'accueil'
-    ? 'parametres'
-    : tab === 'rapport-ventes'
-      ? (reportSources.includes('ONLINE') ? 'commandes' : 'vente-comptoir')
-      : tab;
+  const permissionFeatureId = tab === 'accueil' ? 'parametres' : tab;
   const currentFeaturePermissions = featurePermissions?.[permissionFeatureId];
   const currentCanCreate = Boolean(canCreate && (!featurePermissions || currentFeaturePermissions?.includes('créer')));
   const currentCanModify = Boolean(canModify && currentCanCreate && (!featurePermissions || currentFeaturePermissions?.includes('modifier')));
@@ -459,20 +451,12 @@ export default function EcommerceModulePage({
         />
       )}
       {tab === 'rapport-ventes' && (
-        reportSources.length > 0 ? (
-          <EcommerceSalesReportPanel
-            companyId={companyId}
-            availableSources={reportSources}
-            storeName={store.name}
-            preview={preview}
-          />
-        ) : (
-          <Empty
-            icon={BarChart3}
-            title="Accès au rapport à configurer"
-            text="Activez Commandes ou Vente comptoir pour l’entreprise, puis accordez au rôle le droit Voir sur cette source."
-          />
-        )
+        <EcommerceSalesReportPanel
+          companyId={companyId}
+          availableSources={reportSources}
+          storeName={store.name}
+          preview={preview}
+        />
       )}
       {tab === 'categories' && <CategoryManager data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'commandes' && <><Orders data={data} canModify={currentCanModify} run={run} /><OrderAttachments data={data} /></>}

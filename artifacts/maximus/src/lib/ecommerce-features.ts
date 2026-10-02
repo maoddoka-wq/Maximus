@@ -6,6 +6,7 @@ export const ecommerceFeatureDefinitions = [
   { id: 'vente-numerique', label: 'Vente de produits numériques' },
   { id: 'categories', label: 'Catégories' },
   { id: 'commandes', label: 'Commandes' },
+  { id: 'rapport-ventes', label: 'Rapport des ventes' },
   { id: 'clients', label: 'Clients' },
   { id: 'promotions', label: 'Promotions' },
   { id: 'location', label: 'Location' },
@@ -52,6 +53,15 @@ export const ecommerceFeaturePacks = [
       clients: ['voir'],
       finances: ['voir', 'modifier'],
       parametres: ['voir', 'modifier'],
+    },
+  },
+  {
+    id: 'ecommerce-rapport-ventes',
+    name: 'Rapport des ventes',
+    description: 'Consulter les ventes des sources activées pour l’entreprise.',
+    featureIds: ['rapport-ventes'],
+    featurePermissions: {
+      'rapport-ventes': ['voir'],
     },
   },
   {
@@ -120,11 +130,11 @@ export const ecommerceFeaturePacks = [
     name: 'Supervision boutique',
     description: 'Superviser les ventes physiques et numériques, les promotions et les livraisons.',
     featureIds: ecommerceFeatureDefinitions
-      .filter(feature => feature.id !== 'vente-comptoir')
+        .filter(feature => !['vente-comptoir', 'rapport-ventes'].includes(feature.id))
       .map(feature => feature.id),
     featurePermissions: Object.fromEntries(
       ecommerceFeatureDefinitions
-        .filter(feature => feature.id !== 'vente-comptoir')
+        .filter(feature => !['vente-comptoir', 'rapport-ventes'].includes(feature.id))
         .map(feature => [
         feature.id,
         feature.id === 'dashboard' || feature.id === 'clients'

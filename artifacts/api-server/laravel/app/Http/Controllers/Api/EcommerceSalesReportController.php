@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Support\ModuleAuthorization;
+use App\Support\ModuleCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -20,13 +21,15 @@ final class EcommerceSalesReportController extends Controller
             return response()->json(['error' => 'Entreprise requise.'], 400);
         }
 
-        $canViewOnline = is_array($actor)
-            && ModuleAuthorization::allows($actor, 'ecommerce', 'view', 'commandes');
-        $canViewCounter = is_array($actor)
-            && ModuleAuthorization::allows($actor, 'ecommerce', 'view', 'vente-comptoir');
-        if (! $canViewOnline && ! $canViewCounter) {
-            return response()->json(['error' => 'Aucune vente n’est autorisée pour ce compte.'], 403);
+        if (! is_array($actor)
+            || ! ModuleAuthorization::allows($actor, 'ecommerce', 'view', 'rapport-ventes')) {
+            return response()->json(['error' => 'Le rapport des ventes n’est pas autorisé pour ce compte.'], 403);
         }
+
+        // The report's own view grant authorizes its data; source availability
+        // remains bounded by the features enabled for this company.
+        $canViewOnline = ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'commandes');
+        $canViewCounter = ModuleCatalog::allowsFeature($companyId, 'ecommerce', 'vente-comptoir');
 
         $query = $request->query();
         $input = Validator::make([
@@ -54,6 +57,31 @@ final class EcommerceSalesReportController extends Controller
             $canViewOnline ? 'ONLINE' : null,
             $canViewCounter ? 'COUNTER' : null,
         ]));
+        if (! $includeOnline && ! $includeCounter) {
+            return response()->json([
+                'sales' => [],
+                'availableSources' => [],
+                'summary' => [
+                    'totalSales' => 0,
+                    'onlineSales' => 0,
+                    'counterSales' => 0,
+                    'paidSales' => 0,
+                    'refundedSales' => 0,
+                    'revenueByCurrency' => [],
+                ],
+                'pagination' => [
+                    'page' => (int) $input['page'],
+                    'perPage' => (int) $input['perPage'],
+                    'total' => 0,
+                    'lastPage' => 1,
+                ],
+                'filters' => [
+                    'dateFrom' => (string) $input['dateFrom'],
+                    'dateTo' => (string) $input['dateTo'],
+                    'source' => $source,
+                ],
+            ]);
+        }
 
         $timezone = (string) config('app.timezone', 'UTC');
         $dateFrom = Carbon::parse((string) $input['dateFrom'], $timezone)->startOfDay();

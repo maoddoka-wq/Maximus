@@ -46,7 +46,7 @@ class EcommerceTest extends TestCase
 
     public function test_sales_report_combines_sources_scopes_company_and_groups_paid_revenue_by_currency(): void
     {
-        $this->setEcommerceFeatures(['dashboard', 'catalogue', 'commandes', 'vente-comptoir']);
+        $this->setEcommerceFeatures(['dashboard', 'catalogue', 'commandes', 'vente-comptoir', 'rapport-ventes']);
         $now = now();
         DB::table('ecommerce_stores')->updateOrInsert(
             ['id' => 'ecommerce-store-kora'],
@@ -174,13 +174,40 @@ class EcommerceTest extends TestCase
             ->assertJsonPath('availableSources', ['ONLINE', 'COUNTER']);
     }
 
-    public function test_sales_report_does_not_expose_a_source_without_its_view_permission(): void
+    public function test_sales_report_requires_its_own_company_feature_grant(): void
     {
         $this->setEcommerceFeatures(['dashboard', 'catalogue', 'commandes']);
 
         $this->asActor()
+            ->getJson('/api/ecommerce/sales-report?companyId=kora')
+            ->assertForbidden();
+    }
+
+    public function test_sales_report_sources_are_limited_to_company_enabled_features(): void
+    {
+        $this->setEcommerceFeatures(['dashboard', 'catalogue', 'commandes', 'rapport-ventes']);
+        $request = $this->asActor();
+
+        $request
+            ->getJson('/api/ecommerce/sales-report?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('availableSources', ['ONLINE']);
+
+        $request
             ->getJson('/api/ecommerce/sales-report?companyId=kora&source=COUNTER')
             ->assertForbidden();
+    }
+
+    public function test_sales_report_returns_an_empty_result_when_no_source_is_enabled(): void
+    {
+        $this->setEcommerceFeatures(['dashboard', 'catalogue', 'rapport-ventes']);
+
+        $this->asActor()
+            ->getJson('/api/ecommerce/sales-report?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('availableSources', [])
+            ->assertJsonPath('summary.totalSales', 0)
+            ->assertJsonPath('pagination.total', 0);
     }
 
     public function test_cash_pos_sale_decrements_shared_stock_once_and_reports_the_change(): void

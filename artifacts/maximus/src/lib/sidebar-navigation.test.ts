@@ -319,6 +319,63 @@ test('le menu e-commerce expose les catégories avec le catalogue', () => {
   ]);
 });
 
+test('le menu e-commerce expose le rapport des ventes quand MAXIMUS l’a autorisé', () => {
+  const groups = buildSidebarFeatureGroups({
+    allowed: ['ecommerce'],
+    configuredModules,
+    employeeRole: null,
+    employeeNode: null,
+    companyAdmin: true,
+    selectedFeatureIdsByModule: {
+      ecommerce: ['rapport-ventes'],
+    },
+  });
+
+  assert.deepEqual(groups.flatMap(group => group.items.map(item => item.href)), [
+    '/entreprise/ecommerce?tab=rapport-ventes',
+  ]);
+});
+
+test('le menu e-commerce respecte le droit de lecture du rapport pour les employés', () => {
+  const employeeNode = {
+    id: 'unit-sales-report',
+    companyId: 'kora',
+    parentId: null,
+    moduleIds: ['ecommerce'],
+    moduleFeatures: { ecommerce: ['rapport-ventes'] },
+  };
+  const baseInput = {
+    allowed: ['ecommerce'],
+    configuredModules,
+    employeeNode,
+    ecommerceFeatureIds: ['rapport-ventes'],
+  };
+
+  const authorized = buildSidebarFeatureGroups({
+    ...baseInput,
+    employeeRole: {
+      id: 'sales-report-reader',
+      name: 'Lecteur du rapport',
+      description: '',
+      modulePermissions: { 'ecommerce:menu:rapport-ventes': ['voir'] },
+    },
+  });
+  const denied = buildSidebarFeatureGroups({
+    ...baseInput,
+    employeeRole: {
+      id: 'sales-report-denied',
+      name: 'Sans accès au rapport',
+      description: '',
+      modulePermissions: { 'ecommerce:menu:commandes': ['voir'] },
+    },
+  });
+
+  assert.deepEqual(authorized.flatMap(group => group.items.map(item => item.href)), [
+    '/entreprise/ecommerce?tab=rapport-ventes',
+  ]);
+  assert.deepEqual(denied.flatMap(group => group.items.map(item => item.href)), []);
+});
+
 test('le menu e-commerce ne transforme pas les droits de vente en onglets', () => {
   const groups = buildSidebarFeatureGroups({
     allowed: ['ecommerce'],

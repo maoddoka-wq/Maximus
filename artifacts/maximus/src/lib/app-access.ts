@@ -140,7 +140,9 @@ export function buildAppAccessContext({
       // expose ses fonctionnalités historiques. Les nouvelles capacités du
       // Commerce unifié restent opt-in pour les entreprises déjà configurées.
       return module.id === 'ecommerce'
-        ? getModuleFeatureOptions(module).map(feature => feature.id).filter(featureId => featureId !== 'vente-comptoir')
+        ? getModuleFeatureOptions(module)
+          .map(feature => feature.id)
+          .filter(featureId => !['vente-comptoir', 'rapport-ventes'].includes(featureId))
         : undefined;
     }
 
@@ -173,7 +175,9 @@ export function buildAppAccessContext({
     const requestedFeatures = activeCompany.requestedModuleFeatures;
     if (!requestedFeatures || !Object.prototype.hasOwnProperty.call(requestedFeatures, module.id)) {
       return module.id === 'ecommerce'
-        ? new Set(getModuleFeatureOptions(module).map(feature => feature.id).filter(featureId => featureId !== 'vente-comptoir'))
+        ? new Set(getModuleFeatureOptions(module)
+          .map(feature => feature.id)
+          .filter(featureId => !['vente-comptoir', 'rapport-ventes'].includes(featureId)))
         : undefined;
     }
     return new Set(getEffectiveModuleFeatureIds(module, requestedFeatures[module.id] ?? []));
@@ -251,7 +255,9 @@ export function buildAppAccessContext({
         ? [...getSelectedFeatureIds(accessRole, ecommerceModule, employeeNode?.moduleFeatures?.[ecommerceModule.id])]
           .filter(featureId => {
             const ceiling = companyFeatureCeiling(ecommerceModule);
-            return !ceiling || ceiling.has(featureId);
+            return (!ceiling || ceiling.has(featureId))
+              && (featureId !== 'rapport-ventes'
+                || roleHasFeaturePermission(accessRole, employeeNode, ecommerceModule.id, featureId, 'voir'));
           })
         : undefined;
   const payrollModule = configuredModules.find(module => module.id === 'paie');

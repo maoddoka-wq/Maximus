@@ -58,6 +58,29 @@ test('expose et conserve la fonctionnalité Catégories dans les packs e-commerc
   assert.deepEqual(pack?.featurePermissions?.categories, ['voir', 'créer', 'modifier']);
 });
 
+test('expose Rapport des ventes comme pack facultatif et à lecture seule', () => {
+  const ecommerce = modules.find((module) => module.id === 'ecommerce');
+  assert.ok(ecommerce);
+
+  const report = getModuleFeatureOptions(ecommerce).find(feature => feature.id === 'rapport-ventes');
+  assert.deepEqual(report, { id: 'rapport-ventes', label: 'Rapport des ventes' });
+
+  const managementPack = ecommerce.featurePacks?.find(pack => pack.id === 'ecommerce-gestion');
+  assert.equal(managementPack?.featureIds.includes('rapport-ventes'), false);
+
+  const reportPack = ecommerce.featurePacks?.find(pack => pack.id === 'ecommerce-rapport-ventes');
+  assert.ok(reportPack?.featureIds.includes('rapport-ventes'));
+  assert.deepEqual(reportPack.featurePermissions?.['rapport-ventes'], ['voir']);
+
+  const draft = updatePackPermission(emptyModulePackDraft(), 'rapport-ventes', 'view');
+  const customPack = buildModulePack(
+    ecommerce,
+    { ...draft, name: 'Rapport', description: 'Consulter les ventes.' },
+    'pack-report',
+  );
+  assert.deepEqual(customPack?.featurePermissions?.['rapport-ventes'], ['voir']);
+});
+
 test('expose les autorisations de vente physique et numérique dans e-commerce', () => {
   const ecommerce = modules.find((module) => module.id === 'ecommerce');
   assert.ok(ecommerce);

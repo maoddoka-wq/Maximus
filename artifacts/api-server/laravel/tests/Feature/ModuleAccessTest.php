@@ -269,18 +269,20 @@ class ModuleAccessTest extends TestCase
         $this->withCredentials()->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($maximusAdmin))
             ->patchJson('/api/modules/ecommerce/access?companyId=kora', [
                 'status' => 'ACTIF',
-                'featureIds' => ['dashboard', 'catalogue'],
+                'featureIds' => ['dashboard', 'catalogue', 'rapport-ventes'],
                 'configuration' => [
                     'featureScope' => 'explicit',
-                    'packIds' => ['ecommerce-gestion'],
+                    'packIds' => ['ecommerce-gestion', 'ecommerce-rapport-ventes'],
                     'featurePermissions' => [
                         'dashboard' => ['voir'],
                         'catalogue' => ['voir', 'créer'],
+                        'rapport-ventes' => ['voir'],
                     ],
                 ],
             ])
             ->assertOk()
-            ->assertJsonPath('module.configuration.featurePermissions.catalogue.1', 'créer');
+            ->assertJsonPath('module.configuration.featurePermissions.catalogue.1', 'créer')
+            ->assertJsonPath('module.configuration.featurePermissions.rapport-ventes.0', 'voir');
 
         $company = Company::query()->findOrFail('kora');
         $this->assertSame(
@@ -288,8 +290,12 @@ class ModuleAccessTest extends TestCase
             $company->requested_module_permissions['ecommerce']['catalogue'],
         );
         $this->assertSame(
-            ['ecommerce-gestion'],
+            ['ecommerce-gestion', 'ecommerce-rapport-ventes'],
             $company->requested_module_pack_ids['ecommerce'],
+        );
+        $this->assertSame(
+            ['voir'],
+            $company->requested_module_permissions['ecommerce']['rapport-ventes'],
         );
     }
 
@@ -324,6 +330,24 @@ class ModuleAccessTest extends TestCase
         $this->asCompanyAdmin()
             ->getJson('/api/ecommerce/location/settings?companyId=kora')
             ->assertForbidden();
+    }
+
+    public function test_sales_report_requires_an_explicit_company_feature_grant_for_legacy_access(): void
+    {
+        DB::table('maximus_company_modules')->updateOrInsert(
+            ['company_id' => 'kora', 'module_id' => 'ecommerce'],
+            [
+                'id' => 'company-module-kora-ecommerce',
+                'status' => 'ACTIF',
+                'feature_ids' => json_encode([]),
+                'configuration' => json_encode([]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        $this->assertFalse(ModuleCatalog::allowsFeature('kora', 'ecommerce', 'rapport-ventes'));
+        $this->assertTrue(ModuleCatalog::allowsFeature('kora', 'ecommerce', 'commandes'));
     }
 
     private function asCompanyAdmin(): self

@@ -73,6 +73,7 @@ const ecommerceFeatureIcons: Record<string, Icon> = {
   catalogue: Package,
   categories: Tags,
   commandes: ShoppingCart,
+  'rapport-ventes': FileBarChart,
   clients: Users,
   promotions: CreditCard,
   livraisons: Warehouse,
@@ -94,10 +95,12 @@ const payrollFeatureIcons: Record<string, Icon> = {
 function buildEcommerceNavigationItems(
   module: Module,
   selectedFeatureIds: Set<string>,
+  canViewSalesReport: boolean,
 ) {
   const featureItems = getModuleFeatureOptions(module)
     .filter(feature => !ecommerceCapabilityFeatureIds.has(feature.id))
     .filter(feature => selectedFeatureIds.has(feature.id))
+    .filter(feature => feature.id !== 'rapport-ventes' || canViewSalesReport)
     .map(feature => ({
       href: `/entreprise/ecommerce?tab=${feature.id}`,
       label: feature.label,
@@ -183,13 +186,24 @@ export function buildSidebarFeatureGroups({
       if (allowed.includes('ecommerce')) {
         const ecommerceModule = configuredModules.find(item => item.id === 'ecommerce');
         if (ecommerceModule) {
+          const hasExplicitEcommerceSelection =
+            Object.prototype.hasOwnProperty.call(selectedFeatureIdsByModule ?? {}, 'ecommerce');
           const features = new Set(
             ecommerceFeatureIds
               ?? (moduleId === 'ecommerce'
                 ? [...selectedFeatureIds]
-                : getModuleFeatureOptions(ecommerceModule).map(feature => feature.id)),
+                : getModuleFeatureOptions(ecommerceModule)
+                  .filter(feature => !(
+                    companyAdmin
+                    && !employeeRole
+                    && !hasExplicitEcommerceSelection
+                    && feature.id === 'rapport-ventes'
+                  ))
+                  .map(feature => feature.id)),
           );
-          items.push(...buildEcommerceNavigationItems(ecommerceModule, features));
+          const canViewSalesReport = (companyAdmin && !employeeRole)
+            || roleHasFeaturePermission(employeeRole, employeeNode, ecommerceModule.id, 'rapport-ventes', 'voir');
+          items.push(...buildEcommerceNavigationItems(ecommerceModule, features, canViewSalesReport));
         }
       }
 
@@ -208,7 +222,12 @@ export function buildSidebarFeatureGroups({
             icon: stockFeatureIcons[submodule.id] ?? Warehouse,
           }))
         : moduleId === 'ecommerce'
-          ? buildEcommerceNavigationItems(module, selectedFeatureIds)
+          ? buildEcommerceNavigationItems(
+            module,
+            selectedFeatureIds,
+            (companyAdmin && !employeeRole)
+              || roleHasFeaturePermission(employeeRole, employeeNode, module.id, 'rapport-ventes', 'voir'),
+          )
         : moduleId === 'presences'
           ? getModuleFeatureOptions(module)
             .filter(feature => Boolean(
