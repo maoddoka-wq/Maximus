@@ -142,7 +142,7 @@ export function EmployeesTab({
             .filter(node => node.companyId === company.id && nodeIds.includes(node.id))
             .map(node => node.id),
         );
-      }, 'Les rôles issus des packs ont été vérifiés avec les droits de l’entreprise.');
+      }, null);
       setPackRoleRepairStatus('ready');
     })().catch(error => {
       if (packRoleRepairRun.current !== runId) return;
@@ -210,11 +210,6 @@ export function EmployeesTab({
         </div>
         <ActionButton className="shrink-0 self-start" primary disabled={packRoleRepairStatus !== 'ready' || companyNodes.length === 0 || companyRoles.length === 0} onClick={() => { setEditingEmployee(null); setModalOpen(true); }} testId="btn-create-employee">Ajouter un employé</ActionButton>
       </div>
-      {packRoleRepairStatus === 'checking' || packRoleRepairStatus === 'syncing' ? (
-        <p role="status" className="mx-6 mt-5 rounded-lg bg-[hsl(var(--muted))] p-3 text-sm text-[hsl(var(--muted-foreground))]">
-          Vérification des rôles préremplis et de leurs droits…
-        </p>
-      ) : null}
       {packRoleRepairStatus === 'failed' ? (
         <div role="alert" className="mx-6 mt-5 rounded-lg border border-[hsl(var(--destructive)/.3)] bg-[hsl(var(--destructive)/.08)] p-3 text-sm">
           <p>{packRoleRepairError} Si des comptes utilisent déjà ces rôles, certains peuvent avoir reçu les droits corrigés avant l’échec. Relancez la vérification pour terminer.</p>

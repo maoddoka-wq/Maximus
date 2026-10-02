@@ -14,3 +14,9 @@ Pour réparer un rôle prérempli encore lié à un pack, recalculer ses droits 
 **Why:** Un rôle métier corrigé ne révoque pas automatiquement les permissions déjà copiées dans les comptes authentifiés; une réparation locale seule peut laisser des droits incohérents.
 
 **How to apply:** Réparer uniquement les packs toujours sélectionnés, tester le chemin d’affectation avec un compte actif et couvrir le cas d’échec de provisionnement. Garder les contrôles d’entreprise et d’unité stricts plutôt que de rendre sélectionnable un rôle incompatible.
+
+Les réparations automatiques lancées à l’ouverture d’Organisation & accès restent silencieuses lorsqu’elles réussissent; ne pas répéter de bannière de vérification ni de toast de confirmation. Garder l’alerte d’échec et son action de nouvelle tentative.
+
+**Why:** Les messages informatifs sur les packs revenaient à chaque entrée dans une entreprise et l’utilisateur a demandé leur retrait, sans désactiver la réparation.
+
+**How to apply:** Supprimer les retours visuels récurrents de chargement et de succès; conserver la réparation automatique, son blocage temporaire des actions dépendantes et les erreurs actionnables.

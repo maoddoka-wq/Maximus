@@ -677,7 +677,7 @@ function AppContent() {
     });
   }, [session]);
 
-  const mutate = (fn: (draft: StoreData) => void, message?: string, persist = true) => {
+  const mutate = (fn: (draft: StoreData) => void, message?: string | null, persist = true) => {
     const previous = dataRef.current;
     const next = structuredClone(previous) as StoreData;
     fn(next);
