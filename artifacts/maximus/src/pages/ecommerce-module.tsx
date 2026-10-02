@@ -58,6 +58,7 @@ import {
 import EcommercePosPanel from '@/pages/ecommerce-pos-panel';
 import EcommerceSalesReportPanel from '@/pages/ecommerce-sales-report-panel';
 import { useQueryTab } from '@/lib/query-tab';
+import { isEcommerceTabVisible } from '@/lib/ecommerce-navigation';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
@@ -278,14 +279,7 @@ export default function EcommerceModulePage({
       ...(canViewSource('vente-comptoir') ? ['COUNTER' as const] : []),
     ];
   }, [allowedFeatureIds, featurePermissions]);
-  const visibleTabs = tabs.filter(item => {
-    if (item.id === 'rapport-ventes') return true;
-    if (!allowedFeatureIds) return true;
-    return item.id === 'dashboard'
-      || item.id === 'accueil'
-      || allowedFeatureIds.includes(item.id)
-      || (item.id === 'categories' && allowedFeatureIds.includes('catalogue'));
-  });
+  const visibleTabs = tabs.filter(item => isEcommerceTabVisible(item.id, allowedFeatureIds));
   const visibleTabIds = visibleTabs.map(item => item.id);
   const [tab, setTab] = useQueryTab({ tabs: visibleTabIds, defaultTab: visibleTabIds[0] ?? 'dashboard' });
   const [loading, setLoading] = useState(true);
