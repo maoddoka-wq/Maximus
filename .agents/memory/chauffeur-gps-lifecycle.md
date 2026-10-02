@@ -14,3 +14,9 @@ Ne pas considérer l’ancien indicateur de suivi comme un consentement GPS expl
 **Why:** L’ancien indicateur peut avoir été écrit automatiquement sans action volontaire du chauffeur; le réutiliser relancerait le GPS après mise à jour. Garder le consentement lors d’une suspension temporaire évite de redemander inutilement l’autorisation au retour dans l’application, sans réactiver le suivi en arrière-plan. La mise en pause évite de laisser un chauffeur sans GPS fraîchement actualisé apparaître disponible; un statut de course reste intact pour ne pas abandonner une course.
 
 **How to apply:** Toute évolution du GPS doit garder séparés le consentement durable du chauffeur et l’état d’exécution. Ne démarrer la lecture que lorsque l’application est active; sérialiser activation, suspension, reprise et arrêt. Mettre en pause `AVAILABLE` à chaque transition hors premier plan si les permissions le permettent et s’il n’y a pas de course attribuée/en cours; exiger une action du chauffeur pour redevenir disponible. Après une migration sans consentement fiable, arrêter l’ancien mécanisme et demander une activation explicite.
+
+Un seuil de déplacement non nul dans le watcher peut empêcher les positions d’être renouvelées lorsqu’un chauffeur reste immobile; le `timeInterval` seul ne garantit pas un heartbeat serveur. Utiliser des relevés périodiques même sans déplacement et baser l’état « GPS actif » sur un envoi API récemment confirmé.
+
+**Why:** Le serveur écarte les coordonnées trop anciennes même si le téléphone affiche encore le GPS comme activé; un chauffeur immobile peut donc sembler disponible sans être proposé aux clients.
+
+**How to apply:** Garder des mises à jour périodiques en premier plan sans seuil de distance, conserver une fraîcheur serveur stricte et rendre visible la perte des confirmations d’envoi. Tester le cas d’un chauffeur immobile et celui d’une requête GPS refusée.

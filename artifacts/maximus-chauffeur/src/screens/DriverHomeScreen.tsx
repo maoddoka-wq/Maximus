@@ -52,6 +52,7 @@ import {
   suspendDriverLocationTracking,
   stopDriverLocationTracking,
 } from '../services/location-tracking';
+import { reconcileGpsStateWithLocation } from '../services/location-sync-policy';
 import {
   shouldOpenLocationAppSettings,
   type LocationSetupFailure,
@@ -163,6 +164,21 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
 
     return () => clearTimeout(timeout);
   }, [liveDriverLocation]);
+
+  useEffect(() => {
+    const nextGpsState = reconcileGpsStateWithLocation(
+      gpsState,
+      isFreshDriverLocation(liveDriverLocation),
+    );
+    if (nextGpsState === gpsState) return;
+
+    setGpsState(nextGpsState);
+    setGpsMessage(
+      nextGpsState === 'stale'
+        ? 'Le serveur ne reçoit plus de position récente. Gardez MAXIMUS Chauffeur ouverte et actualisez le GPS.'
+        : null,
+    );
+  }, [gpsState, liveDriverLocation]);
 
   useEffect(() => {
     if (!driver) return;

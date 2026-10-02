@@ -5,10 +5,11 @@ import { Card } from '@workspace/maximus-chauffeur-design-system/components/nati
 import { Spinner } from '@workspace/maximus-chauffeur-design-system/components/native/spinner';
 import { Typography } from '@workspace/maximus-chauffeur-design-system/components/native/typography';
 import { isDriverAvailableWithActiveGps } from '../services/driver-availability-policy';
+import type { DriverGpsState } from '../services/location-sync-policy';
 import { cardRadius, space, type getPalette } from '../theme';
 
 type Palette = ReturnType<typeof getPalette>;
-export type GpsState = 'active' | 'starting' | 'attention' | 'inactive';
+export type GpsState = DriverGpsState;
 
 export function AvailabilityCard({
   driver,
@@ -41,17 +42,32 @@ export function AvailabilityCard({
       ? 'Disponible'
       : serverSaysAvailable && gpsState === 'starting'
         ? 'Vérification GPS'
+        : serverSaysAvailable && gpsState === 'stale'
+          ? 'GPS à actualiser'
         : 'En pause';
   const statusColor = isOnTrip || isAvailable ? colors.chart3 : colors.mutedForeground;
   const gpsLabel =
     gpsState === 'active' ? 'GPS actif' :
     gpsState === 'starting' ? 'Activation du GPS…' :
     gpsState === 'attention' ? 'GPS à activer' :
+    gpsState === 'stale' ? 'Position non confirmée' :
     'GPS en attente';
+  const availabilityActionLabel =
+    gpsState === 'stale' && serverSaysAvailable
+      ? 'Actualiser le GPS'
+      : isAvailable
+        ? 'Me mettre en pause'
+        : 'Passer disponible';
+  const availabilityAccessibilityLabel =
+    gpsState === 'stale' && serverSaysAvailable
+      ? 'Actualiser ma position GPS'
+      : isAvailable
+        ? 'Me mettre en pause'
+        : 'Passer disponible';
   const showEnableGpsButton =
-    gpsState === 'attention' &&
     Boolean(onEnableGps) &&
-    (isOnTrip || (serverSaysAvailable && !canToggle));
+    ((gpsState === 'attention' && (isOnTrip || (serverSaysAvailable && !canToggle))) ||
+      (gpsState === 'stale' && isOnTrip));
 
   return (
     <Card colors={colors} style={styles.card}>
@@ -98,13 +114,13 @@ export function AvailabilityCard({
           colors={colors}
           variant={isAvailable ? 'secondary' : 'default'}
           accessibilityRole="button"
-          accessibilityLabel={isAvailable ? 'Me mettre en pause' : 'Passer disponible'}
+          accessibilityLabel={availabilityAccessibilityLabel}
           disabled={isBusy}
           loading={isBusy}
           onPress={onToggle}
           style={styles.button}
         >
-          {isAvailable ? 'Me mettre en pause' : 'Passer disponible'}
+          {availabilityActionLabel}
         </Button>
       ) : null}
 
@@ -116,7 +132,7 @@ export function AvailabilityCard({
           onPress={onEnableGps}
           style={styles.gpsButton}
         >
-          Réactiver le GPS
+          {gpsState === 'stale' ? 'Actualiser le GPS' : 'Réactiver le GPS'}
         </Button>
       ) : null}
 
