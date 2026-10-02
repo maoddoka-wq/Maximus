@@ -13,6 +13,7 @@ import type { LocationSetupFailure } from './location-setup-policy';
 import { FOREGROUND_LOCATION_UPDATE_OPTIONS } from './location-sync-policy';
 import { createSerializedLocationOperations } from './serialized-location-operation-queue';
 import {
+  getFreshDriverLocationCoordinates,
   isFreshDriverLocation,
   type DriverLocationSnapshot,
 } from '../lib/trip-map-geometry';
@@ -125,10 +126,17 @@ async function startForegroundLocationUpdates(driverId: string): Promise<void> {
       ) {
         return;
       }
+      const coordinates = getFreshDriverLocationCoordinates({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        timestamp: location.timestamp,
+      });
+      if (!coordinates) return;
+
       void updateDriverPosition(
         driverId,
-        location.coords.latitude,
-        location.coords.longitude,
+        coordinates.latitude,
+        coordinates.longitude,
       )
         .then(() => {
           if (
@@ -221,10 +229,21 @@ async function enableDriverLocationTrackingUnlocked(
       accuracy: Location.Accuracy.High,
       mayShowUserSettingsDialog: true,
     });
+    const coordinates = getFreshDriverLocationCoordinates({
+      latitude: current.coords.latitude,
+      longitude: current.coords.longitude,
+      timestamp: current.timestamp,
+    });
+    if (!coordinates) {
+      throw new Error(
+        'Le téléphone n’a pas fourni de position GPS récente. Gardez l’application ouverte et réessayez.',
+      );
+    }
+
     await updateDriverPosition(
       driverId,
-      current.coords.latitude,
-      current.coords.longitude,
+      coordinates.latitude,
+      coordinates.longitude,
     );
     await startForegroundLocationUpdates(driverId);
     publishDriverLocation(current);
