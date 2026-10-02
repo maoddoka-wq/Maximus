@@ -15,6 +15,21 @@ class TransportTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        DB::table('company_public_site_access')->updateOrInsert(
+            ['company_id' => 'kora'],
+            [
+                'enabled' => true,
+                'updated_by' => 'transport-test',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+    }
+
     public function test_taxi_cycle_is_persisted_and_vehicle_returns_to_available_after_completion(): void
     {
         $request = $this->asActor();
@@ -136,6 +151,13 @@ class TransportTest extends TestCase
             'employeeId' => $driverEmployeeId,
             'licenseNumber' => 'SN-DISPATCH-001',
         ])->assertCreated();
+        $vehicle = $request->postJson('/api/transport/vehicles?companyId=kora', [
+            'registration' => 'DK-DISPATCH-01',
+            'model' => 'Toyota Yaris',
+            'vehicleType' => 'TAXI',
+            'driverId' => $driver->json('id'),
+            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ])->assertCreated();
         $request->patchJson('/api/transport/drivers/'.$driver->json('id').'/location?companyId=kora', [
             'latitude' => 0,
             'longitude' => 0,
@@ -148,13 +170,6 @@ class TransportTest extends TestCase
         $request->patchJson('/api/transport/drivers/'.$driver->json('id').'/availability?companyId=kora', [
             'availability' => 'AVAILABLE',
         ])->assertOk();
-        $vehicle = $request->postJson('/api/transport/vehicles?companyId=kora', [
-            'registration' => 'DK-DISPATCH-01',
-            'model' => 'Toyota Yaris',
-            'vehicleType' => 'TAXI',
-            'driverId' => $driver->json('id'),
-            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-        ])->assertCreated();
         $trip = $request->postJson('/api/transport/trips?companyId=kora', [
             'pickup' => 'Point E',
             'destination' => 'Plateau',
@@ -215,14 +230,14 @@ class TransportTest extends TestCase
         ]);
     }
 
-    public function test_driver_requires_fresh_gps_before_becoming_available(): void
+    public function test_driver_requires_fresh_gps_and_available_vehicle_before_becoming_available(): void
     {
         ModuleCatalog::ensureCompanyAccess('kora');
         DB::table('maximus_company_modules')
             ->where('company_id', 'kora')
             ->where('module_id', 'transport')
             ->update([
-                'feature_ids' => json_encode(['overview', 'trips', 'drivers']),
+                'feature_ids' => json_encode(['overview', 'trips', 'drivers', 'vehicles']),
                 'configuration' => json_encode(['featureScope' => 'explicit']),
             ]);
         $admin = $this->asActor();
@@ -244,6 +259,16 @@ class TransportTest extends TestCase
             'latitude' => 14.7167,
             'longitude' => -17.4677,
         ])->assertOk();
+        $admin->patchJson($availabilityPath, ['availability' => 'AVAILABLE'])
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'Rattachez un véhicule disponible à ce chauffeur avant de vous rendre disponible.');
+        $admin->postJson('/api/transport/vehicles?companyId=kora', [
+            'registration' => 'DK-GPS-AVAILABLE-01',
+            'model' => 'Toyota GPS disponibilité',
+            'vehicleType' => 'TAXI',
+            'driverId' => $driverId,
+            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ])->assertCreated();
         $admin->patchJson($availabilityPath, ['availability' => 'AVAILABLE'])
             ->assertOk()
             ->assertJsonPath('availability', 'AVAILABLE');
@@ -411,7 +436,30 @@ class TransportTest extends TestCase
 
     public function test_public_taxi_matches_the_nearest_driver_with_a_recent_gps_position(): void
     {
-        Http::fake();
+        Http::fake([
+            'https://nominatim.openstreetmap.org/*' => Http::response([
+                [
+                    'lat' => '14.7300',
+                    'lon' => '-17.4500',
+                    'display_name' => 'Almadies, Dakar, Sénégal',
+                    'type' => 'place',
+                ],
+            ]),
+            'https://router.project-osrm.org/*' => Http::response([
+                'code' => 'Ok',
+                'routes' => [[
+                    'distance' => 4200,
+                    'duration' => 900,
+                    'geometry' => [
+                        'type' => 'LineString',
+                        'coordinates' => [
+                            [-17.4677, 14.7167],
+                            [-17.4500, 14.7300],
+                        ],
+                    ],
+                ]],
+            ]),
+        ]);
         ModuleCatalog::ensureCompanyAccess('kora');
         DB::table('maximus_company_modules')
             ->where('company_id', 'kora')
@@ -499,7 +547,7 @@ class TransportTest extends TestCase
             ->assertJsonPath('trip.vehicleImageUrl', '/taxi-car.svg');
 
         $this->asActor('employee', [
-            'transport:menu:trips' => ['voir', 'modifier'],
+            'transport:menu:trips' => ['voir', 'créer', 'modifier'],
         ], $freshDriver)
             ->patchJson('/api/transport/trips/'.$tripId.'/status?companyId=kora', [
                 'status' => 'ASSIGNED',

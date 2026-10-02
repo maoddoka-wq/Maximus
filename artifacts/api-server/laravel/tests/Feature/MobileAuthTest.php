@@ -33,6 +33,13 @@ class MobileAuthTest extends TestCase
             'licenseNumber' => 'SN-MOBILE-001',
         ])->assertCreated();
         $driverPath = '/api/transport/drivers/'.$driver->json('id');
+        $adminRequest->postJson('/api/transport/vehicles?companyId=kora', [
+            'registration' => 'DK-MOBILE-01',
+            'model' => 'Toyota Mobile',
+            'vehicleType' => 'TAXI',
+            'driverId' => $driver->json('id'),
+            'imageData' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ])->assertCreated();
         $adminRequest->patchJson($driverPath.'/location?companyId=kora', [
             'latitude' => 14.7167,
             'longitude' => -17.4677,
@@ -380,7 +387,7 @@ class MobileAuthTest extends TestCase
             ->where('company_id', 'kora')
             ->where('module_id', 'transport')
             ->update([
-                'feature_ids' => json_encode(['overview', 'trips', 'drivers']),
+                'feature_ids' => json_encode(['overview', 'trips', 'drivers', 'vehicles']),
                 'configuration' => json_encode(['featureScope' => 'explicit']),
             ]);
     }

@@ -356,6 +356,15 @@ class TransportController extends Controller
                 'error' => 'Activez le GPS et partagez une position récente avant de vous rendre disponible.',
             ], 422);
         }
+        if ($input['availability'] === 'AVAILABLE' && ! DB::table('transport_vehicles')
+            ->where('company_id', $company)
+            ->where('driver_id', $id)
+            ->where('status', 'AVAILABLE')
+            ->exists()) {
+            return response()->json([
+                'error' => 'Rattachez un véhicule disponible à ce chauffeur avant de vous rendre disponible.',
+            ], 422);
+        }
         if ($input['availability'] === 'PAUSED' && DB::table('transport_trips')
             ->where('company_id', $company)
             ->where('driver_id', $id)

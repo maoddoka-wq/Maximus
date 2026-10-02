@@ -9,11 +9,11 @@ La sélection Taxi utilise uniquement les coordonnées GPS envoyées par l’app
 
 **How to apply:** Toute nouvelle entrée de course doit recevoir la position du client depuis son appareil, refuser une position absente ou obsolète, et ne retourner au client que les coordonnées de contact du chauffeur effectivement affecté.
 
-Un chauffeur ne peut devenir disponible qu’avec une position acceptée par l’API, dans Dakar et encore fraîche. Les transitions automatiques après annulation, fin de course ou expiration d’offre appliquent la même vérification ; une fiche nouvellement créée commence en pause.
+Un chauffeur ne peut devenir disponible qu’avec une position acceptée par l’API, dans Dakar et encore fraîche, ainsi qu’un véhicule `AVAILABLE` lié au même chauffeur et à la même entreprise. Les transitions automatiques après annulation, fin de course ou expiration d’offre appliquent la vérification GPS ; une fiche nouvellement créée commence en pause.
 
-**Why:** Le statut `AVAILABLE` seul peut rendre un chauffeur éligible aux clients malgré une position absente ou périmée. Les transitions automatiques ne doivent pas contourner le contrôle manuel.
+**Why:** Le statut `AVAILABLE` seul peut rendre un chauffeur éligible aux clients malgré une position absente ou périmée ou un véhicule indisponible. Les transitions automatiques ne doivent pas contourner le contrôle manuel.
 
-**How to apply:** Réutiliser la règle serveur de fraîcheur configurée pour toute transition vers `AVAILABLE`; repasser en `PAUSED` si elle échoue, et n’afficher le GPS comme actif côté client qu’après confirmation de l’API.
+**How to apply:** Réutiliser la règle serveur de fraîcheur configurée pour toute transition vers `AVAILABLE`; refuser aussi ce statut sans véhicule disponible rattaché dans le même tenant, repasser en `PAUSED` si le contrôle GPS échoue, et n’afficher le GPS comme actif côté client qu’après confirmation de l’API.
 
 Ne jamais republier périodiquement la dernière position GPS connue en la faisant passer pour une nouvelle ; les décimales PostgreSQL doivent aussi être converties en nombres avant de les exposer aux cartes.
 
