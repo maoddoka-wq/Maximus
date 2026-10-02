@@ -279,7 +279,7 @@ export default function EcommerceModulePage({
     ];
   }, [allowedFeatureIds, featurePermissions]);
   const visibleTabs = tabs.filter(item => {
-    if (item.id === 'rapport-ventes') return reportSources.length > 0;
+    if (item.id === 'rapport-ventes') return true;
     if (!allowedFeatureIds) return true;
     return item.id === 'dashboard'
       || item.id === 'accueil'
@@ -465,12 +465,20 @@ export default function EcommerceModulePage({
         />
       )}
       {tab === 'rapport-ventes' && (
-        <EcommerceSalesReportPanel
-          companyId={companyId}
-          availableSources={reportSources}
-          storeName={store.name}
-          preview={preview}
-        />
+        reportSources.length > 0 ? (
+          <EcommerceSalesReportPanel
+            companyId={companyId}
+            availableSources={reportSources}
+            storeName={store.name}
+            preview={preview}
+          />
+        ) : (
+          <Empty
+            icon={BarChart3}
+            title="Accès au rapport à configurer"
+            text="Activez Commandes ou Vente comptoir pour l’entreprise, puis accordez au rôle le droit Voir sur cette source."
+          />
+        )
       )}
       {tab === 'categories' && <CategoryManager data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}
       {tab === 'commandes' && <><Orders data={data} canModify={currentCanModify} run={run} /><OrderAttachments data={data} /></>}
