@@ -1391,6 +1391,7 @@ class EcommerceController extends Controller
     private function publicStorePayload(object $row, ?array $features = null, array $galleryMap = []): array
     {
         $features ??= $this->publicEnabledFeatures((string) $row->company_id);
+        $visibility = $this->publicSiteVisibility((string) $row->company_id);
         $company = DB::table('companies')
             ->where('id', $row->company_id)
             ->whereNull('deleted_at')
@@ -1401,7 +1402,8 @@ class EcommerceController extends Controller
             'name' => $row->name,
             'description' => (string) ($row->description ?? ''),
             'status' => $row->status,
-            'homepageEnabled' => (bool) ($row->homepage_enabled ?? true),
+            'homepageEnabled' => $visibility['homepageEnabled'],
+            'bannerEnabled' => $visibility['bannerEnabled'],
             'currency' => $row->currency,
             'primaryColor' => $row->primary_color,
             'accentColor' => $row->accent_color,
@@ -1437,6 +1439,19 @@ class EcommerceController extends Controller
         }
 
         return $key === 'primaryColor' ? '#161D27' : '#F2B705';
+    }
+
+    /** @return array{homepageEnabled: bool, bannerEnabled: bool} */
+    private function publicSiteVisibility(string $companyId): array
+    {
+        $settings = DB::table('company_public_site_access')
+            ->where('company_id', $companyId)
+            ->first(['homepage_enabled', 'banner_enabled']);
+
+        return [
+            'homepageEnabled' => (bool) ($settings->homepage_enabled ?? true),
+            'bannerEnabled' => (bool) ($settings->banner_enabled ?? true),
+        ];
     }
 
     private function publicLocationSettings(string $company): array
@@ -2237,6 +2252,8 @@ class EcommerceController extends Controller
 
     private function store(object $row): array
     {
+        $visibility = $this->publicSiteVisibility((string) $row->company_id);
+
         return [
             'id' => $row->id,
             'companyId' => $row->company_id,
@@ -2244,7 +2261,8 @@ class EcommerceController extends Controller
             'name' => $row->name,
             'description' => $row->description,
             'status' => $row->status,
-            'homepageEnabled' => (bool) ($row->homepage_enabled ?? true),
+            'homepageEnabled' => $visibility['homepageEnabled'],
+            'bannerEnabled' => $visibility['bannerEnabled'],
             'currency' => $row->currency,
             'primaryColor' => $row->primary_color,
             'accentColor' => $row->accent_color,

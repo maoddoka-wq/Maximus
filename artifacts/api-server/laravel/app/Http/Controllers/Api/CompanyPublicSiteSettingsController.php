@@ -35,7 +35,6 @@ final class CompanyPublicSiteSettingsController extends Controller
             'description' => ['sometimes', 'nullable', 'string', 'max:500'],
             'primaryColor' => ['sometimes', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'accentColor' => ['sometimes', 'regex:/^#[0-9a-fA-F]{6}$/'],
-            'homepageEnabled' => ['sometimes', 'boolean'],
         ])->validate();
 
         $store = $this->ensureStore($companyId);
@@ -52,7 +51,6 @@ final class CompanyPublicSiteSettingsController extends Controller
                     : (string) ($store->description ?? ''),
                 'primary_color' => (string) ($input['primaryColor'] ?? $store->primary_color ?? '#D69E2E'),
                 'accent_color' => (string) ($input['accentColor'] ?? $store->accent_color ?? '#172033'),
-                'homepage_enabled' => (bool) ($input['homepageEnabled'] ?? $store->homepage_enabled ?? true),
                 'updated_at' => now(),
             ]);
 
@@ -254,6 +252,10 @@ final class CompanyPublicSiteSettingsController extends Controller
             abort(500, 'Les paramètres du site public n’ont pas pu être chargés.');
         }
 
+        $visibility = DB::table('company_public_site_access')
+            ->where('company_id', $store->company_id)
+            ->first(['homepage_enabled', 'banner_enabled']);
+
         return [
             'id' => (string) $store->id,
             'companyId' => (string) $store->company_id,
@@ -261,7 +263,8 @@ final class CompanyPublicSiteSettingsController extends Controller
             'name' => (string) $store->name,
             'description' => (string) ($store->description ?? ''),
             'status' => (string) $store->status,
-            'homepageEnabled' => (bool) ($store->homepage_enabled ?? true),
+            'homepageEnabled' => (bool) ($visibility->homepage_enabled ?? true),
+            'bannerEnabled' => (bool) ($visibility->banner_enabled ?? true),
             'currency' => (string) ($store->currency ?? 'XOF'),
             'primaryColor' => (string) ($store->primary_color ?? '#D69E2E'),
             'accentColor' => (string) ($store->accent_color ?? '#172033'),

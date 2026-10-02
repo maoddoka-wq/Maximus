@@ -193,18 +193,24 @@ final class InstallationSyncService
         ];
     }
 
-    /** @return array{enabled: bool} */
+    /** @return array{enabled: bool, homepageEnabled?: bool, bannerEnabled?: bool} */
     private function validatePublicSiteAccess(mixed $access, mixed $companyId): array
     {
         if (! is_array($access)
             || ! is_string($companyId)
             || $companyId === ''
             || ($access['companyId'] ?? null) !== $companyId
-            || ! is_bool($access['enabled'] ?? null)) {
+            || ! is_bool($access['enabled'] ?? null)
+            || (array_key_exists('homepageEnabled', $access) && ! is_bool($access['homepageEnabled']))
+            || (array_key_exists('bannerEnabled', $access) && ! is_bool($access['bannerEnabled']))) {
             throw new RuntimeException('Configuration de l’accès au site public invalide.');
         }
 
-        return ['enabled' => $access['enabled']];
+        return array_filter([
+            'enabled' => $access['enabled'],
+            'homepageEnabled' => $access['homepageEnabled'] ?? null,
+            'bannerEnabled' => $access['bannerEnabled'] ?? null,
+        ], static fn (mixed $value): bool => $value !== null);
     }
 
     private function applyValidated(
@@ -352,6 +358,12 @@ final class InstallationSyncService
                     'updated_by' => 'maximus-sync',
                     'updated_at' => now(),
                 ];
+                if (array_key_exists('homepageEnabled', $publicSiteAccess)) {
+                    $values['homepage_enabled'] = $publicSiteAccess['homepageEnabled'];
+                }
+                if (array_key_exists('bannerEnabled', $publicSiteAccess)) {
+                    $values['banner_enabled'] = $publicSiteAccess['bannerEnabled'];
+                }
                 if ($existingPublicSiteAccess) {
                     DB::table('company_public_site_access')
                         ->where('company_id', $companyId)

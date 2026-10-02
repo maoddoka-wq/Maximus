@@ -23,6 +23,13 @@ export type PublicSiteDomain = {
   verifiedAt: string | null;
 };
 
+export type PublicSiteAccessSettings = {
+  companyId: string;
+  enabled: boolean;
+  homepageEnabled: boolean;
+  bannerEnabled: boolean;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return requestJson<T>(path, init, { fallbackMessage: 'La demande d’entreprise est indisponible.' });
 }
@@ -112,7 +119,6 @@ export const companyRequestApi = {
       description: string;
       primaryColor: string;
       accentColor: string;
-      homepageEnabled: boolean;
     },
   ) =>
     request<{ store: EcommerceStore }>(
@@ -164,13 +170,16 @@ export const companyRequestApi = {
       { method: 'DELETE' },
     ),
   publicSiteAccess: (companyId: string) =>
-    request<{ companyId: string; enabled: boolean }>(
+    request<PublicSiteAccessSettings>(
       `/companies/${encodeURIComponent(companyId)}/public-site-access`,
     ),
-  updatePublicSiteAccess: (companyId: string, enabled: boolean) =>
-    request<{ ok: true; companyId: string; enabled: boolean }>(
+  updatePublicSiteAccess: (
+    companyId: string,
+    input: Partial<Pick<PublicSiteAccessSettings, 'enabled' | 'homepageEnabled' | 'bannerEnabled'>>,
+  ) =>
+    request<{ ok: true } & PublicSiteAccessSettings>(
       `/companies/${encodeURIComponent(companyId)}/public-site-access`,
-      { method: 'PATCH', body: JSON.stringify({ enabled }) },
+      { method: 'PATCH', body: JSON.stringify(input) },
     ),
   installationManifest: (companyId: string) =>
     request<{
@@ -195,6 +204,7 @@ export const companyRequestApi = {
         featureIds: Partial<Record<ModuleId, string[]>>;
         permissions: Partial<Record<ModuleId, Partial<Record<string, string[]>>>>;
       };
+      publicSiteAccess: PublicSiteAccessSettings;
     }>(`/companies/${encodeURIComponent(companyId)}/installation-manifest`),
   issueInstallation: (companyId: string, input: { mode: 'dedicated' | 'on_premise'; endpointUrl?: string; createNew?: boolean; installationId?: string }) =>
     request<{

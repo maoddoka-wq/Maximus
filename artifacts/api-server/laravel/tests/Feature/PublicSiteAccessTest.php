@@ -32,6 +32,7 @@ class PublicSiteAccessTest extends TestCase
             'primaryColor' => '#123456',
             'accentColor' => '#ABCDEF',
             'homepageEnabled' => false,
+            'bannerEnabled' => false,
         ])
             ->assertOk()
             ->assertJsonPath('store.name', 'Atelier Acme')
@@ -40,7 +41,8 @@ class PublicSiteAccessTest extends TestCase
             ->assertJsonPath('store.description', 'Une présentation indépendante du module E-commerce.')
             ->assertJsonPath('store.primaryColor', '#123456')
             ->assertJsonPath('store.accentColor', '#ABCDEF')
-            ->assertJsonPath('store.homepageEnabled', false);
+            ->assertJsonPath('store.homepageEnabled', true)
+            ->assertJsonPath('store.bannerEnabled', true);
 
         $this->assertDatabaseMissing('maximus_company_modules', [
             'company_id' => $company->id,
@@ -52,19 +54,30 @@ class PublicSiteAccessTest extends TestCase
         $this->authenticate($maximusAdmin)
             ->getJson('/api/companies/'.$company->id.'/public-site-access')
             ->assertOk()
-            ->assertJsonPath('enabled', false);
+            ->assertJsonPath('enabled', false)
+            ->assertJsonPath('homepageEnabled', true)
+            ->assertJsonPath('bannerEnabled', true);
 
-        $this->patchJson('/api/companies/'.$company->id.'/public-site-access', ['enabled' => true])
+        $this->patchJson('/api/companies/'.$company->id.'/public-site-access', [
+            'enabled' => true,
+            'homepageEnabled' => false,
+            'bannerEnabled' => true,
+        ])
             ->assertOk()
-            ->assertJsonPath('enabled', true);
+            ->assertJsonPath('enabled', true)
+            ->assertJsonPath('homepageEnabled', false)
+            ->assertJsonPath('bannerEnabled', true);
         $this->assertDatabaseHas('company_public_site_access', [
             'company_id' => $company->id,
             'enabled' => true,
+            'homepage_enabled' => false,
+            'banner_enabled' => true,
         ]);
         $this->getJson('/api/shop/atelier-acme-public')->assertOk();
         $this->getJson('/api/shop/atelier-acme-public')
             ->assertOk()
             ->assertJsonPath('store.homepageEnabled', false)
+            ->assertJsonPath('store.bannerEnabled', true)
             ->assertJsonPath('store.primaryColor', '#123456');
 
         $this->patchJson('/api/companies/'.$company->id.'/public-site-access', ['enabled' => false])
@@ -95,19 +108,39 @@ class PublicSiteAccessTest extends TestCase
             'description' => $uploadedStore['description'],
             'primaryColor' => $uploadedStore['primaryColor'],
             'accentColor' => $uploadedStore['accentColor'],
-            'homepageEnabled' => true,
         ])->assertOk();
 
         $maximusAdmin = $this->createActor('public-site-banner-maximus', 'maximus_admin', null);
         $this->authenticate($maximusAdmin)
-            ->patchJson('/api/companies/'.$company->id.'/public-site-access', ['enabled' => true])
-            ->assertOk();
+            ->patchJson('/api/companies/'.$company->id.'/public-site-access', [
+                'enabled' => true,
+                'homepageEnabled' => true,
+                'bannerEnabled' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('homepageEnabled', true)
+            ->assertJsonPath('bannerEnabled', false);
 
         $heroUrl = $uploaded->json('store.heroImages.0');
         $this->getJson('/api/shop/'.$publicSlug)
             ->assertOk()
+            ->assertJsonPath('store.homepageEnabled', true)
+            ->assertJsonPath('store.bannerEnabled', false)
             ->assertJsonPath('store.heroImages.0', $heroUrl);
         $this->get($heroUrl)->assertOk();
+        $this->authenticate($companyAdmin)
+            ->getJson('/api/company-public-site?companyId='.$company->id)
+            ->assertOk()
+            ->assertJsonPath('store.heroImages.0', $heroUrl);
+
+        $this->authenticate($maximusAdmin)
+            ->patchJson('/api/companies/'.$company->id.'/public-site-access', ['bannerEnabled' => true])
+            ->assertOk()
+            ->assertJsonPath('bannerEnabled', true);
+        $this->getJson('/api/shop/'.$publicSlug)
+            ->assertOk()
+            ->assertJsonPath('store.bannerEnabled', true)
+            ->assertJsonPath('store.heroImages.0', $heroUrl);
 
         $imageId = basename($uploaded->json('store.heroImages.0'));
         $this->authenticate($companyAdmin)

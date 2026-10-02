@@ -130,6 +130,12 @@ final class InstallationController extends Controller
             'enabled' => (bool) DB::table('company_public_site_access')
                 ->where('company_id', $company->id)
                 ->value('enabled'),
+            'homepageEnabled' => (bool) (DB::table('company_public_site_access')
+                ->where('company_id', $company->id)
+                ->value('homepage_enabled') ?? true),
+            'bannerEnabled' => (bool) (DB::table('company_public_site_access')
+                ->where('company_id', $company->id)
+                ->value('banner_enabled') ?? true),
         ];
         $hiddenWorkspaceFeatures = $this->hiddenWorkspaceFeatures((string) $company->id);
 

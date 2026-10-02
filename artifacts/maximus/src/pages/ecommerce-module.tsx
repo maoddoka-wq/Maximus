@@ -297,6 +297,7 @@ export default function EcommerceModulePage({
           description: 'Aperçu administratif sans données de production.',
           status: 'DRAFT',
           homepageEnabled: true,
+          bannerEnabled: true,
           currency: 'XOF',
           ...maximusShopColors,
           logoUrl: '',

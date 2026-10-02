@@ -8310,6 +8310,10 @@ function CompanyModulesDetail({
   const [paymentLoading, setPaymentLoading] = useState(true);
   const [publicSiteEnabled, setPublicSiteEnabled] = useState(false);
   const [savedPublicSiteEnabled, setSavedPublicSiteEnabled] = useState(false);
+  const [publicHomepageEnabled, setPublicHomepageEnabled] = useState(true);
+  const [savedPublicHomepageEnabled, setSavedPublicHomepageEnabled] = useState(true);
+  const [publicBannerEnabled, setPublicBannerEnabled] = useState(true);
+  const [savedPublicBannerEnabled, setSavedPublicBannerEnabled] = useState(true);
   const [publicSiteLoading, setPublicSiteLoading] = useState(true);
   const [publicSiteSaving, setPublicSiteSaving] = useState(false);
   const [publicSiteError, setPublicSiteError] = useState('');
@@ -8332,6 +8336,7 @@ function CompanyModulesDetail({
   const [activeCompanySettingsTab, setActiveCompanySettingsTab] = useState('access');
   const companySettingsTabs = [
     { id: 'access', label: 'Accès & permissions', icon: ShieldCheck },
+    { id: 'public-site', label: 'Site public', icon: Store },
     { id: 'connection', label: 'Connexion publique', icon: LogIn },
     { id: 'installation', label: 'Installations', icon: KeyRound },
   ];
@@ -8465,17 +8470,29 @@ function CompanyModulesDetail({
     setPublicSiteError('');
     setPublicSiteEnabled(false);
     setSavedPublicSiteEnabled(false);
+    setPublicHomepageEnabled(true);
+    setSavedPublicHomepageEnabled(true);
+    setPublicBannerEnabled(true);
+    setSavedPublicBannerEnabled(true);
     setPublicSiteSaving(false);
     void companyRequestApi.publicSiteAccess(company.id)
-      .then(({ enabled }) => {
+      .then((settings) => {
         if (cancelled) return;
-        setPublicSiteEnabled(enabled);
-        setSavedPublicSiteEnabled(enabled);
+        setPublicSiteEnabled(settings.enabled);
+        setSavedPublicSiteEnabled(settings.enabled);
+        setPublicHomepageEnabled(settings.homepageEnabled);
+        setSavedPublicHomepageEnabled(settings.homepageEnabled);
+        setPublicBannerEnabled(settings.bannerEnabled);
+        setSavedPublicBannerEnabled(settings.bannerEnabled);
       })
       .catch((error) => {
         if (!cancelled) {
           setPublicSiteEnabled(false);
           setSavedPublicSiteEnabled(false);
+          setPublicHomepageEnabled(true);
+          setSavedPublicHomepageEnabled(true);
+          setPublicBannerEnabled(true);
+          setSavedPublicBannerEnabled(true);
           setPublicSiteError(error instanceof Error ? error.message : 'Le contrôle du site public est indisponible.');
         }
       })
@@ -8884,6 +8901,125 @@ function CompanyModulesDetail({
         ariaLabel={`Réglages de ${company.name}`}
         testIdPrefix="company-settings-tab"
       />
+      <div className={activeCompanySettingsTab === 'public-site' ? 'space-y-5' : 'hidden'}>
+        <Card className="p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="font-bold">Réglages du site public</h2>
+              <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
+                Ces réglages sont administrés par MAXIMUS et restent indépendants de la publication et des images de la boutique.
+              </p>
+            </div>
+            <Badge variant={publicSiteEnabled ? 'default' : 'secondary'} className="shrink-0">
+              {publicSiteLoading ? 'Chargement…' : publicSiteEnabled ? 'Site autorisé' : 'Site bloqué'}
+            </Badge>
+          </div>
+          <div className="mt-5 grid gap-3">
+            <label className={`flex items-start gap-3 rounded-xl border p-4 transition ${publicSiteEnabled ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)]' : 'bg-[hsl(var(--muted)/.4)]'}`}>
+              <Checkbox
+                data-testid="checkbox-company-public-site-access"
+                aria-label="Autoriser le site public de cette entreprise"
+                checked={publicSiteEnabled}
+                disabled={publicSiteLoading || publicSiteSaving}
+                onCheckedChange={(checked) => {
+                  setPublicSiteEnabled(checked === true);
+                  setPublicSiteError('');
+                }}
+                className="mt-0.5"
+              />
+              <span>
+                <strong className="block text-sm">Autoriser le site public</strong>
+                <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                  Autorisation générale. L’entreprise doit aussi publier son site dans Organisation et accès → Site public.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 rounded-xl border p-4">
+              <Checkbox
+                data-testid="checkbox-company-public-homepage-enabled"
+                aria-label="Autoriser la page d’accueil publique"
+                checked={publicHomepageEnabled}
+                disabled={publicSiteLoading || publicSiteSaving}
+                onCheckedChange={(checked) => {
+                  setPublicHomepageEnabled(checked === true);
+                  setPublicSiteError('');
+                }}
+                className="mt-0.5"
+              />
+              <span>
+                <strong className="block text-sm">Autoriser l’accueil entier</strong>
+                <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                  Cette autorisation contrôle toute la page d’accueil. Les autres rubriques publiques restent accessibles.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 rounded-xl border p-4">
+              <Checkbox
+                data-testid="checkbox-company-public-banner-enabled"
+                aria-label="Autoriser la bannière de l’accueil"
+                checked={publicBannerEnabled}
+                disabled={publicSiteLoading || publicSiteSaving}
+                onCheckedChange={(checked) => {
+                  setPublicBannerEnabled(checked === true);
+                  setPublicSiteError('');
+                }}
+                className="mt-0.5"
+              />
+              <span>
+                <strong className="block text-sm">Autoriser la bannière</strong>
+                <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                  Si elle est désactivée, rien de la bannière n’est affiché. Ses images restent enregistrées.
+                </span>
+              </span>
+            </label>
+          </div>
+          {publicSiteError && <p role="alert" className="mt-3 text-sm text-[hsl(var(--destructive))]">{publicSiteError}</p>}
+          <div className="mt-5 flex justify-end">
+            <DesignSystemActionButton
+              primary
+              testId="button-save-company-public-site-settings"
+              disabled={
+                publicSiteLoading
+                || publicSiteSaving
+                || (
+                  publicSiteEnabled === savedPublicSiteEnabled
+                  && publicHomepageEnabled === savedPublicHomepageEnabled
+                  && publicBannerEnabled === savedPublicBannerEnabled
+                )
+              }
+              onClick={async () => {
+                const targetCompanyId = company.id;
+                setPublicSiteSaving(true);
+                setPublicSiteError('');
+                try {
+                  const settings = await companyRequestApi.updatePublicSiteAccess(targetCompanyId, {
+                    enabled: publicSiteEnabled,
+                    homepageEnabled: publicHomepageEnabled,
+                    bannerEnabled: publicBannerEnabled,
+                  });
+                  if (publicSiteCompanyIdRef.current !== targetCompanyId) return;
+                  setPublicSiteEnabled(settings.enabled);
+                  setSavedPublicSiteEnabled(settings.enabled);
+                  setPublicHomepageEnabled(settings.homepageEnabled);
+                  setSavedPublicHomepageEnabled(settings.homepageEnabled);
+                  setPublicBannerEnabled(settings.bannerEnabled);
+                  setSavedPublicBannerEnabled(settings.bannerEnabled);
+                } catch (error) {
+                  if (publicSiteCompanyIdRef.current !== targetCompanyId) return;
+                  setPublicSiteEnabled(savedPublicSiteEnabled);
+                  setPublicHomepageEnabled(savedPublicHomepageEnabled);
+                  setPublicBannerEnabled(savedPublicBannerEnabled);
+                  setPublicSiteError(error instanceof Error ? error.message : 'Les réglages du site public n’ont pas pu être enregistrés.');
+                } finally {
+                  if (publicSiteCompanyIdRef.current === targetCompanyId) setPublicSiteSaving(false);
+                }
+              }}
+            >
+              {publicSiteSaving ? 'Enregistrement…' : 'Enregistrer les réglages'}
+            </DesignSystemActionButton>
+          </div>
+        </Card>
+      </div>
       <div className={activeCompanySettingsTab === 'installation' ? 'space-y-5' : 'hidden'}>
       <section className="card-surface rounded-2xl border border-[hsl(var(--primary)/.25)] p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -8964,66 +9100,6 @@ function CompanyModulesDetail({
               Les modules, les droits de leurs fonctionnalités et les accès transverses sont regroupés ici.
             </p>
           </div>
-        </div>
-      </Card>
-      <Card className="p-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="font-bold">Accès au site public</h2>
-            <p className="mt-1 max-w-2xl text-sm text-[hsl(var(--muted-foreground))]">
-              Contrôle général, distinct d’E-commerce. La publication de l’entreprise reste séparée et les pages disponibles
-              dépendent toujours des modules et fonctionnalités autorisés.
-            </p>
-          </div>
-          <Badge variant={publicSiteEnabled ? 'default' : 'secondary'} className="shrink-0">
-            {publicSiteLoading ? 'Chargement…' : publicSiteEnabled ? 'Autorisé' : 'Bloqué'}
-          </Badge>
-        </div>
-        <div className={`mt-5 flex items-start gap-3 rounded-xl border p-4 transition ${publicSiteEnabled ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)]' : 'bg-[hsl(var(--muted)/.4)]'}`}>
-          <Checkbox
-            data-testid="checkbox-company-public-site-access"
-            aria-label="Autoriser le site public de cette entreprise"
-            checked={publicSiteEnabled}
-            disabled={publicSiteLoading || publicSiteSaving}
-            onCheckedChange={(checked) => {
-              setPublicSiteEnabled(checked === true);
-              setPublicSiteError('');
-            }}
-            className="mt-0.5"
-          />
-          <span>
-            <strong className="block text-sm">Autoriser le site public de cette entreprise</strong>
-            <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-              Cette autorisation ne publie pas le site à elle seule. L’entreprise doit aussi choisir le statut « Publié » dans Organisation et accès → Site public.
-            </span>
-          </span>
-        </div>
-        {publicSiteError && <p role="alert" className="mt-3 text-sm text-[hsl(var(--destructive))]">{publicSiteError}</p>}
-        <div className="mt-5 flex justify-end">
-          <DesignSystemActionButton
-            primary
-            testId="button-save-company-public-site-access"
-            disabled={publicSiteLoading || publicSiteSaving || publicSiteEnabled === savedPublicSiteEnabled}
-            onClick={async () => {
-              const targetCompanyId = company.id;
-              setPublicSiteSaving(true);
-              setPublicSiteError('');
-              try {
-                const access = await companyRequestApi.updatePublicSiteAccess(targetCompanyId, publicSiteEnabled);
-                if (publicSiteCompanyIdRef.current !== targetCompanyId) return;
-                setPublicSiteEnabled(access.enabled);
-                setSavedPublicSiteEnabled(access.enabled);
-              } catch (error) {
-                if (publicSiteCompanyIdRef.current !== targetCompanyId) return;
-                setPublicSiteEnabled(savedPublicSiteEnabled);
-                setPublicSiteError(error instanceof Error ? error.message : 'La configuration du site public n’a pas pu être enregistrée.');
-              } finally {
-                if (publicSiteCompanyIdRef.current === targetCompanyId) setPublicSiteSaving(false);
-              }
-            }}
-          >
-            {publicSiteSaving ? 'Enregistrement…' : 'Enregistrer l’accès au site'}
-          </DesignSystemActionButton>
         </div>
       </Card>
       </div>

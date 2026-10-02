@@ -2235,7 +2235,7 @@ function ShopHomePage({
   }, [heroImages.length]);
 
   return <section className="space-y-6 sm:space-y-10">
-    <div className="relative min-h-[240px] overflow-hidden rounded-3xl p-5 text-white shadow-xl sm:min-h-[340px] sm:p-9">
+    {store.bannerEnabled && <div className="relative min-h-[240px] overflow-hidden rounded-3xl p-5 text-white shadow-xl sm:min-h-[340px] sm:p-9">
        <div
          className="absolute inset-0 flex transition-transform duration-1000 ease-in-out motion-reduce:transition-none"
          style={{ transform: `translateX(-${heroIndex * 100}%)` }}
@@ -2260,7 +2260,7 @@ function ShopHomePage({
           Voir la boutique <ArrowRight size={16} />
         </button>
       </div>
-    </div>
+    </div>}
     <div className="flex flex-col gap-10">
       <DiscoveryRail title="Tous les produits" items={products} type="product" store={store} onProduct={onProduct} onAdd={onAdd} />
       {locationEnabled && <DiscoveryRail title="Locations disponibles" items={rentals} type="rental" store={store} onLocation={onLocation} />}

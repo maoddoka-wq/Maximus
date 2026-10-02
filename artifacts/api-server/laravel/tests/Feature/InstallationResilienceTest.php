@@ -118,26 +118,48 @@ class InstallationResilienceTest extends TestCase
         $payload['publicSiteAccess'] = [
             'companyId' => 'sync-company',
             'enabled' => false,
+            'homepageEnabled' => false,
+            'bannerEnabled' => true,
         ];
 
         $sync->apply($payload, true);
         $this->assertDatabaseHas('company_public_site_access', [
             'company_id' => 'sync-company',
             'enabled' => false,
+            'homepage_enabled' => false,
+            'banner_enabled' => true,
         ]);
 
         $payload['publicSiteAccess']['enabled'] = true;
+        $payload['publicSiteAccess']['homepageEnabled'] = true;
+        $payload['publicSiteAccess']['bannerEnabled'] = false;
         $sync->apply($payload);
         $this->assertDatabaseHas('company_public_site_access', [
             'company_id' => 'sync-company',
             'enabled' => true,
+            'homepage_enabled' => true,
+            'banner_enabled' => false,
+        ]);
+
+        $payload['publicSiteAccess'] = [
+            'companyId' => 'sync-company',
+            'enabled' => false,
+        ];
+        $sync->apply($payload);
+        $this->assertDatabaseHas('company_public_site_access', [
+            'company_id' => 'sync-company',
+            'enabled' => false,
+            'homepage_enabled' => true,
+            'banner_enabled' => false,
         ]);
 
         unset($payload['publicSiteAccess']);
         $sync->apply($payload);
         $this->assertDatabaseHas('company_public_site_access', [
             'company_id' => 'sync-company',
-            'enabled' => true,
+            'enabled' => false,
+            'homepage_enabled' => true,
+            'banner_enabled' => false,
         ]);
     }
 

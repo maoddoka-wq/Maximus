@@ -9,7 +9,7 @@ import { OrganizationPublicSiteDomains } from './organization-public-site-domain
 
 type PublicSiteForm = Pick<
   EcommerceStore,
-  'name' | 'slug' | 'status' | 'description' | 'primaryColor' | 'accentColor' | 'homepageEnabled'
+  'name' | 'slug' | 'status' | 'description' | 'primaryColor' | 'accentColor'
 >;
 
 function slugify(value: string): string {
@@ -50,7 +50,6 @@ export function OrganizationPublicSite({ company }: { company: Company }) {
           description: loadedStore.description,
           primaryColor: loadedStore.primaryColor,
           accentColor: loadedStore.accentColor,
-          homepageEnabled: loadedStore.homepageEnabled,
         });
         setSlugEdited(false);
       })
@@ -92,7 +91,6 @@ export function OrganizationPublicSite({ company }: { company: Company }) {
         description: result.store.description,
         primaryColor: result.store.primaryColor,
         accentColor: result.store.accentColor,
-        homepageEnabled: result.store.homepageEnabled,
       });
       setLogoFile(null);
       setNotice('Les paramètres du site public ont été enregistrés.');
@@ -249,26 +247,6 @@ export function OrganizationPublicSite({ company }: { company: Company }) {
               <option value="PUBLISHED">Publié</option>
               <option value="SUSPENDED">Suspendu</option>
             </select>
-          </label>
-
-          <label className="flex items-start gap-3 rounded-xl border p-4">
-            <input
-              data-testid="checkbox-public-homepage-enabled"
-              type="checkbox"
-              checked={form.homepageEnabled}
-              disabled={saving}
-              onChange={event => setForm(current => current ? {
-                ...current,
-                homepageEnabled: event.target.checked,
-              } : current)}
-              className="mt-0.5"
-            />
-            <span>
-              <span className="block text-sm font-bold">Activer la page d’accueil publique</span>
-              <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                Les autres rubriques publiques restent accessibles lorsque cette page est désactivée.
-              </span>
-            </span>
           </label>
 
           <label className="block text-xs font-bold">

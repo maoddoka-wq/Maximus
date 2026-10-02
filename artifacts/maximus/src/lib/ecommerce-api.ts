@@ -176,6 +176,7 @@ export interface EcommerceStore {
   description: string;
   status: EcommerceStoreStatus;
   homepageEnabled: boolean;
+  bannerEnabled: boolean;
   currency: 'XOF' | 'EUR' | 'USD';
   primaryColor: string;
   accentColor: string;
