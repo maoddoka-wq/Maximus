@@ -48,6 +48,7 @@ import {
 import {
   enableDriverLocationTracking,
   resumeDriverLocationTracking,
+  subscribeToDriverLocationIssue,
   subscribeToDriverLocation,
   suspendDriverLocationTracking,
   stopDriverLocationTracking,
@@ -105,6 +106,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
   const colors = getPalette(scheme, session.company.primaryColor);
   const [gpsState, setGpsState] = useState<GpsState>('inactive');
   const [gpsMessage, setGpsMessage] = useState<string | null>(null);
+  const [gpsQualityMessage, setGpsQualityMessage] = useState<string | null>(null);
   const [liveDriverLocation, setLiveDriverLocation] =
     useState<DriverLocationSnapshot | null>(null);
   const [availabilityBusy, setAvailabilityBusy] = useState(false);
@@ -148,6 +150,10 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
   const photoUri = companyLogoUri(session.company.profilePhoto);
 
   useEffect(() => subscribeToDriverLocation(setLiveDriverLocation), []);
+  useEffect(
+    () => subscribeToDriverLocationIssue(setGpsQualityMessage),
+    [],
+  );
 
   useEffect(() => {
     if (!liveDriverLocation) return;
@@ -175,7 +181,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
     setGpsState(nextGpsState);
     setGpsMessage(
       nextGpsState === 'stale'
-        ? 'Le serveur ne reçoit plus de position récente. Gardez MAXIMUS Chauffeur ouverte et actualisez le GPS.'
+        ? 'La dernière position GPS confirmée n’est plus récente. Gardez MAXIMUS Chauffeur ouverte et actualisez le GPS.'
         : null,
     );
   }, [gpsState, liveDriverLocation]);
@@ -591,6 +597,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                 isBusy={availabilityBusy || gpsState === 'starting'}
                 gpsState={gpsState}
                 gpsMessage={
+                  gpsQualityMessage ??
                   gpsMessage ??
                   (!canUpdateLocation
                     ? 'Votre compte ne permet pas le partage de position.'

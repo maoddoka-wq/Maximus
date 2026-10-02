@@ -1,7 +1,7 @@
 const TILE_BASE_URL = 'https://tile.openstreetmap.org';
 
 export const DRIVER_MAP_TILE_HEADERS = {
-  'User-Agent': 'MAXIMUS Chauffeur (+https://github.com/maoddoka-wq/Maximus)',
+  'User-Agent': 'MAXIMUS-Chauffeur/1.0.10 (+https://github.com/maoddoka-wq/Maximus)',
 } as const;
 
 export function getDriverMapTileUrls(zoom: number, tileX: number, tileY: number): string[] {

@@ -5,9 +5,11 @@ export type MapPoint = {
 
 export type DriverLocationSnapshot = MapPoint & {
   timestamp: number;
+  accuracy: number;
 };
 
 export const DRIVER_LOCATION_MAX_AGE_MS = 45_000;
+export const DRIVER_LOCATION_MAX_ACCURACY_METERS = 75;
 
 export function pointFromCoordinates(
   latitude: unknown,
@@ -47,7 +49,10 @@ export function isFreshDriverLocation(
   if (
     !location ||
     !pointFromCoordinates(location.latitude, location.longitude) ||
-    !Number.isFinite(location.timestamp)
+    !Number.isFinite(location.timestamp) ||
+    !Number.isFinite(location.accuracy) ||
+    location.accuracy < 0 ||
+    location.accuracy > DRIVER_LOCATION_MAX_ACCURACY_METERS
   ) {
     return false;
   }

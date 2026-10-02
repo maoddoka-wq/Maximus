@@ -44,6 +44,7 @@ test('accepts only recent driver GPS fixes', () => {
     latitude: 14.7167,
     longitude: -17.4677,
     timestamp: now,
+    accuracy: 12,
   };
 
   assert.equal(isFreshDriverLocation(current, now), true);

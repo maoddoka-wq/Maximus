@@ -1,7 +1,8 @@
 import * as Location from 'expo-location';
 import { AppState, Platform } from 'react-native';
+import { updateTransportDriverLocation } from '@workspace/api-client-react';
 import type { TransportDriver } from '@workspace/api-client-react';
-import { customFetch } from '../lib/api';
+import '../lib/api';
 import {
   hasLocationTrackingConsent,
   isLocationTrackingEnabled,
@@ -10,7 +11,11 @@ import {
 } from '../lib/auth-storage';
 import { canResumeLocationTracking } from './location-resume-policy';
 import type { LocationSetupFailure } from './location-setup-policy';
-import { FOREGROUND_LOCATION_UPDATE_OPTIONS } from './location-sync-policy';
+import {
+  FOREGROUND_LOCATION_UPDATE_OPTIONS,
+  getDriverLocationQualityMessage,
+  isPlausibleDriverLocationUpdate,
+} from './location-sync-policy';
 import { createSerializedLocationOperations } from './serialized-location-operation-queue';
 import {
   getFreshDriverLocationCoordinates,
@@ -25,6 +30,19 @@ let latestDriverLocation: DriverLocationSnapshot | null = null;
 const driverLocationListeners = new Set<
   (location: DriverLocationSnapshot | null) => void
 >();
+const driverLocationIssueListeners = new Set<
+  (message: string | null) => void
+>();
+let latestDriverLocationIssue: string | null = null;
+let latestObservedLocationTimestamp = 0;
+let queuedLocationUpdate: {
+  driverId: string;
+  generation: number;
+  location: Location.LocationObject;
+} | null = null;
+let locationUpdateInFlight = false;
+let locationRequestQueue: Promise<void> = Promise.resolve();
+let lastLocationUploadTimestamp = 0;
 
 function notifyDriverLocationListeners(): void {
   const position = isFreshDriverLocation(latestDriverLocation)
@@ -44,12 +62,24 @@ function publishDriverLocation(location: Location.LocationObject): void {
     latitude: location.coords.latitude,
     longitude: location.coords.longitude,
     timestamp: location.timestamp,
+    accuracy: location.coords.accuracy ?? Number.NaN,
   };
   if (!isFreshDriverLocation(snapshot)) return;
   if (latestDriverLocation && snapshot.timestamp < latestDriverLocation.timestamp) return;
 
   latestDriverLocation = snapshot;
   notifyDriverLocationListeners();
+}
+
+function publishDriverLocationIssue(message: string | null): void {
+  latestDriverLocationIssue = message;
+  for (const listener of driverLocationIssueListeners) {
+    try {
+      listener(message);
+    } catch (error) {
+      console.error('MAXIMUS Chauffeur could not notify a GPS quality issue.', error);
+    }
+  }
 }
 
 function clearPublishedDriverLocation(): void {
@@ -69,25 +99,146 @@ export function subscribeToDriverLocation(
   };
 }
 
+export function subscribeToDriverLocationIssue(
+  listener: (message: string | null) => void,
+): () => void {
+  driverLocationIssueListeners.add(listener);
+  listener(latestDriverLocationIssue);
+  return () => {
+    driverLocationIssueListeners.delete(listener);
+  };
+}
+
 export async function updateDriverPosition(
   driverId: string,
-  latitude: number,
-  longitude: number,
-): Promise<void> {
-  await customFetch<TransportDriver>(
-    `/api/transport/drivers/${encodeURIComponent(driverId)}/location`,
-    {
-      method: 'PATCH',
-      responseType: 'json',
-      body: JSON.stringify({ latitude, longitude }),
-    },
+  location: DriverLocationSnapshot,
+): Promise<boolean> {
+  const request = locationRequestQueue.then(async () => {
+    if (
+      !isFreshDriverLocation(location) ||
+      location.timestamp <= lastLocationUploadTimestamp
+    ) {
+      return false;
+    }
+
+    lastLocationUploadTimestamp = location.timestamp;
+    await updateTransportDriverLocation(driverId, {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      accuracy: location.accuracy,
+      measuredAt: Math.round(location.timestamp),
+    });
+    return true;
+  });
+  locationRequestQueue = request.then(
+    () => undefined,
+    () => undefined,
   );
+  return request;
+}
+
+function snapshotFromLocation(
+  location: Location.LocationObject,
+): DriverLocationSnapshot {
+  return {
+    latitude: location.coords.latitude,
+    longitude: location.coords.longitude,
+    timestamp: location.timestamp,
+    accuracy: location.coords.accuracy ?? Number.NaN,
+  };
+}
+
+async function drainQueuedLocationUpdate(): Promise<void> {
+  if (locationUpdateInFlight) return;
+  locationUpdateInFlight = true;
+
+  try {
+    while (queuedLocationUpdate) {
+      const queued = queuedLocationUpdate;
+      queuedLocationUpdate = null;
+      if (
+        queued.generation !== foregroundGeneration ||
+        AppState.currentState !== 'active'
+      ) {
+        continue;
+      }
+
+      const snapshot = snapshotFromLocation(queued.location);
+      const qualityMessage = getDriverLocationQualityMessage(snapshot);
+      if (qualityMessage) {
+        publishDriverLocationIssue(qualityMessage);
+        continue;
+      }
+
+      const previous = isFreshDriverLocation(latestDriverLocation)
+        ? latestDriverLocation
+        : null;
+      if (!isPlausibleDriverLocationUpdate(previous, snapshot)) {
+        publishDriverLocationIssue(
+          'Le GPS a signalé un déplacement incohérent. Attendez quelques secondes que le téléphone confirme sa position.',
+        );
+        continue;
+      }
+
+      try {
+        const uploaded = await updateDriverPosition(queued.driverId, snapshot);
+        if (
+          !uploaded ||
+          queued.generation !== foregroundGeneration ||
+          AppState.currentState !== 'active'
+        ) {
+          continue;
+        }
+
+        publishDriverLocation(queued.location);
+        if (snapshot.timestamp >= latestObservedLocationTimestamp) {
+          publishDriverLocationIssue(null);
+        }
+      } catch (error) {
+        if (queued.generation === foregroundGeneration) {
+          publishDriverLocationIssue(
+            'La position GPS n’a pas pu être confirmée par le serveur. Vérifiez votre connexion.',
+          );
+        }
+        console.error('MAXIMUS Chauffeur could not send the foreground location.', error);
+      }
+    }
+  } finally {
+    locationUpdateInFlight = false;
+    if (queuedLocationUpdate) {
+      void drainQueuedLocationUpdate();
+    }
+  }
+}
+
+function queueForegroundLocationUpdate(
+  driverId: string,
+  generation: number,
+  location: Location.LocationObject,
+): void {
+  if (location.timestamp <= latestObservedLocationTimestamp) return;
+
+  const qualityMessage = getDriverLocationQualityMessage(
+    snapshotFromLocation(location),
+  );
+  if (qualityMessage) {
+    queuedLocationUpdate = null;
+    publishDriverLocationIssue(qualityMessage);
+    return;
+  }
+
+  latestObservedLocationTimestamp = location.timestamp;
+  queuedLocationUpdate = { driverId, generation, location };
+  void drainQueuedLocationUpdate();
 }
 
 async function stopForegroundLocationUpdates(): Promise<void> {
   const subscription = foregroundLocationSubscription;
   foregroundGeneration += 1;
+  queuedLocationUpdate = null;
+  latestObservedLocationTimestamp = 0;
   clearPublishedDriverLocation();
+  publishDriverLocationIssue(null);
   if (!subscription) {
     foregroundDriverId = null;
     return;
@@ -116,7 +267,7 @@ async function startForegroundLocationUpdates(driverId: string): Promise<void> {
   const generation = foregroundGeneration;
   const subscription = await Location.watchPositionAsync(
     {
-      accuracy: Location.Accuracy.High,
+      accuracy: Location.Accuracy.Highest,
       ...FOREGROUND_LOCATION_UPDATE_OPTIONS,
     },
     (location) => {
@@ -126,33 +277,14 @@ async function startForegroundLocationUpdates(driverId: string): Promise<void> {
       ) {
         return;
       }
-      const coordinates = getFreshDriverLocationCoordinates({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        timestamp: location.timestamp,
-      });
-      if (!coordinates) return;
-
-      void updateDriverPosition(
-        driverId,
-        coordinates.latitude,
-        coordinates.longitude,
-      )
-        .then(() => {
-          if (
-            generation === foregroundGeneration &&
-            AppState.currentState === 'active'
-          ) {
-            publishDriverLocation(location);
-          }
-        })
-        .catch((error) => {
-          console.error('MAXIMUS Chauffeur could not send the foreground location.', error);
-        });
+      queueForegroundLocationUpdate(driverId, generation, location);
     },
     (error) => {
       if (generation === foregroundGeneration) {
         clearPublishedDriverLocation();
+        publishDriverLocationIssue(
+          'Le GPS ne fournit plus de position. Vérifiez les services de localisation du téléphone.',
+        );
         console.error('MAXIMUS Chauffeur foreground location watcher failed.', error);
       }
     },
@@ -226,27 +358,28 @@ async function enableDriverLocationTrackingUnlocked(
     }
 
     const current = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
+      accuracy: Location.Accuracy.Highest,
       mayShowUserSettingsDialog: true,
     });
-    const coordinates = getFreshDriverLocationCoordinates({
-      latitude: current.coords.latitude,
-      longitude: current.coords.longitude,
-      timestamp: current.timestamp,
-    });
+    const currentSnapshot = snapshotFromLocation(current);
+    const qualityMessage = getDriverLocationQualityMessage(currentSnapshot);
+    const coordinates = getFreshDriverLocationCoordinates(currentSnapshot);
     if (!coordinates) {
       throw new Error(
-        'Le téléphone n’a pas fourni de position GPS récente. Gardez l’application ouverte et réessayez.',
+        qualityMessage ??
+          'Le téléphone n’a pas fourni de position GPS récente. Gardez l’application ouverte et réessayez.',
       );
     }
 
-    await updateDriverPosition(
-      driverId,
-      coordinates.latitude,
-      coordinates.longitude,
-    );
+    const uploaded = await updateDriverPosition(driverId, currentSnapshot);
+    if (!uploaded) {
+      throw new Error(
+        'La position GPS a expiré avant sa confirmation. Réessayez dans un endroit dégagé.',
+      );
+    }
     await startForegroundLocationUpdates(driverId);
     publishDriverLocation(current);
+    publishDriverLocationIssue(null);
     await setLocationTrackingEnabled(true);
     return { ok: true };
   } catch (error) {
