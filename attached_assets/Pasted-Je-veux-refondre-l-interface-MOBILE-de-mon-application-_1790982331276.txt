@@ -1,0 +1,377 @@
+Je veux refondre l'interface MOBILE de mon application MAXIMUS Chauffeur.
+
+IMPORTANT :
+La maquette fournie est une INSPIRATION UX/UI et non une liste obligatoire de fonctionnalités.
+
+NE PAS COPIER OU INVENTER des fonctionnalités qui n'existent pas actuellement dans mon application.
+
+Avant toute modification, analyse attentivement :
+1. les fonctionnalités réellement présentes dans le projet ;
+2. les routes/pages existantes ;
+3. les API disponibles ;
+4. les données réellement retournées par le backend ;
+5. la logique actuelle des chauffeurs ;
+6. le système de disponibilité ;
+7. le fonctionnement du GPS/localisation ;
+8. les courses ;
+9. l'authentification ;
+10. les rôles et permissions.
+
+OBJECTIF PRINCIPAL :
+Améliorer fortement l'expérience MOBILE sans casser la logique métier existante.
+
+La maquette jointe sert uniquement de référence visuelle pour :
+- la structure mobile ;
+- la navigation basse ;
+- l'organisation des informations ;
+- les cartes ;
+- les espacements ;
+- la hiérarchie visuelle ;
+- le design moderne ;
+- la lisibilité ;
+- l'utilisation d'un thème sombre ;
+- les couleurs MAXIMUS ;
+- l'expérience chauffeur.
+
+==================================================
+1. NAVIGATION MOBILE
+==================================================
+
+Si la structure actuelle du projet le permet, organiser l'application autour d'une navigation basse fixe.
+
+Exemple de structure :
+
+🏠 Accueil
+🚗 Courses
+🔔 Notifications
+👤 Profil
+
+Ajouter d'autres onglets UNIQUEMENT s'ils correspondent à une fonctionnalité réellement existante.
+
+NE PAS créer artificiellement :
+- Gains
+- Documents
+- SOS
+- véhicule
+- paiements
+- etc.
+
+si ces fonctionnalités ne sont pas déjà disponibles dans le projet.
+
+Si une fonctionnalité existe mais n'a pas besoin d'être un onglet principal, la placer dans Profil, Paramètres ou un menu secondaire.
+
+==================================================
+2. ACCUEIL CHAUFFEUR
+==================================================
+
+L'accueil doit être beaucoup plus simple que l'interface actuelle.
+
+Actuellement trop de fonctionnalités sont exposées simultanément.
+
+L'accueil doit principalement afficher :
+
+- identité du chauffeur ;
+- statut actuel ;
+- état du GPS/localisation ;
+- bouton principal pour changer le statut ;
+- course actuelle ou message indiquant qu'il n'y a aucune course ;
+- éventuellement les informations réellement disponibles et utiles.
+
+Ne pas afficher une longue succession de cartes inutiles.
+
+Créer une hiérarchie claire :
+
+Bonjour, [nom]
+
+[ STATUT ]
+
+[ GPS / LOCALISATION ]
+
+[ COURSE ACTUELLE ]
+
+Puis laisser de l'espace visuel.
+
+==================================================
+3. STATUT CHAUFFEUR
+==================================================
+
+Conserver EXACTEMENT la logique métier actuelle.
+
+Ne pas modifier le fonctionnement backend du statut sans nécessité.
+
+Le chauffeur doit comprendre immédiatement s'il est :
+
+- disponible ;
+- en pause ;
+- hors ligne ;
+- ou dans un autre état réellement prévu par l'application.
+
+Le bouton principal doit être très visible.
+
+Exemple :
+
+🟢 Disponible
+Position partagée
+
+[ PASSER EN PAUSE ]
+
+ou selon la logique réelle du projet.
+
+==================================================
+4. GPS / LOCALISATION
+==================================================
+
+ATTENTION :
+
+Le système GPS est une partie sensible de l'application.
+
+NE PAS modifier ou réécrire inutilement la logique GPS existante.
+
+L'interface doit simplement présenter clairement son état :
+
+GPS actif
+GPS en attente
+Permission refusée
+Localisation indisponible
+etc.
+
+Utiliser uniquement les états réellement gérés par le code.
+
+NE PAS introduire une nouvelle logique de localisation qui pourrait provoquer des crashs ou fermer l'application.
+
+==================================================
+5. COURSES
+==================================================
+
+Créer une section/page Courses uniquement avec les fonctionnalités réellement présentes.
+
+Si l'application gère actuellement :
+
+- courses attribuées ;
+- acceptation ;
+- refus ;
+- course en cours ;
+- course terminée ;
+
+les organiser clairement.
+
+Utiliser des cartes compactes.
+
+Exemple visuel :
+
+Nouvelle course
+Départ
+Destination
+Distance
+Montant si disponible
+
+[ VOIR LA COURSE ]
+
+Mais NE PAS afficher une donnée si elle n'existe pas dans le backend.
+
+==================================================
+6. DÉTAIL D'UNE COURSE
+==================================================
+
+Lorsqu'une course existe, présenter les informations réellement disponibles de manière claire.
+
+Priorité :
+
+1. statut de la course ;
+2. départ ;
+3. destination ;
+4. informations client si disponibles ;
+5. informations véhicule si disponibles ;
+6. informations financières si disponibles ;
+7. actions disponibles.
+
+Les boutons doivent dépendre de l'état réel de la course.
+
+Exemple :
+
+[ ACCEPTER ]
+
+puis après acceptation :
+
+[ DÉMARRER ]
+
+puis :
+
+[ TERMINER ]
+
+Mais utiliser UNIQUEMENT les actions réellement implémentées dans le backend.
+
+NE PAS créer de faux boutons fonctionnels.
+
+==================================================
+7. NOTIFICATIONS
+==================================================
+
+Si le système de notifications existe déjà, créer une présentation claire :
+
+- nouvelles courses ;
+- messages ;
+- informations système ;
+- autres notifications réellement disponibles.
+
+Si le système n'existe pas encore, NE PAS inventer un backend de notifications.
+
+On peut uniquement préparer l'interface de manière compatible avec une future fonctionnalité.
+
+==================================================
+8. PROFIL
+==================================================
+
+Regrouper ici les informations réellement disponibles :
+
+- nom ;
+- téléphone ;
+- entreprise ;
+- véhicule ;
+- paramètres ;
+- déconnexion ;
+- autres informations réellement présentes.
+
+Ne pas inventer des données.
+
+==================================================
+9. DESIGN
+==================================================
+
+Utiliser la maquette comme inspiration.
+
+Style souhaité :
+
+- premium ;
+- professionnel ;
+- moderne ;
+- mobile-first ;
+- sombre ;
+- élégant ;
+- peu chargé ;
+- cartes arrondies ;
+- boutons clairement visibles ;
+- typographie lisible ;
+- espaces généreux ;
+- icônes cohérentes ;
+- couleurs MAXIMUS.
+
+Conserver l'identité visuelle actuelle de MAXIMUS lorsque cela est pertinent.
+
+Le vert MAXIMUS peut servir aux actions principales et états positifs.
+
+Éviter de mettre du vert partout.
+
+==================================================
+10. RESPONSIVE
+==================================================
+
+L'application doit être pensée d'abord pour smartphone.
+
+Tester particulièrement :
+
+- petits écrans Android ;
+- écrans 360px ;
+- écrans 390px ;
+- écrans 412px ;
+- différentes tailles de texte ;
+- navigation basse ;
+- clavier ouvert ;
+- écran avec encoche ;
+- barre système Android.
+
+Aucune information importante ne doit être coupée.
+
+==================================================
+11. NE PAS CASSER L'EXISTANT
+==================================================
+
+C'est extrêmement important.
+
+Avant de modifier le code :
+
+- analyser l'architecture ;
+- identifier les composants existants ;
+- identifier les routes ;
+- identifier les appels API ;
+- identifier les états ;
+- identifier les modèles de données ;
+- identifier les fonctionnalités réellement opérationnelles.
+
+Puis refactoriser progressivement.
+
+NE PAS remplacer toute l'application par une nouvelle architecture simplement pour obtenir le design de la maquette.
+
+NE PAS supprimer une fonctionnalité existante.
+
+NE PAS modifier le backend si ce n'est pas nécessaire pour la refonte UI.
+
+NE PAS modifier la logique GPS sans nécessité.
+
+NE PAS modifier l'authentification.
+
+NE PAS créer de données fictives en production.
+
+==================================================
+12. RÈGLE ESSENTIELLE
+==================================================
+
+La maquette représente la DESTINATION VISUELLE.
+
+Le code actuel représente la SOURCE DE VÉRITÉ fonctionnelle.
+
+Donc :
+
+MAQUETTE = inspiration UX/UI
+CODE EXISTANT = vérité fonctionnelle
+
+Si une fonctionnalité apparaît dans la maquette mais n'existe pas dans l'application :
+
+→ ne pas la créer.
+
+Si une fonctionnalité existe dans l'application mais n'apparaît pas dans la maquette :
+
+→ la conserver et trouver l'endroit UX le plus logique pour l'intégrer.
+
+Si la logique actuelle impose une autre organisation :
+
+→ conserver la logique métier et adapter le design autour d'elle.
+
+==================================================
+13. MÉTHODE DE TRAVAIL
+==================================================
+
+Étape 1 :
+Analyser le projet sans modifier le code.
+
+Étape 2 :
+Faire l'inventaire des fonctionnalités réellement existantes.
+
+Étape 3 :
+Identifier les écrans actuels.
+
+Étape 4 :
+Proposer une nouvelle architecture mobile adaptée aux fonctionnalités existantes.
+
+Étape 5 :
+Refondre progressivement l'interface.
+
+Étape 6 :
+Tester toutes les interactions existantes.
+
+Étape 7 :
+Vérifier que le GPS, l'authentification, les courses et les API fonctionnent toujours.
+
+Étape 8 :
+Corriger les problèmes responsive.
+
+Étape 9 :
+Supprimer uniquement les éléments visuels inutiles ou redondants.
+
+À LA FIN :
+Donne-moi un résumé précis de :
+- ce qui a été modifié ;
+- les fonctionnalités conservées ;
+- les fonctionnalités déplacées ;
+- les fonctionnalités qui n'ont pas été ajoutées car elles n'existent pas encore ;
+- les éventuels problèmes détectés.
