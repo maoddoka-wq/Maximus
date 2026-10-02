@@ -1,6 +1,7 @@
 import { commerceTabDefinitions, commerceTabPermissionKeys } from './commerce-permissions';
 import { getModuleFeatureOptions } from './module-features';
 import { permissionFeatureKey } from './permission-keys';
+import { normalizePermissionLadder } from './permission-ladder';
 import {
   getConfiguredModules,
   type Company,
@@ -29,13 +30,6 @@ function featureIdsForModule(module: Module) {
   return getModuleFeatureOptions(module).map(feature => feature.id);
 }
 
-function isFeaturePermissionKey(module: Module, key: string) {
-  if (module.id === 'commerce') return key.startsWith('commerce:menu:');
-  if (module.id === 'stocks') return key.startsWith('stocks:');
-  if (module.id === 'presences') return key.startsWith('presence.');
-  return key.startsWith(`${module.id}:menu:`);
-}
-
 function defaultFeaturePermissions(pack: ModuleFeaturePack, featureId: string) {
   return [...new Set(['voir', ...(pack.featurePermissions?.[featureId] ?? [])])];
 }
@@ -47,26 +41,59 @@ function buildPackRolePermissions(
   selectedFeatureIds: string[],
   previousPermissions: Record<string, string[]> = {},
 ) {
-  const selected = new Set(selectedFeatureIds);
-  const permissions = Object.fromEntries(
-    Object.entries(previousPermissions).filter(([key]) => !isFeaturePermissionKey(module, key) && key !== module.id),
+  const hasRequestedFeatureLimit = Object.prototype.hasOwnProperty.call(
+    company.requestedModuleFeatures ?? {},
+    module.id,
   );
+  const requestedModulePermissions = company.requestedModulePermissions?.[module.id];
+  const hasRequestedPermissionLimit = Object.prototype.hasOwnProperty.call(
+    company.requestedModulePermissions ?? {},
+    module.id,
+  );
+  const companyFeatureIds = hasRequestedFeatureLimit
+    ? new Set(company.requestedModuleFeatures?.[module.id] ?? [])
+    : hasRequestedPermissionLimit
+      ? new Set(
+          Object.keys(requestedModulePermissions ?? {})
+            .map(featureId => featureId.startsWith(`${module.id}:menu:`)
+              ? featureId.slice(`${module.id}:menu:`.length)
+              : featureId),
+        )
+      : null;
+  const packFeatureIds = new Set(pack.featureIds);
+  const validFeatureIds = new Set(featureIdsForModule(module));
+  const selected = new Set(
+    selectedFeatureIds.filter(featureId =>
+      packFeatureIds.has(featureId)
+      && validFeatureIds.has(featureId)
+      && (!companyFeatureIds || companyFeatureIds.has(featureId)),
+    ),
+  );
+  const permissions: Record<string, string[]> = {};
 
-  if (selected.size === 0) return permissions;
+  [...selected].forEach(featureId => {
+    const keys = featurePermissionKeys(module, featureId);
+    const packMaximum = defaultFeaturePermissions(pack, featureId);
+    const requestedActions =
+      requestedModulePermissions?.[featureId]
+      ?? requestedModulePermissions?.[`${module.id}:menu:${featureId}`];
+    const companyMaximum = requestedActions !== undefined
+      ? requestedActions
+      : hasRequestedFeatureLimit || hasRequestedPermissionLimit
+        ? ['voir']
+        : packMaximum;
+    const previous = keys.flatMap(key => previousPermissions[key] ?? []);
+    const preferred = previous.length > 0
+      ? previous
+      : requestedActions !== undefined
+        ? requestedActions
+        : packMaximum;
+    const next = normalizePermissionLadder(
+      [...new Set(preferred)].filter(permission => companyMaximum.includes(permission)),
+    );
 
-  [...selected]
-    .filter(featureId => featureIdsForModule(module).includes(featureId))
-    .forEach(featureId => {
-      const keys = featurePermissionKeys(module, featureId);
-      const previous = keys.flatMap(key => previousPermissions[key] ?? []);
-      const next = previous.length > 0
-        ? [...new Set(['voir', ...previous])]
-        : company.requestedModulePermissions?.[module.id]?.[featureId]?.length
-          ? [...new Set(company.requestedModulePermissions[module.id]![featureId]!)]
-          : defaultFeaturePermissions(pack, featureId);
-      keys.forEach(key => { delete permissions[key]; });
-      if (next.length > 0) permissions[keys[0]] = next;
-    });
+    if (next.length > 0) permissions[keys[0]] = next;
+  });
 
   return permissions;
 }
@@ -86,7 +113,12 @@ function hasRoleAssignment(data: StoreData, company: Company | undefined, roleId
   return data.employees.some(employee => employee.roleId === roleId) || company?.managerRoleId === roleId;
 }
 
-export function synchronizeUnitPackRoles(data: StoreData, company: Company, node: OrgNode) {
+export function synchronizeUnitPackRoles(
+  data: StoreData,
+  company: Company,
+  node: OrgNode,
+  options: { cleanupDeselectedRoles?: boolean } = {},
+) {
   const modules = getConfiguredModules(data);
   const desiredRoleKeys = new Set<string>();
   const canonicalRoleIds = new Map<string, string>();
@@ -123,6 +155,8 @@ export function synchronizeUnitPackRoles(data: StoreData, company: Company, node
     });
   });
 
+  if (options.cleanupDeselectedRoles === false) return;
+
   data.roles = data.roles.filter(role => {
     if (role.companyId !== node.companyId || role.sectorId !== node.id || !role.packId || !role.packModuleId) return true;
     const roleKey = `${role.packModuleId}:${role.packId}`;
@@ -134,4 +168,24 @@ export function synchronizeUnitPackRoles(data: StoreData, company: Company, node
     }
     return false;
   });
+}
+
+/**
+ * Repairs only roles for packs that are still selected. This is safe to run
+ * before employee-role selection without deleting or demoting stale roles.
+ */
+export function synchronizeSelectedPackRolesForCompany(
+  data: StoreData,
+  company: Company,
+  nodeIds: string[],
+) {
+  const selectedNodeIds = new Set(nodeIds);
+  data.orgNodes
+    .filter(node => node.companyId === company.id && selectedNodeIds.has(node.id))
+    .forEach(node => {
+      const hasSelectedPacks = Object.values(node.modulePackIds ?? {})
+        .some(packIds => Array.isArray(packIds) && packIds.length > 0);
+      if (!hasSelectedPacks) return;
+      synchronizeUnitPackRoles(data, company, node, { cleanupDeselectedRoles: false });
+    });
 }

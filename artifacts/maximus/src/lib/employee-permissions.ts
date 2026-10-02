@@ -113,11 +113,22 @@ export function restrictRoleToCompany(role: Role | null | undefined, company: Co
   if (!requestedFeatures && !requestedPermissions) return role;
 
   const enabledModules = new Set(company.allowedModules.length ? company.allowedModules : company.requestedModules);
-  const hasFeatureLimit = (moduleId: ModuleId) => Object.prototype.hasOwnProperty.call(requestedFeatures ?? {}, moduleId);
-  const featureIds = (moduleId: ModuleId) => new Set(requestedFeatures?.[moduleId] ?? []);
+  const hasFeatureLimit = (moduleId: ModuleId) =>
+    Object.prototype.hasOwnProperty.call(requestedFeatures ?? {}, moduleId)
+    || Object.prototype.hasOwnProperty.call(requestedPermissions ?? {}, moduleId);
+  const featureIds = (moduleId: ModuleId) => {
+    if (Object.prototype.hasOwnProperty.call(requestedFeatures ?? {}, moduleId)) {
+      return new Set(requestedFeatures?.[moduleId] ?? []);
+    }
+    const menuPrefix = `${moduleId}:menu:`;
+    return new Set(
+      Object.keys(requestedPermissions?.[moduleId] ?? {})
+        .map(featureId => featureId.startsWith(menuPrefix) ? featureId.slice(menuPrefix.length) : featureId),
+    );
+  };
   const featurePermissions = (moduleId: ModuleId, featureId: string) =>
     requestedPermissions?.[moduleId]?.[featureId]
-    ?? requestedPermissions?.[moduleId]?.[featureId.replace(`${moduleId}:menu:`, '')]
+    ?? requestedPermissions?.[moduleId]?.[`${moduleId}:menu:${featureId}`]
     ?? ['voir'];
 
   const boundedEntries: [string, string[]][] = [];

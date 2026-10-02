@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { Company, OrgNode, Role } from './store';
+import type { Company, Employee, OrgNode, Role } from './store';
 import { isRoleAssignableToUnit } from './employee-permissions';
 import { emptyStoreData, modules } from './store';
-import { synchronizeUnitPackRoles } from './module-role-sync';
+import {
+  synchronizeSelectedPackRolesForCompany,
+  synchronizeUnitPackRoles,
+} from './module-role-sync';
+import { repairSelectedPackRolesAndAccounts } from './pack-role-repair';
 
 function createCompany(): Company {
   return {
@@ -92,6 +96,218 @@ test('propose à la création d’employé un rôle généré depuis un pack de 
   );
   assert.ok(packRole);
   assert.equal(packRole.modulePermissions.transport, undefined);
+  assert.equal(
+    isRoleAssignableToUnit(packRole, company, unit.id, nodes, modules),
+    true,
+  );
+
+  packRole.modulePermissions.transport = ['voir'];
+  synchronizeSelectedPackRolesForCompany(data, company, [unit.id]);
+
+  const repairedRole = data.roles.find(role => role.id === packRole.id);
+  assert.ok(repairedRole);
+  assert.equal(repairedRole.modulePermissions.transport, undefined);
+  assert.equal(
+    isRoleAssignableToUnit(repairedRole, company, unit.id, nodes, modules),
+    true,
+  );
+});
+
+test('répare les droits anciens d’un pack selon les limites de l’entreprise', () => {
+  const company = createCompany();
+  company.requestedModulePermissions = { transport: {} };
+  const nodes = createNodes();
+  const unit = nodes[0];
+  unit.modulePackIds = { transport: ['transport-gestion'] };
+  const data = emptyStoreData();
+  data.companies.push(company);
+  data.orgNodes.push(...nodes);
+  data.roles.push({
+    id: 'legacy-pack-role',
+    companyId: company.id,
+    sectorId: unit.id,
+    name: 'Gestionnaire Transport',
+    description: '',
+    packId: 'transport-gestion',
+    packModuleId: 'transport',
+    modulePermissions: {
+      transport: ['voir'],
+      'transport:menu:trips': ['voir', 'créer', 'modifier'],
+      'transport:menu:vehicles': ['voir', 'créer'],
+    },
+  });
+
+  synchronizeSelectedPackRolesForCompany(data, company, [unit.id]);
+
+  const repairedRole = data.roles.find(role => role.id === 'legacy-pack-role');
+  assert.ok(repairedRole);
+  assert.deepEqual(repairedRole.modulePermissions, {
+    'transport:menu:trips': ['voir'],
+    'transport:menu:vehicles': ['voir'],
+  });
+  assert.equal(
+    isRoleAssignableToUnit(repairedRole, company, unit.id, nodes, modules),
+    true,
+  );
+});
+
+test('synchronise le compte actif affecté avant de retourner le rôle réparé', async () => {
+  const company = createCompany();
+  company.requestedModulePermissions = { transport: {} };
+  const nodes = createNodes();
+  const unit = nodes[0];
+  unit.modulePackIds = { transport: ['transport-gestion'] };
+  const data = emptyStoreData();
+  data.companies.push(company);
+  data.orgNodes.push(...nodes);
+  const role: Role = {
+    id: 'assigned-legacy-pack-role',
+    companyId: company.id,
+    sectorId: unit.id,
+    name: 'Gestionnaire Transport',
+    description: '',
+    packId: 'transport-gestion',
+    packModuleId: 'transport',
+    modulePermissions: {
+      transport: ['voir'],
+      'transport:menu:trips': ['voir', 'créer', 'modifier'],
+    },
+  };
+  const employee: Employee = {
+    id: 'active-pack-employee',
+    firstName: 'Awa',
+    lastName: 'Sow',
+    email: 'awa@example.test',
+    phone: '',
+    position: 'Gestionnaire',
+    department: unit.name,
+    subDepartment: '',
+    role: role.name,
+    roleId: role.id,
+    status: 'ACTIF',
+    companyId: company.id,
+    sectorId: unit.id,
+  };
+  data.roles.push(role);
+  data.employees.push(employee);
+
+  const provisioned: Array<{ employeeId: string; permissions: Role['modulePermissions'] }> = [];
+  const repair = await repairSelectedPackRolesAndAccounts({
+    data,
+    company,
+    nodeIds: [unit.id],
+    employees: [employee],
+    provisionEmployee: async (assignedEmployee, repairedRole) => {
+      provisioned.push({
+        employeeId: assignedEmployee.id,
+        permissions: repairedRole.modulePermissions,
+      });
+    },
+  });
+
+  assert.deepEqual(provisioned, [{
+    employeeId: employee.id,
+    permissions: {
+      'transport:menu:trips': ['voir'],
+      'transport:menu:vehicles': ['voir'],
+    },
+  }]);
+  assert.deepEqual(repair.synchronizedEmployeeIds, [employee.id]);
+  assert.deepEqual(
+    repair.repairedData.roles.find(item => item.id === role.id)?.modulePermissions,
+    {
+      'transport:menu:trips': ['voir'],
+      'transport:menu:vehicles': ['voir'],
+    },
+  );
+  assert.deepEqual(data.roles.find(item => item.id === role.id)?.modulePermissions, {
+    transport: ['voir'],
+    'transport:menu:trips': ['voir', 'créer', 'modifier'],
+  });
+});
+
+test('ne retourne pas le rôle réparé si la synchronisation du compte échoue', async () => {
+  const company = createCompany();
+  company.requestedModulePermissions = { transport: {} };
+  const nodes = createNodes();
+  const unit = nodes[0];
+  unit.modulePackIds = { transport: ['transport-gestion'] };
+  const data = emptyStoreData();
+  data.companies.push(company);
+  data.orgNodes.push(...nodes);
+  const role: Role = {
+    id: 'failed-sync-pack-role',
+    companyId: company.id,
+    sectorId: unit.id,
+    name: 'Gestionnaire Transport',
+    description: '',
+    packId: 'transport-gestion',
+    packModuleId: 'transport',
+    modulePermissions: { 'transport:menu:trips': ['voir', 'créer', 'modifier'] },
+  };
+  const employee: Employee = {
+    id: 'failed-sync-employee',
+    firstName: 'Awa',
+    lastName: 'Sow',
+    email: 'awa@example.test',
+    phone: '',
+    position: 'Gestionnaire',
+    department: unit.name,
+    subDepartment: '',
+    role: role.name,
+    roleId: role.id,
+    status: 'ACTIF',
+    companyId: company.id,
+    sectorId: unit.id,
+  };
+  data.roles.push(role);
+  data.employees.push(employee);
+
+  await assert.rejects(
+    repairSelectedPackRolesAndAccounts({
+      data,
+      company,
+      nodeIds: [unit.id],
+      employees: [employee],
+      provisionEmployee: async () => {
+        throw new Error('Compte indisponible');
+      },
+    }),
+    /Compte indisponible/,
+  );
+  assert.deepEqual(data.roles.find(item => item.id === role.id)?.modulePermissions, {
+    'transport:menu:trips': ['voir', 'créer', 'modifier'],
+  });
+});
+
+test('utilise les fonctionnalités et droits demandés quand le détail des fonctionnalités manque', () => {
+  const company = createCompany();
+  company.requestedModuleFeatures = undefined;
+  company.requestedModulePermissions = {
+    transport: {
+      trips: ['voir'],
+      vehicles: ['voir'],
+    },
+  };
+  const nodes = createNodes();
+  const unit = nodes[0];
+  unit.modulePackIds = { transport: ['transport-gestion'] };
+  const data = emptyStoreData();
+  data.companies.push(company);
+  data.orgNodes.push(...nodes);
+
+  synchronizeUnitPackRoles(data, company, unit);
+
+  const packRole = data.roles.find(role =>
+    role.companyId === company.id
+    && role.sectorId === unit.id
+    && role.packId === 'transport-gestion',
+  );
+  assert.ok(packRole);
+  assert.deepEqual(packRole.modulePermissions, {
+    'transport:menu:trips': ['voir'],
+    'transport:menu:vehicles': ['voir'],
+  });
   assert.equal(
     isRoleAssignableToUnit(packRole, company, unit.id, nodes, modules),
     true,

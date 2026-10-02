@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { provisionCompanyAccess } from './company-access-provisioning';
 import { buildAppAccessContext } from './app-access';
-import { seedData, type Company, type Employee } from './store';
+import { isRoleAssignableToUnit } from './employee-permissions';
+import { modules, seedData, type Company, type Employee } from './store';
 
 test('propage une sélection d’inscription vers l’unité, le rôle et le menu employé', () => {
   const data = seedData();
@@ -62,7 +63,7 @@ test('propage une sélection d’inscription vers l’unité, le rôle et le men
   assert.equal(access.stockPermissions?.settings, undefined);
 });
 
-test('propage le pack Paie et ses droits vers l’espace entreprise', () => {
+test('propage le pack Paie et garde son rôle compatible avec la chaîne des droits', () => {
   const data = seedData();
   const company: Company = {
     id: 'payroll-company',
@@ -88,7 +89,9 @@ test('propage le pack Paie et ses droits vers l’espace entreprise', () => {
   assert.deepEqual(company.requestedModulePermissions?.paie?.['préparer-une-paie'], ['voir', 'créer', 'modifier']);
   assert.equal(role.modulePermissions['paie'], undefined);
   assert.ok(role.modulePermissions['paie:menu:préparer-une-paie']?.includes('créer'));
-  assert.ok(role.modulePermissions['paie:menu:virements']?.includes('modifier'));
+  assert.deepEqual(company.requestedModulePermissions?.paie?.virements, ['voir', 'modifier']);
+  assert.deepEqual(role.modulePermissions['paie:menu:virements'], ['voir']);
+  assert.equal(isRoleAssignableToUnit(role, company, root.id, data.orgNodes, modules), true);
 
   const employee: Employee = {
     id: 'payroll-employee',

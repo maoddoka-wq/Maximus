@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Building2, Settings, Trash2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@workspace/maximus-design-system/components/ui/alert';
 import { useAppDialog } from '@/components/confirm-dialog';
@@ -14,6 +14,8 @@ import {
 } from '@/lib/store';
 import { authApi } from '@/lib/auth-api';
 import { isRoleAssignableToUnit } from '@/lib/employee-permissions';
+import { synchronizeSelectedPackRolesForCompany } from '@/lib/module-role-sync';
+import { repairSelectedPackRolesAndAccounts } from '@/lib/pack-role-repair';
 import { ActionButton, Field, Modal } from './organization-shared';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
@@ -53,6 +55,114 @@ export function EmployeesTab({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [deletingEmployeeId, setDeletingEmployeeId] = useState('');
+  const [packRoleRepairStatus, setPackRoleRepairStatus] = useState<'checking' | 'syncing' | 'ready' | 'failed'>('checking');
+  const [packRoleRepairError, setPackRoleRepairError] = useState('');
+  const [packRoleRepairAttempt, setPackRoleRepairAttempt] = useState(0);
+  const attemptedPackRoleRepair = useRef('');
+  const packRoleRepairRun = useRef(0);
+
+  const packRoleRepairSignature = JSON.stringify({
+    companyId: company.id,
+    allowedModules: company.allowedModules,
+    requestedModules: company.requestedModules,
+    requestedModuleFeatures: company.requestedModuleFeatures,
+    requestedModulePermissions: company.requestedModulePermissions,
+    nodes: companyNodes.map(node => ({
+      id: node.id,
+      parentId: node.parentId,
+      modulePackIds: node.modulePackIds,
+      moduleFeatures: node.moduleFeatures,
+    })),
+    roles: companyRoles.map(role => ({
+      id: role.id,
+      sectorId: role.sectorId,
+      packId: role.packId,
+      packModuleId: role.packModuleId,
+      modulePermissions: role.modulePermissions,
+    })),
+    employees: companyEmployees.map(employee => ({
+      id: employee.id,
+      email: employee.email,
+      firstName: employee.firstName,
+      lastName: employee.lastName,
+      phone: employee.phone,
+      status: employee.status,
+      sectorId: employee.sectorId,
+      isSectorAdmin: employee.isSectorAdmin,
+      roleId: employee.roleId,
+    })),
+  });
+
+  useEffect(() => {
+    const attemptKey = `${packRoleRepairSignature}:${packRoleRepairAttempt}`;
+    if (attemptedPackRoleRepair.current === attemptKey) return;
+    attemptedPackRoleRepair.current = attemptKey;
+    const runId = ++packRoleRepairRun.current;
+
+    const nodeIds = companyNodes.map(node => node.id);
+    setPackRoleRepairError('');
+    setPackRoleRepairStatus('checking');
+    void (async () => {
+      const repair = await repairSelectedPackRolesAndAccounts({
+        data,
+        company,
+        nodeIds,
+        employees: companyEmployees,
+        provisionEmployee: async (employee, role) => {
+          if (!employee.sectorId || !employee.email.trim()) {
+            throw new Error('Un compte utilisant un rôle prérempli est incomplet; ses droits n’ont pas été synchronisés.');
+          }
+          await authApi.provisionAccount({
+            id: employee.id,
+            email: employee.email.trim().toLowerCase(),
+            displayName: `${employee.firstName.trim()} ${employee.lastName.trim()}`,
+            phone: employee.phone,
+            companyId: company.id,
+            employeeId: employee.id,
+            sectorId: employee.sectorId,
+            sectorIds: employee.isSectorAdmin
+              ? getSectorDescendantIds(companyNodes, employee.sectorId)
+              : [employee.sectorId],
+            role: employee.isSectorAdmin ? 'sector_manager' : 'employee',
+            permissions: role.modulePermissions,
+          });
+        },
+      });
+      if (packRoleRepairRun.current !== runId) return;
+      if (!repair.rolesChanged) {
+        setPackRoleRepairStatus('ready');
+        return;
+      }
+
+      mutate(draft => {
+        synchronizeSelectedPackRolesForCompany(
+          draft,
+          company,
+          draft.orgNodes
+            .filter(node => node.companyId === company.id && nodeIds.includes(node.id))
+            .map(node => node.id),
+        );
+      }, 'Les rôles issus des packs ont été vérifiés avec les droits de l’entreprise.');
+      setPackRoleRepairStatus('ready');
+    })().catch(error => {
+      if (packRoleRepairRun.current !== runId) return;
+      setPackRoleRepairError(
+        error instanceof Error
+          ? error.message
+          : 'La vérification des rôles issus des packs a échoué.',
+      );
+      setPackRoleRepairStatus('failed');
+    });
+  }, [
+    company,
+    companyEmployees,
+    companyNodes,
+    companyRoles,
+    data,
+    mutate,
+    packRoleRepairAttempt,
+    packRoleRepairSignature,
+  ]);
 
   const deleteEmployee = async (employee: Employee) => {
     if (deletingEmployeeId) return;
@@ -98,9 +208,28 @@ export function EmployeesTab({
           <h2 className="text-lg font-bold">Comptes Employés</h2>
           <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Créez le compte, choisissez son appartenance et son rôle. Les permissions viennent du rôle configuré à l’étape 2.</p>
         </div>
-        <ActionButton className="shrink-0 self-start" primary disabled={companyNodes.length === 0 || companyRoles.length === 0} onClick={() => { setEditingEmployee(null); setModalOpen(true); }} testId="btn-create-employee">Ajouter un employé</ActionButton>
+        <ActionButton className="shrink-0 self-start" primary disabled={packRoleRepairStatus !== 'ready' || companyNodes.length === 0 || companyRoles.length === 0} onClick={() => { setEditingEmployee(null); setModalOpen(true); }} testId="btn-create-employee">Ajouter un employé</ActionButton>
       </div>
-      {(companyNodes.length === 0 || companyRoles.length === 0) && <p className="m-6 rounded-lg bg-[hsl(var(--muted))] p-3 text-sm text-[hsl(var(--muted-foreground))]">Créez d’abord la structure, configurez les rôles et leurs autorisations, puis ajoutez les comptes employés.</p>}
+      {packRoleRepairStatus === 'checking' || packRoleRepairStatus === 'syncing' ? (
+        <p role="status" className="mx-6 mt-5 rounded-lg bg-[hsl(var(--muted))] p-3 text-sm text-[hsl(var(--muted-foreground))]">
+          Vérification des rôles préremplis et de leurs droits…
+        </p>
+      ) : null}
+      {packRoleRepairStatus === 'failed' ? (
+        <div role="alert" className="mx-6 mt-5 rounded-lg border border-[hsl(var(--destructive)/.3)] bg-[hsl(var(--destructive)/.08)] p-3 text-sm">
+          <p>{packRoleRepairError} Si des comptes utilisent déjà ces rôles, certains peuvent avoir reçu les droits corrigés avant l’échec. Relancez la vérification pour terminer.</p>
+          <button
+            type="button"
+            className="mt-2 font-bold text-[hsl(var(--destructive))] underline"
+            onClick={() => setPackRoleRepairAttempt(attempt => attempt + 1)}
+          >
+            Réessayer
+          </button>
+        </div>
+      ) : null}
+      {packRoleRepairStatus === 'ready' && (companyNodes.length === 0 || companyRoles.length === 0) && (
+        <p className="m-6 rounded-lg bg-[hsl(var(--muted))] p-3 text-sm text-[hsl(var(--muted-foreground))]">Créez d’abord la structure, configurez les rôles et leurs autorisations, puis ajoutez les comptes employés.</p>
+      )}
       <div className="space-y-3 p-4 sm:hidden">
         {companyEmployees.map(employee => {
           const sector = companyNodes.find(node => node.id === employee.sectorId);
