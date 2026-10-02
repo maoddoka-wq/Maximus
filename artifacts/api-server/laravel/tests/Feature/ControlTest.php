@@ -81,7 +81,6 @@ class ControlTest extends TestCase
             'role' => 'employee',
             'company_id' => 'kora',
             'employee_id' => 'employee-1',
-            'permissions' => ['controle' => ['voir']],
         ]);
 
         $request->postJson('/api/control/tasks', [
@@ -115,7 +114,6 @@ class ControlTest extends TestCase
             'role' => 'employee',
             'company_id' => 'kora',
             'employee_id' => 'employee-1',
-            'permissions' => ['controle' => ['voir']],
         ]);
 
         ControlTask::query()->create([
@@ -149,6 +147,14 @@ class ControlTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'tasks')
             ->assertJsonPath('tasks.0.id', 'task-visible');
+
+        $request->patchJson('/api/control/tasks/task-visible/status', [
+            'status' => 'EN COURS',
+        ])->assertOk()->assertJsonPath('status', 'EN COURS');
+
+        $request->patchJson('/api/control/tasks/task-hidden/status', [
+            'status' => 'EN COURS',
+        ])->assertForbidden();
     }
 
     public function test_company_admin_cannot_read_another_company_or_global_scope(): void

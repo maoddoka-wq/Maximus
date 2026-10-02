@@ -9,7 +9,7 @@ import { buildAdminAssistantInsights } from '@/lib/local-assistant';
 import type { AdminAssistantScope } from '@/lib/local-assistant';
 import { normalizePayrollFeatureId } from '@/lib/payroll-features';
 import type { MaximusAssistantAction, MaximusAssistantMessage, MaximusAssistantResponse } from '@/lib/maximus-assistant-api';
-import { getAdminControlRoute } from '@/lib/control-routing';
+import { getAdminControlRoute, getCompanyControlCapabilities } from '@/lib/control-routing';
 import type { CompanyWorkspaceFeatureId } from '@/lib/company-workspace-features';
 
 /**
@@ -313,7 +313,13 @@ export function CompanyRouter({
       });
     }
     const controlPermissions = moduleFeaturePermissions?.controle?.controle ?? [];
-    if (!companyAdmin && !controlPermissions.includes('voir')) {
+    const controlCapabilities = getCompanyControlCapabilities({
+      companyAdmin,
+      sectorManager,
+      employeeId: employee?.id,
+      permissions: controlPermissions,
+    });
+    if (!controlCapabilities.canView) {
       return renderScreen(screens.empty, {
         title: 'Accès non autorisé',
         text: 'Votre rôle ne possède pas la permission Voir pour le contrôle et la coordination.',

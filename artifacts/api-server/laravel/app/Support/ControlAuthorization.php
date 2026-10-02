@@ -61,7 +61,11 @@ final class ControlAuthorization
 
     public static function canRead(array $actor, ?string $companyId = null, ?array $task = null): bool
     {
-        if (! self::isValid($actor) || ! self::allowsCrud($actor, 'view')) {
+        if (! self::isValid($actor)) {
+            return false;
+        }
+
+        if (($actor['role'] ?? null) !== 'employee' && ! self::allowsCrud($actor, 'view')) {
             return false;
         }
 
@@ -110,6 +114,10 @@ final class ControlAuthorization
 
     public static function canUpdate(array $actor, array $task): bool
     {
+        if (($actor['role'] ?? null) === 'employee') {
+            return self::canRead($actor, $task['companyId'] ?? null, $task);
+        }
+
         return self::allowsCrud($actor, 'update')
             && self::canRead($actor, $task['companyId'] ?? null, $task);
     }

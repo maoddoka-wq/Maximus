@@ -46,13 +46,18 @@ test('le manager de secteur reste limité à ses secteurs descendants', () => {
 });
 
 test('l’employé ne lit et ne modifie que ses tâches', () => {
+  const employeeWithoutControlPermission: ControlActorContext = {
+    ...employee,
+    sectorIds: [],
+  };
   const ownTask = { companyId: 'kora', sectorId: 'commerce', assigneeEmployeeId: 'demo-emp-awa' };
   const otherTask = { companyId: 'kora', sectorId: 'commerce', assigneeEmployeeId: 'demo-emp-ibrahima' };
-  assert.equal(canReadControlScope(employee, 'kora', ownTask), true);
-  assert.equal(canUpdateControlTask(employee, ownTask), true);
-  assert.equal(canReadControlScope(employee, 'kora', otherTask), false);
-  assert.equal(canUpdateControlTask(employee, otherTask), false);
-  assert.equal(canCreateControlTask(employee, ownTask), false);
+  assert.equal(canReadControlScope(employeeWithoutControlPermission, 'kora'), true);
+  assert.equal(canReadControlScope(employeeWithoutControlPermission, 'kora', ownTask), true);
+  assert.equal(canUpdateControlTask(employeeWithoutControlPermission, ownTask), true);
+  assert.equal(canReadControlScope(employeeWithoutControlPermission, 'kora', otherTask), false);
+  assert.equal(canUpdateControlTask(employeeWithoutControlPermission, otherTask), false);
+  assert.equal(canCreateControlTask(employeeWithoutControlPermission, ownTask), false);
 });
 
 test('aucun acteur ne franchit la frontière d’entreprise', () => {

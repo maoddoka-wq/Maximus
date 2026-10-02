@@ -12,7 +12,7 @@ import {
   type StoreData,
 } from '@/lib/store';
 import { controlApi, type ControlBootstrap } from '@/lib/control-api';
-import { getCompanyControlScope } from '@/lib/control-routing';
+import { getCompanyControlCapabilities, getCompanyControlScope } from '@/lib/control-routing';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { ControlTaskList } from '@/components/control-task-list';
 import { ControlCreateTaskDialog, type CreateTaskForm } from '@/components/control-create-task-dialog';
@@ -172,12 +172,15 @@ export function ControlCenterPage({
     node.companyId === targetCompanyId
     && (!sectorManager || isDescendantOrSelf(data.orgNodes, node.id, scopeNodeId, companyId ?? '')),
   );
-  const canCreate = isAdmin || Boolean(companyAdmin) || (controlPermissions?.includes('voir') === true && controlPermissions.includes('créer'));
-  const canUpdate = isAdmin || Boolean(companyAdmin) || (
-    controlPermissions?.includes('voir') === true
-    && controlPermissions.includes('créer')
-    && controlPermissions.includes('modifier')
-  );
+  const controlCapabilities = getCompanyControlCapabilities({
+    isAdmin,
+    companyAdmin,
+    sectorManager,
+    employeeId,
+    permissions: controlPermissions,
+  });
+  const canCreate = controlCapabilities.canCreate;
+  const canUpdate = controlCapabilities.canUpdate;
 
   const updateTask = async (taskId: string, status: ControlTaskStatus) => {
     const task = accessibleTasks.find(candidate => candidate.id === taskId);
