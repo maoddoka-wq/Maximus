@@ -149,6 +149,55 @@ class MobileAuthTest extends TestCase
         $this->getJson('/api/auth/mobile/session', $headers)->assertUnauthorized();
     }
 
+    public function test_transport_settings_users_can_download_the_chauffeur_apk_with_their_company_session(): void
+    {
+        $this->enableTransport();
+        $settingsUser = $this->createUser(
+            id: 'transport-settings-reader',
+            role: 'employee',
+            permissions: [
+                'transport:menu:parametres' => ['voir'],
+            ],
+        );
+
+        config([
+            'services.github.mobile_release_repository' => 'maoddoka-wq/Maximus',
+            'services.github.mobile_release_token' => 'unit-test-read-token',
+        ]);
+        Http::fake([
+            'https://api.github.com/repos/maoddoka-wq/Maximus/releases?per_page=100' => Http::response([
+                [
+                    'tag_name' => 'chauffeur-v1.0.20',
+                    'name' => 'MAXIMUS Chauffeur 1.0.20',
+                    'published_at' => '2026-10-02T00:00:00Z',
+                    'assets' => [[
+                        'name' => 'maximus-chauffeur.apk',
+                        'url' => 'https://api.github.com/repos/maoddoka-wq/Maximus/releases/assets/120',
+                        'size' => 12,
+                    ]],
+                ],
+            ]),
+            'https://api.github.com/repos/maoddoka-wq/Maximus/releases/assets/120' => Http::response('APK-content'),
+        ]);
+
+        $session = MaximusAuth::issueSession($settingsUser);
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $session)
+            ->getJson('/api/transport/mobile/releases/latest')
+            ->assertOk()
+            ->assertJsonPath('version', '1.0.20');
+
+        $download = $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $session)
+            ->get('/api/transport/mobile/releases/latest/download');
+
+        $download->assertOk();
+        $this->assertStringContainsString(
+            'maximus-chauffeur.apk',
+            (string) $download->headers->get('content-disposition'),
+        );
+    }
+
     public function test_mobile_login_does_not_allow_company_administrator_accounts(): void
     {
         $this->enableTransport();

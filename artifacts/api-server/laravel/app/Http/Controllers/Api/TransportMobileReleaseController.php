@@ -15,8 +15,8 @@ class TransportMobileReleaseController extends Controller
 
     public function latest(Request $request): JsonResponse
     {
-        if (! $this->isDriver($request)) {
-            return response()->json(['error' => 'Le téléchargement est réservé aux chauffeurs.'], 403);
+        if (! $this->canAccessRelease($request)) {
+            return response()->json(['error' => 'Le téléchargement nécessite un compte MAXIMUS autorisé au Transport.'], 403);
         }
 
         $release = $this->latestRelease();
@@ -43,8 +43,8 @@ class TransportMobileReleaseController extends Controller
 
     public function download(Request $request)
     {
-        if (! $this->isDriver($request)) {
-            return response()->json(['error' => 'Le téléchargement est réservé aux chauffeurs.'], 403);
+        if (! $this->canAccessRelease($request)) {
+            return response()->json(['error' => 'Le téléchargement nécessite un compte MAXIMUS autorisé au Transport.'], 403);
         }
 
         $release = $this->latestRelease();
@@ -161,14 +161,21 @@ class TransportMobileReleaseController extends Controller
         return response()->json(['error' => 'Aucune version APK MAXIMUS Chauffeur n’a encore été publiée.'], 404);
     }
 
-    private function isDriver(Request $request): bool
+    private function canAccessRelease(Request $request): bool
     {
         $actor = $request->attributes->get('authActor');
 
-        return is_array($actor)
-            && ($actor['role'] ?? null) === 'employee'
-            && ! empty($actor['employeeId'])
-            && ! empty($actor['companyId'])
-            && ModuleAuthorization::allows($actor, 'transport', 'view', 'drivers');
+        if (! is_array($actor) || empty($actor['companyId'])) {
+            return false;
+        }
+
+        $role = $actor['role'] ?? null;
+        if (! in_array($role, ['employee', 'company_admin'], true)
+            || ($role === 'employee' && empty($actor['employeeId']))) {
+            return false;
+        }
+
+        return ModuleAuthorization::allows($actor, 'transport', 'view', 'drivers')
+            || ModuleAuthorization::allows($actor, 'transport', 'view', 'parametres');
     }
 }

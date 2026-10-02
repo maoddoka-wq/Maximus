@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   CircleDollarSign,
   Clock3,
+  Copy,
   Download,
   FilePlus2,
   Gauge,
@@ -20,6 +21,7 @@ import {
   RefreshCw,
   Route,
   RotateCcw,
+  Share2,
   ShieldCheck,
   Settings,
   Smartphone,
@@ -29,6 +31,7 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import {
   createTransportApi,
   type CreateDriverInput,
@@ -674,7 +677,7 @@ export default function TransportModulePage({
         onActivate={activateDriverGps}
         onAvailabilityChange={updateAvailability}
       />}
-      {currentEmployeeId && currentDriver && !preview && (
+      {currentEmployeeId && currentDriver && !preview && tab !== 'parametres' && (
         <DriverMobileAppCard loadRelease={api.latestMobileRelease} />
       )}
 
@@ -694,7 +697,10 @@ export default function TransportModulePage({
           {tab === 'drivers' && <><DriversPanel drivers={data.drivers} modeEvents={data.modeEvents} canCreate={canCreateDrivers} onCreate={() => setDialog('driver')} /><DriverLocationPanel driver={currentDriver} active={driverGpsTracking} error={locationError} onAvailabilityChange={canModifyDrivers ? updateAvailability : undefined} onPricingModeChange={canModifyDrivers ? updatePricingMode : undefined} fullscreen={driverFullscreen || driverFullscreenFallback} onFullscreenToggle={() => void toggleDriverFullscreen()} /></>}
         {tab === 'vehicles' && <VehiclesPanel vehicles={data.vehicles} drivers={data.drivers} canCreate={canCreateVehicles} canModify={canModifyVehicles} onCreate={() => { setEditingVehicle(null); setDialog('vehicle'); }} onEdit={vehicle => { setEditingVehicle(vehicle); setDialog('vehicle'); }} onDelete={removeVehicle} />}
         {tab === 'historique' && <HistoryPanel trips={data.trips} />}
-        {tab === 'parametres' && <SettingsPanel settings={data.settings} canModify={canModifySettings} onSave={settings => preview ? setData(current => current ? { ...current, settings } : current) : void run(() => api.updateSettings(settings), 'Paramètres Transport enregistrés.')} />}
+        {tab === 'parametres' && <div className="fade-up space-y-4">
+          <SettingsPanel settings={data.settings} canModify={canModifySettings} onSave={settings => preview ? setData(current => current ? { ...current, settings } : current) : void run(() => api.updateSettings(settings), 'Paramètres Transport enregistrés.')} />
+          {!preview && <DriverMobileAppCard loadRelease={api.latestMobileRelease} showShareActions />}
+        </div>}
       </>}
 
       {dialog === 'driver' && <DriverDialog busy={Boolean(pendingAction)} employees={employees} onClose={() => setDialog(null)} onSubmit={input => preview ? addPreviewDriver(input) : void run(() => api.createDriver(input), 'Chauffeur créé.')} />}
@@ -743,13 +749,21 @@ function Overview({ data, onTab }: { data: TransportBootstrap; onTab: (tab: Tran
 
 function DriverMobileAppCard({
   loadRelease,
+  showShareActions = false,
 }: {
   loadRelease: () => Promise<DriverMobileRelease>;
+  showShareActions?: boolean;
 }) {
   const [release, setRelease] = useState<DriverMobileRelease | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [qrCode, setQrCode] = useState('');
+  const [qrError, setQrError] = useState('');
+  const [linkStatus, setLinkStatus] = useState('');
+  const downloadUrl = typeof window === 'undefined'
+    ? ''
+    : `${window.location.origin}${transportMobileReleaseDownloadPath}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -774,6 +788,66 @@ function DriverMobileAppCard({
       cancelled = true;
     };
   }, [attempt, loadRelease]);
+
+  useEffect(() => {
+    if (!showShareActions || !release || !downloadUrl) {
+      setQrCode('');
+      setQrError('');
+      return;
+    }
+
+    let cancelled = false;
+    setQrCode('');
+    setQrError('');
+
+    void QRCode.toDataURL(downloadUrl, {
+      width: 200,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+    })
+      .then(image => {
+        if (!cancelled) setQrCode(image);
+      })
+      .catch(() => {
+        if (!cancelled) setQrError('Le QR code n’a pas pu être créé.');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [downloadUrl, release?.version, showShareActions]);
+
+  const copyDownloadLink = async () => {
+    try {
+      if (!navigator.clipboard?.writeText || !downloadUrl) {
+        throw new Error('Clipboard indisponible');
+      }
+      await navigator.clipboard.writeText(downloadUrl);
+      setLinkStatus('Lien copié.');
+    } catch {
+      setLinkStatus('Copie impossible. Utilisez le QR code ou copiez le lien depuis la barre d’adresse.');
+    }
+  };
+
+  const shareDownloadLink = async () => {
+    if (!downloadUrl) return;
+    if (!navigator.share) {
+      await copyDownloadLink();
+      return;
+    }
+
+    try {
+      await navigator.share({
+        title: 'MAXIMUS Chauffeur',
+        text: 'Télécharger MAXIMUS Chauffeur',
+        url: downloadUrl,
+      });
+      setLinkStatus('Lien partagé.');
+    } catch (cause) {
+      if (cause instanceof Error && cause.name === 'AbortError') return;
+      setLinkStatus('Partage impossible. Vous pouvez copier le lien.');
+    }
+  };
 
   const sizeLabel = release && Number.isFinite(release.sizeBytes) && release.sizeBytes > 0
     ? `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(release.sizeBytes / 1_000_000)} Mo`
@@ -838,6 +912,37 @@ function DriverMobileAppCard({
       <p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">
         Le téléchargement utilise votre session MAXIMUS. Android peut demander l’autorisation d’installer l’application.
       </p>
+      {showShareActions && release && !loading && (
+        <div className="mt-4 flex flex-col gap-4 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold">Partager le téléchargement</h3>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+              Le destinataire doit se connecter à MAXIMUS avec un compte autorisé au Transport. Le QR code ne contient pas d’identifiant de connexion.
+            </p>
+            <p className="mt-2 break-all font-mono text-xs text-[hsl(var(--muted-foreground))]">{downloadUrl}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => void copyDownloadLink()}>
+                <Copy size={15} aria-hidden="true" />
+                Copier le lien
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => void shareDownloadLink()}>
+                <Share2 size={15} aria-hidden="true" />
+                Partager
+              </Button>
+            </div>
+            {linkStatus && <p className="mt-2 text-xs" role="status">{linkStatus}</p>}
+          </div>
+          <div className="flex min-h-36 min-w-36 shrink-0 items-center justify-center rounded-xl border bg-[hsl(var(--card))] p-2">
+            {qrCode ? (
+              <img src={qrCode} alt="QR code pour télécharger MAXIMUS Chauffeur" className="h-32 w-32" />
+            ) : qrError ? (
+              <p className="max-w-32 text-center text-xs text-[hsl(var(--destructive))]" role="alert">{qrError}</p>
+            ) : (
+              <p className="text-xs text-[hsl(var(--muted-foreground))]" role="status">Création du QR code…</p>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
