@@ -40,6 +40,8 @@ export * from './transportDriverAvailabilityInput';
 export * from './transportDriverAvailabilityInputAvailability';
 export * from './transportDriverLocationInput';
 export * from './transportDriverStatus';
+export * from './transportRouteGeometry';
+export * from './transportRouteGeometryType';
 export * from './transportTrip';
 export * from './transportTripStatus';
 export * from './transportTripStatusInput';

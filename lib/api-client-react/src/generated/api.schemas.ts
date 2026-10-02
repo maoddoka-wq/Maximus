@@ -202,6 +202,20 @@ export interface TransportDriver {
   [key: string]: unknown;
  }
 
+export type TransportRouteGeometryType = typeof TransportRouteGeometryType[keyof typeof TransportRouteGeometryType];
+
+
+export const TransportRouteGeometryType = {
+  LineString: 'LineString',
+} as const;
+
+export interface TransportRouteGeometry {
+  type?: TransportRouteGeometryType;
+  /** @items.minItems 2 */
+  coordinates?: number[][];
+  [key: string]: unknown;
+ }
+
 export type TransportTripStatus = typeof TransportTripStatus[keyof typeof TransportTripStatus];
 
 
@@ -225,6 +239,12 @@ export interface TransportTrip {
   status: TransportTripStatus;
   requestedAt: string;
   pickupCode?: string | null;
+  pickupLatitude?: number | null;
+  pickupLongitude?: number | null;
+  destinationLatitude?: number | null;
+  destinationLongitude?: number | null;
+  pickupRouteGeometry?: TransportRouteGeometry | null;
+  routeGeometry?: TransportRouteGeometry | null;
   [key: string]: unknown;
  }
 

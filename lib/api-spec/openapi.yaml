@@ -505,6 +505,17 @@ components:
         longitude: { type: number, nullable: true }
         locationUpdatedAt: { type: string, nullable: true }
       required: [id, name, status, availability]
+    TransportRouteGeometry:
+      type: object
+      additionalProperties: true
+      properties:
+        type: { type: string, enum: [LineString] }
+        coordinates:
+          type: array
+          items:
+            type: array
+            minItems: 2
+            items: { type: number }
     TransportTrip:
       type: object
       additionalProperties: true
@@ -519,6 +530,18 @@ components:
         status: { type: string, enum: [REQUESTED, OFFERED, ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED] }
         requestedAt: { type: string }
         pickupCode: { type: string, nullable: true }
+        pickupLatitude: { type: number, nullable: true }
+        pickupLongitude: { type: number, nullable: true }
+        destinationLatitude: { type: number, nullable: true }
+        destinationLongitude: { type: number, nullable: true }
+        pickupRouteGeometry:
+          allOf:
+            - $ref: "#/components/schemas/TransportRouteGeometry"
+          nullable: true
+        routeGeometry:
+          allOf:
+            - $ref: "#/components/schemas/TransportRouteGeometry"
+          nullable: true
       required: [id, reference, pickup, destination, passengerName, passengerPhone, fare, status, requestedAt]
     TransportBootstrap:
       type: object

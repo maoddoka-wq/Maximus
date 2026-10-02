@@ -41,8 +41,14 @@ import { API_BASE_URL } from '../lib/api';
 import { formatApiMessage as apiMessage } from '../lib/api-message';
 import { hasLocationTrackingConsent } from '../lib/auth-storage';
 import {
+  DRIVER_LOCATION_MAX_AGE_MS,
+  isFreshDriverLocation,
+  type DriverLocationSnapshot,
+} from '../lib/trip-map-geometry';
+import {
   enableDriverLocationTracking,
   resumeDriverLocationTracking,
+  subscribeToDriverLocation,
   suspendDriverLocationTracking,
   stopDriverLocationTracking,
 } from '../services/location-tracking';
@@ -98,8 +104,12 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
   const colors = getPalette(scheme, session.company.primaryColor);
   const [gpsState, setGpsState] = useState<GpsState>('inactive');
   const [gpsMessage, setGpsMessage] = useState<string | null>(null);
+  const [liveDriverLocation, setLiveDriverLocation] =
+    useState<DriverLocationSnapshot | null>(null);
   const [availabilityBusy, setAvailabilityBusy] = useState(false);
   const [tripBusyId, setTripBusyId] = useState<string | null>(null);
+  const [dismissedNavigationTripId, setDismissedNavigationTripId] =
+    useState<string | null>(null);
 
   const transportQuery = useGetTransportBootstrap({
     query: {
@@ -117,6 +127,15 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
       .filter((trip) => trip.status in priority)
       .sort((left, right) => priority[left.status] - priority[right.status]);
   }, [transportQuery.data?.trips]);
+  const activeNavigationTrip = activeTrips.find(
+    (trip) => trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS',
+  ) ?? null;
+  const currentDriverPosition = isFreshDriverLocation(liveDriverLocation)
+    ? {
+        latitude: liveDriverLocation.latitude,
+        longitude: liveDriverLocation.longitude,
+      }
+    : null;
 
   const canUpdateLocation = Boolean(session.capabilities?.updateLocation);
   const canUpdateAvailability = Boolean(session.capabilities?.updateAvailability);
@@ -126,6 +145,24 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
     (trip) => trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS',
   );
   const photoUri = companyLogoUri(session.company.profilePhoto);
+
+  useEffect(() => subscribeToDriverLocation(setLiveDriverLocation), []);
+
+  useEffect(() => {
+    if (!liveDriverLocation) return;
+
+    const remainingFreshTime =
+      DRIVER_LOCATION_MAX_AGE_MS -
+      (Date.now() - liveDriverLocation.timestamp) +
+      1;
+    const timeout = setTimeout(() => {
+      setLiveDriverLocation((current) =>
+        current?.timestamp === liveDriverLocation.timestamp ? null : current,
+      );
+    }, Math.max(0, remainingFreshTime));
+
+    return () => clearTimeout(timeout);
+  }, [liveDriverLocation]);
 
   useEffect(() => {
     if (!driver) return;
@@ -567,10 +604,20 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                           colors={colors}
                           canUpdate={canUpdateTrips}
                           isBusy={tripBusyId === trip.id}
-                          driverPosition={
-                            typeof driver.latitude === 'number' && typeof driver.longitude === 'number'
-                              ? { latitude: driver.latitude, longitude: driver.longitude }
-                              : null
+                          driverPosition={currentDriverPosition}
+                          fullScreen={
+                            activeNavigationTrip?.id === trip.id &&
+                            dismissedNavigationTripId !== trip.id
+                          }
+                          onDismissFullscreen={
+                            activeNavigationTrip?.id === trip.id
+                              ? () => setDismissedNavigationTripId(trip.id)
+                              : undefined
+                          }
+                          onOpenFullscreen={
+                            activeNavigationTrip?.id === trip.id
+                              ? () => setDismissedNavigationTripId(null)
+                              : undefined
                           }
                           onUpdateStatus={(status) => updateTripStatus(trip.id, status)}
                         />

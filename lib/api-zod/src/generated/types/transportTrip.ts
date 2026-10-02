@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { TransportRouteGeometry } from './transportRouteGeometry';
 import type { TransportTripStatus } from './transportTripStatus';
 
 export interface TransportTrip {
@@ -18,5 +19,11 @@ export interface TransportTrip {
   status: TransportTripStatus;
   requestedAt: string;
   pickupCode?: string | null;
+  pickupLatitude?: number | null;
+  pickupLongitude?: number | null;
+  destinationLatitude?: number | null;
+  destinationLongitude?: number | null;
+  pickupRouteGeometry?: TransportRouteGeometry | null;
+  routeGeometry?: TransportRouteGeometry | null;
   [key: string]: unknown;
  }

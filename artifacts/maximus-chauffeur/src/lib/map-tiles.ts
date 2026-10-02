@@ -12,7 +12,7 @@ export function getDriverMapTileUrls(zoom: number, tileX: number, tileY: number)
   const host = TILE_HOSTS[Math.abs(tileX + tileY) % TILE_HOSTS.length];
 
   return [
-    `https://tile.openstreetmap.org/${zoom}/${wrappedX}/${tileY}.png`,
     `https://${host}.basemaps.cartocdn.com/light_all/${zoom}/${wrappedX}/${tileY}@2x.png`,
+    `https://tile.openstreetmap.org/${zoom}/${wrappedX}/${tileY}.png`,
   ];
 }

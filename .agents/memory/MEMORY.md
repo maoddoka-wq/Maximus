@@ -2,6 +2,7 @@
 - [Isolation des releases APK Chauffeur](chauffeur-release-isolation.md) — repartir du dernier APK publié si la branche de travail contient des changements GPS non approuvés.
 - [Ordre des releases Chauffeur](chauffeur-release-order.md) — sélectionner la release stable au numéro sémantique maximal, jamais le premier résultat GitHub.
 - [Sérialisation GPS Chauffeur](chauffeur-gps-lifecycle.md) — GPS au premier plan, disponibilité mise en pause à l’arrière-plan, consentement conservé à la suspension.
+- [Carte chauffeur en direct](chauffeur-live-map.md) — afficher une position locale acceptée et récente, avec CARTO avant OSM lorsque les tuiles OSM sont bloquées.
 - [Navigation Gestion de stock](stock-navigation.md) — reprendre exactement les dix rubriques de la référence, dans une barre horizontale et sans rubrique supplémentaire.
 - [Champs vides des mouvements Stock](stock-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel les convertit en null alors que référence et commentaire sont non nullables.
 - [Gouvernance par unité](sector-governance.md) — les managers de secteur définissent les droits de leurs employés, sans accès aux autres unités.

@@ -252,6 +252,12 @@ export const MobileLogoutResponse = zod.void()
 /**
  * @summary Load the signed-in driver's authorized transport data
  */
+export const getTransportBootstrapResponseTripsItemPickupRouteGeometryOneCoordinatesItemMin = 2;
+
+export const getTransportBootstrapResponseTripsItemRouteGeometryOneCoordinatesItemMin = 2;
+
+
+
 export const GetTransportBootstrapResponse = zod.object({
   "drivers": zod.array(zod.object({
   "id": zod.string(),
@@ -274,7 +280,19 @@ export const GetTransportBootstrapResponse = zod.object({
   "fare": zod.int(),
   "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
   "requestedAt": zod.string(),
-  "pickupCode": zod.string().nullish()
+  "pickupCode": zod.string().nullish(),
+  "pickupLatitude": zod.number().nullish(),
+  "pickupLongitude": zod.number().nullish(),
+  "destinationLatitude": zod.number().nullish(),
+  "destinationLongitude": zod.number().nullish(),
+  "pickupRouteGeometry": zod.object({
+  "type": zod.enum(['LineString']).optional(),
+  "coordinates": zod.array(zod.array(zod.number()).min(getTransportBootstrapResponseTripsItemPickupRouteGeometryOneCoordinatesItemMin)).optional()
+}).nullish(),
+  "routeGeometry": zod.object({
+  "type": zod.enum(['LineString']).optional(),
+  "coordinates": zod.array(zod.array(zod.number()).min(getTransportBootstrapResponseTripsItemRouteGeometryOneCoordinatesItemMin)).optional()
+}).nullish()
 })),
   "metrics": zod.record(zod.string(), zod.unknown()),
   "settings": zod.record(zod.string(), zod.unknown())
@@ -353,6 +371,12 @@ export const UpdateTransportTripStatusBody = zod.object({
   "pickupCode": zod.string().min(updateTransportTripStatusBodyPickupCodeMin).max(updateTransportTripStatusBodyPickupCodeMax).optional()
 })
 
+export const updateTransportTripStatusResponsePickupRouteGeometryOneCoordinatesItemMin = 2;
+
+export const updateTransportTripStatusResponseRouteGeometryOneCoordinatesItemMin = 2;
+
+
+
 export const UpdateTransportTripStatusResponse = zod.object({
   "id": zod.string(),
   "reference": zod.string(),
@@ -363,7 +387,19 @@ export const UpdateTransportTripStatusResponse = zod.object({
   "fare": zod.int(),
   "status": zod.enum(['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
   "requestedAt": zod.string(),
-  "pickupCode": zod.string().nullish()
+  "pickupCode": zod.string().nullish(),
+  "pickupLatitude": zod.number().nullish(),
+  "pickupLongitude": zod.number().nullish(),
+  "destinationLatitude": zod.number().nullish(),
+  "destinationLongitude": zod.number().nullish(),
+  "pickupRouteGeometry": zod.object({
+  "type": zod.enum(['LineString']).optional(),
+  "coordinates": zod.array(zod.array(zod.number()).min(updateTransportTripStatusResponsePickupRouteGeometryOneCoordinatesItemMin)).optional()
+}).nullish(),
+  "routeGeometry": zod.object({
+  "type": zod.enum(['LineString']).optional(),
+  "coordinates": zod.array(zod.array(zod.number()).min(updateTransportTripStatusResponseRouteGeometryOneCoordinatesItemMin)).optional()
+}).nullish()
 })
 
 

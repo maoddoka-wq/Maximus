@@ -11,12 +11,64 @@ import {
 import { canResumeLocationTracking } from './location-resume-policy';
 import type { LocationSetupFailure } from './location-setup-policy';
 import { createSerializedLocationOperations } from './serialized-location-operation-queue';
+import {
+  isFreshDriverLocation,
+  type DriverLocationSnapshot,
+} from '../lib/trip-map-geometry';
 
 const LOCATION_UPDATE_INTERVAL_MS = 15_000;
 const LOCATION_UPDATE_DISTANCE_METERS = 30;
 
 let foregroundLocationSubscription: Location.LocationSubscription | null = null;
 let foregroundDriverId: string | null = null;
+let foregroundGeneration = 0;
+let latestDriverLocation: DriverLocationSnapshot | null = null;
+const driverLocationListeners = new Set<
+  (location: DriverLocationSnapshot | null) => void
+>();
+
+function notifyDriverLocationListeners(): void {
+  const position = isFreshDriverLocation(latestDriverLocation)
+    ? latestDriverLocation
+    : null;
+  for (const listener of driverLocationListeners) {
+    try {
+      listener(position);
+    } catch (error) {
+      console.error('MAXIMUS Chauffeur could not notify a GPS position listener.', error);
+    }
+  }
+}
+
+function publishDriverLocation(location: Location.LocationObject): void {
+  const snapshot: DriverLocationSnapshot = {
+    latitude: location.coords.latitude,
+    longitude: location.coords.longitude,
+    timestamp: location.timestamp,
+  };
+  if (!isFreshDriverLocation(snapshot)) return;
+  if (latestDriverLocation && snapshot.timestamp < latestDriverLocation.timestamp) return;
+
+  latestDriverLocation = snapshot;
+  notifyDriverLocationListeners();
+}
+
+function clearPublishedDriverLocation(): void {
+  latestDriverLocation = null;
+  notifyDriverLocationListeners();
+}
+
+export function subscribeToDriverLocation(
+  listener: (location: DriverLocationSnapshot | null) => void,
+): () => void {
+  driverLocationListeners.add(listener);
+  listener(
+    isFreshDriverLocation(latestDriverLocation) ? latestDriverLocation : null,
+  );
+  return () => {
+    driverLocationListeners.delete(listener);
+  };
+}
 
 export async function updateDriverPosition(
   driverId: string,
@@ -35,6 +87,8 @@ export async function updateDriverPosition(
 
 async function stopForegroundLocationUpdates(): Promise<void> {
   const subscription = foregroundLocationSubscription;
+  foregroundGeneration += 1;
+  clearPublishedDriverLocation();
   if (!subscription) {
     foregroundDriverId = null;
     return;
@@ -60,6 +114,7 @@ async function startForegroundLocationUpdates(driverId: string): Promise<void> {
   }
 
   await stopForegroundLocationUpdates();
+  const generation = foregroundGeneration;
   const subscription = await Location.watchPositionAsync(
     {
       accuracy: Location.Accuracy.High,
@@ -67,16 +122,34 @@ async function startForegroundLocationUpdates(driverId: string): Promise<void> {
       distanceInterval: LOCATION_UPDATE_DISTANCE_METERS,
     },
     (location) => {
+      if (
+        generation !== foregroundGeneration ||
+        AppState.currentState !== 'active'
+      ) {
+        return;
+      }
       void updateDriverPosition(
         driverId,
         location.coords.latitude,
         location.coords.longitude,
-      ).catch((error) => {
-        console.error('MAXIMUS Chauffeur could not send the foreground location.', error);
-      });
+      )
+        .then(() => {
+          if (
+            generation === foregroundGeneration &&
+            AppState.currentState === 'active'
+          ) {
+            publishDriverLocation(location);
+          }
+        })
+        .catch((error) => {
+          console.error('MAXIMUS Chauffeur could not send the foreground location.', error);
+        });
     },
     (error) => {
-      console.error('MAXIMUS Chauffeur foreground location watcher failed.', error);
+      if (generation === foregroundGeneration) {
+        clearPublishedDriverLocation();
+        console.error('MAXIMUS Chauffeur foreground location watcher failed.', error);
+      }
     },
   );
 
@@ -157,6 +230,7 @@ async function enableDriverLocationTrackingUnlocked(
       current.coords.longitude,
     );
     await startForegroundLocationUpdates(driverId);
+    publishDriverLocation(current);
     await setLocationTrackingEnabled(true);
     return { ok: true };
   } catch (error) {

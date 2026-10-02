@@ -12,6 +12,11 @@ import Svg, { Circle, Polyline } from 'react-native-svg';
 import type { TransportTrip } from '@workspace/api-client-react';
 import { cardRadius, space, type getPalette } from '../theme';
 import { getDriverMapTileUrls } from '../lib/map-tiles';
+import {
+  geometryPoints,
+  getTripNavigationUrl,
+  pointFromCoordinates,
+} from '../lib/trip-map-geometry';
 
 type Palette = ReturnType<typeof getPalette>;
 type Point = { latitude: number; longitude: number };
@@ -21,34 +26,6 @@ type Tile = { key: string; uris: string[]; left: number; top: number };
 
 const TILE_SIZE = 256;
 const TILE_USER_AGENT = 'MAXIMUS-Chauffeur';
-
-function pointFrom(latitude: unknown, longitude: unknown): Point | null {
-  if (
-    typeof latitude !== 'number' ||
-    typeof longitude !== 'number' ||
-    !Number.isFinite(latitude) ||
-    !Number.isFinite(longitude) ||
-    Math.abs(latitude) > 90 ||
-    Math.abs(longitude) > 180
-  ) {
-    return null;
-  }
-
-  return { latitude, longitude };
-}
-
-function geometryPoints(value: unknown): Point[] {
-  if (!value || typeof value !== 'object') return [];
-  const coordinates = (value as { coordinates?: unknown }).coordinates;
-  if (!Array.isArray(coordinates)) return [];
-
-  return coordinates.flatMap((coordinate): Point[] => {
-    if (!Array.isArray(coordinate)) return [];
-    const [longitude, latitude] = coordinate;
-    const point = pointFrom(latitude, longitude);
-    return point ? [point] : [];
-  });
-}
 
 function project(point: Point, zoom: number): PixelPoint {
   const latitude = Math.max(-85.05112878, Math.min(85.05112878, point.latitude));
@@ -89,10 +66,12 @@ export function TripRouteMap({
   trip,
   driverPosition,
   colors,
+  fullScreen = false,
 }: {
   trip: TransportTrip;
   driverPosition: DriverPosition;
   colors: Palette;
+  fullScreen?: boolean;
 }) {
   const [mapSize, setMapSize] = useState({ width: 0, height: 220 });
   const [navigationError, setNavigationError] = useState<string | null>(null);
@@ -100,16 +79,15 @@ export function TripRouteMap({
   const [tileRetry, setTileRetry] = useState(0);
 
   const driver = driverPosition
-    ? pointFrom(driverPosition.latitude, driverPosition.longitude)
+    ? pointFromCoordinates(driverPosition.latitude, driverPosition.longitude)
     : null;
-  const tripFields = trip as unknown as Record<string, unknown>;
-  const pickup = pointFrom(tripFields.pickupLatitude, tripFields.pickupLongitude);
-  const destination = pointFrom(
-    tripFields.destinationLatitude,
-    tripFields.destinationLongitude,
+  const pickup = pointFromCoordinates(trip.pickupLatitude, trip.pickupLongitude);
+  const destination = pointFromCoordinates(
+    trip.destinationLatitude,
+    trip.destinationLongitude,
   );
-  const pickupRoute = geometryPoints(tripFields.pickupRouteGeometry);
-  const passengerRoute = geometryPoints(tripFields.routeGeometry);
+  const pickupRoute = geometryPoints(trip.pickupRouteGeometry);
+  const passengerRoute = geometryPoints(trip.routeGeometry);
 
   const viewport = useMemo(() => {
     if (mapSize.width <= 0 || mapSize.height <= 0) return null;
@@ -181,10 +159,7 @@ export function TripRouteMap({
     setTileRetry((current) => current + 1);
   };
 
-  const navigationTarget = trip.status === 'IN_PROGRESS' ? destination : pickup;
-  const navigationUrl = navigationTarget
-    ? `https://www.google.com/maps/dir/?api=1&destination=${navigationTarget.latitude},${navigationTarget.longitude}&travelmode=driving`
-    : null;
+  const navigationUrl = getTripNavigationUrl(trip);
 
   const openGuidance = async () => {
     if (!navigationUrl) return;
@@ -197,27 +172,32 @@ export function TripRouteMap({
   };
 
   return (
-    <View style={styles.card}>
-      <View style={styles.heading}>
-        <View style={{ flex: 1 }}>
-          <Typography colors={colors} size="xs" weight="bold" tone="muted" style={styles.kicker}>
-            GUIDAGE DE LA COURSE
-          </Typography>
-          <Typography colors={colors} size="base" weight="bold" style={styles.title}>
-            {trip.status === 'IN_PROGRESS' ? 'Rejoindre la destination' : 'Rejoindre le client'}
-          </Typography>
+    <View style={fullScreen ? styles.fullScreenRoot : styles.card}>
+      {!fullScreen ? (
+        <View style={styles.heading}>
+          <View style={{ flex: 1 }}>
+            <Typography colors={colors} size="xs" weight="bold" tone="muted" style={styles.kicker}>
+              GUIDAGE DE LA COURSE
+            </Typography>
+            <Typography colors={colors} size="base" weight="bold" style={styles.title}>
+              {trip.status === 'IN_PROGRESS' ? 'Rejoindre la destination' : 'Rejoindre le client'}
+            </Typography>
+          </View>
+          <View style={[styles.liveBadge, { backgroundColor: colors.muted }]}>
+            <View style={[styles.liveDot, { backgroundColor: driver ? colors.chart3 : colors.mutedForeground }]} />
+            <Typography colors={colors} size="xs" weight="semibold" tone="muted">
+              {driver ? 'Position reçue' : 'GPS en attente'}
+            </Typography>
+          </View>
         </View>
-        <View style={[styles.liveBadge, { backgroundColor: colors.muted }]}>
-          <View style={[styles.liveDot, { backgroundColor: driver ? colors.chart3 : colors.mutedForeground }]} />
-          <Typography colors={colors} size="xs" weight="semibold" tone="muted">
-            {driver ? 'Position reçue' : 'GPS en attente'}
-          </Typography>
-        </View>
-      </View>
-
+      ) : null}
       <View
         accessibilityLabel="Carte de la course avec la position du chauffeur, l’arrêt client et la destination"
-        style={[styles.map, { backgroundColor: colors.muted }]}
+        style={[
+          styles.map,
+          fullScreen ? styles.fullScreenMap : styles.inlineMap,
+          { backgroundColor: colors.muted },
+        ]}
         testID="driver-trip-map"
         onLayout={({ nativeEvent }) => {
           const { width, height } = nativeEvent.layout;
@@ -353,7 +333,7 @@ export function TripRouteMap({
           </Svg>
         ) : null}
 
-        {!driver ? (
+        {!fullScreen && !driver ? (
           <View pointerEvents="none" style={[styles.gpsNotice, { backgroundColor: colors.card }]}>
             <Ionicons name="locate-outline" size={16} color={colors.mutedForeground} />
             <Typography colors={colors} size="xs" tone="muted" style={styles.gpsNoticeText}>
@@ -369,30 +349,34 @@ export function TripRouteMap({
         </View>
       </View>
 
-      <View style={styles.legend}>
-        <LegendItem color={colors.primary} label="Votre position" colors={colors} />
-        <LegendItem color={colors.chart4} label="Arrêt client" colors={colors} />
-        <LegendItem color={colors.chart3} label="Destination" colors={colors} />
-      </View>
+      {!fullScreen ? (
+        <>
+          <View style={styles.legend}>
+            <LegendItem color={colors.primary} label="Votre position" colors={colors} />
+            <LegendItem color={colors.chart4} label="Arrêt client" colors={colors} />
+            <LegendItem color={colors.chart3} label="Destination" colors={colors} />
+          </View>
 
-      <Button
-        colors={colors}
-        accessibilityRole="button"
-        accessibilityLabel={trip.status === 'IN_PROGRESS' ? 'Ouvrir le guidage vers la destination' : 'Ouvrir le guidage vers le client'}
-        disabled={!navigationUrl}
-        onPress={() => void openGuidance()}
-        style={styles.navigationButton}
-        testID="button-open-trip-guidance"
-      >
-        <Ionicons name="navigate" size={18} color={colors.primaryForeground} />
-        <Typography colors={colors} size="xs" weight="bold">
-          Ouvrir le guidage
-        </Typography>
-      </Button>
-      {navigationError ? (
-        <Typography colors={colors} tone="destructive" size="xs" style={styles.errorText}>
-          {navigationError}
-        </Typography>
+          <Button
+            colors={colors}
+            accessibilityRole="button"
+            accessibilityLabel={trip.status === 'IN_PROGRESS' ? 'Ouvrir le guidage vers la destination' : 'Ouvrir le guidage vers le client'}
+            disabled={!navigationUrl}
+            onPress={() => void openGuidance()}
+            style={styles.navigationButton}
+            testID="button-open-trip-guidance"
+          >
+            <Ionicons name="navigate" size={18} color={colors.primaryForeground} />
+            <Typography colors={colors} size="xs" weight="bold">
+              Ouvrir le guidage
+            </Typography>
+          </Button>
+          {navigationError ? (
+            <Typography colors={colors} tone="destructive" size="xs" style={styles.errorText}>
+              {navigationError}
+            </Typography>
+          ) : null}
+        </>
       ) : null}
     </View>
   );
@@ -453,12 +437,29 @@ const styles = StyleSheet.create({
     padding: space.sm,
     gap: space.sm,
   },
+  fullScreenRoot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 0,
+  },
   heading: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   kicker: { letterSpacing: 0.7 },
   title: { marginTop: space.xs },
   liveBadge: { flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingHorizontal: space.sm, paddingVertical: space.xs, borderRadius: cardRadius },
   liveDot: { width: 7, height: 7, borderRadius: 4 },
-  map: { height: 220, width: '100%', overflow: 'hidden', borderRadius: cardRadius },
+  map: { width: '100%', overflow: 'hidden', borderRadius: cardRadius },
+  inlineMap: { height: 220 },
+  fullScreenMap: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 0,
+  },
   tile: { position: 'absolute', width: TILE_SIZE, height: TILE_SIZE },
   mapPlaceholder: {
     flexDirection: 'row',
