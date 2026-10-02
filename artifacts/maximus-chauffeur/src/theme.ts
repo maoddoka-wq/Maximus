@@ -1,4 +1,4 @@
-import { tokens } from '@workspace/maximus-design-system/tokens';
+import { tokens } from '@workspace/maximus-chauffeur-design-system/tokens';
 import {
   nativeTheme,
   type ColorScheme,

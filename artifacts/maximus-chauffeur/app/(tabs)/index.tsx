@@ -1,4 +1,5 @@
-import { useColorScheme, View } from 'react-native';
+import { View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Button } from '@workspace/maximus-chauffeur-design-system/components/native/button';
 import { Spinner } from '@workspace/maximus-chauffeur-design-system/components/native/spinner';
 import { Typography } from '@workspace/maximus-chauffeur-design-system/components/native/typography';
@@ -9,7 +10,8 @@ import { getPalette } from '../../src/theme';
 
 export default function ChauffeurScreen() {
   const { status, session, retrySession } = useAuth();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const router = useRouter();
+  const scheme = 'dark';
   const colors = getPalette(scheme, session?.company.primaryColor);
 
   if (status === 'restoring') {
@@ -32,7 +34,7 @@ export default function ChauffeurScreen() {
   }
 
   if (!session) return <SignInScreen />;
-  return <DriverHomeScreen session={session} />;
+  return <DriverHomeScreen session={session} onOpenTrips={() => router.navigate('/(tabs)/trips')} />;
 }
 
 function SessionRecoveryScreen({

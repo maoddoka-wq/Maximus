@@ -4,7 +4,6 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  useColorScheme,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +17,7 @@ import { cardRadius, getPalette, space } from '../theme';
 
 export function SignInScreen() {
   const { signIn } = useAuth();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = 'dark';
   const colors = getPalette(scheme);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
