@@ -344,7 +344,7 @@ export function TripRouteMap({
 
         <View pointerEvents="none" style={[styles.attribution, { backgroundColor: colors.card }]}>
           <Typography colors={colors} size="xs" tone="muted">
-            © OpenStreetMap contributors · © CARTO
+            © OpenStreetMap contributors
           </Typography>
         </View>
       </View>

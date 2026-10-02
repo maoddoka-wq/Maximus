@@ -2,17 +2,19 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getDriverMapTileUrls } from '../src/lib/map-tiles.ts';
 
-test('uses CARTO first and OpenStreetMap as the fallback', () => {
+test('uses the same public OpenStreetMap tiles as the customer map, without a keyed map API', () => {
   assert.deepEqual(getDriverMapTileUrls(2, 1, 1), [
-    'https://c.basemaps.cartocdn.com/light_all/2/1/1@2x.png',
-    'https://tile.openstreetmap.org/2/1/1.png',
+    'https://c.tile.openstreetmap.org/2/1/1.png',
+    'https://a.tile.openstreetmap.org/2/1/1.png',
+    'https://b.tile.openstreetmap.org/2/1/1.png',
   ]);
 });
 
-test('wraps tiles across the horizontal world edge', () => {
+test('rotates among OpenStreetMap subdomains and wraps tiles across the horizontal world edge', () => {
   assert.deepEqual(getDriverMapTileUrls(2, -1, 1), [
-    'https://a.basemaps.cartocdn.com/light_all/2/3/1@2x.png',
-    'https://tile.openstreetmap.org/2/3/1.png',
+    'https://a.tile.openstreetmap.org/2/3/1.png',
+    'https://b.tile.openstreetmap.org/2/3/1.png',
+    'https://c.tile.openstreetmap.org/2/3/1.png',
   ]);
 });
 
