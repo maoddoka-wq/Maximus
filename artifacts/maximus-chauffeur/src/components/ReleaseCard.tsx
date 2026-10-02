@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { getApkDownloadError } from '../lib/android-apk';
 import {
   Alert,
   AppState,
@@ -23,6 +24,14 @@ import { readMobileToken } from '../lib/auth-storage';
 import { cardRadius, space, type getPalette } from '../theme';
 
 type Palette = ReturnType<typeof getPalette>;
+type DownloadStage = 'preparing' | 'downloading' | 'verifying' | 'installer';
+
+const DOWNLOAD_STAGE_LABELS: Record<DownloadStage, string> = {
+  preparing: 'Préparation du téléchargement…',
+  downloading: 'Téléchargement de la mise à jour…',
+  verifying: 'Vérification du fichier APK…',
+  installer: 'Ouverture de l’installateur Android…',
+};
 
 function ReleaseCheckButton({
   colors,
@@ -94,8 +103,11 @@ function isNewerVersion(candidate: string, installed: string): boolean {
   return false;
 }
 
+const GRANT_READ_URI_PERMISSION = 1;
+
 export function ReleaseCard({ colors }: { colors: Palette }) {
   const [downloading, setDownloading] = useState(false);
+  const [downloadStage, setDownloadStage] = useState<DownloadStage | null>(null);
   const releaseQuery = useGetLatestChauffeurRelease({
     query: {
       queryKey: getGetLatestChauffeurReleaseQueryKey(),
@@ -136,6 +148,7 @@ export function ReleaseCard({ colors }: { colors: Palette }) {
     }
 
     setDownloading(true);
+    setDownloadStage('preparing');
     try {
       const token = await readMobileToken();
       if (!token || !FileSystem.cacheDirectory) {
@@ -144,52 +157,84 @@ export function ReleaseCard({ colors }: { colors: Palette }) {
 
       const localUri = `${FileSystem.cacheDirectory}maximus-chauffeur.apk`;
       await FileSystem.deleteAsync(localUri, { idempotent: true });
+      setDownloadStage('downloading');
       const download = await FileSystem.downloadAsync(
         `${API_BASE_URL}/api/transport/mobile/releases/latest/download`,
         localUri,
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      if (download.status !== 200) {
-        throw new Error(`Le serveur a refusé le téléchargement (HTTP ${download.status}).`);
-      }
 
+      setDownloadStage('verifying');
       const file = await FileSystem.getInfoAsync(download.uri);
-      if (!file.exists || !('size' in file) || file.size < 1) {
-        throw new Error('Le fichier APK téléchargé est vide ou incomplet.');
+      const validationError = getApkDownloadError({
+        status: download.status,
+        mimeType: download.mimeType,
+        headers: download.headers,
+        fileExists: file.exists,
+        fileSize: file.exists && 'size' in file ? file.size : 0,
+        expectedSize: releaseQuery.data?.sizeBytes,
+      });
+      if (validationError) {
+        throw new Error(validationError);
       }
 
       const contentUri = await FileSystem.getContentUriAsync(download.uri);
-      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+      setDownloadStage('installer');
+      const installerResult = await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
         data: contentUri,
         type: 'application/vnd.android.package-archive',
-        flags: 1,
+        flags: GRANT_READ_URI_PERMISSION,
       });
+      if (installerResult.resultCode === IntentLauncher.ResultCode.Canceled) {
+        Alert.alert(
+          'Installation interrompue',
+          'Android a interrompu l’installation. Vérifiez que MAXIMUS Chauffeur est autorisé à installer des applications inconnues, puis réessayez.',
+          [
+            { text: 'Fermer', style: 'cancel' },
+            ...(Constants.expoConfig?.android?.package
+              ? [{ text: 'Ouvrir les paramètres', onPress: () => void openInstallSettings() }]
+              : []),
+          ],
+        );
+      }
     } catch (error) {
-      const applicationId = Constants.expoConfig?.android?.package;
       const message =
         error instanceof Error
           ? error.message
           : 'Le fichier n’a pas pu être téléchargé ou ouvert.';
       Alert.alert(
         'Installation non terminée',
-        `${message}\n\nSi Android bloque l’installation, autorisez MAXIMUS Chauffeur à installer des applications inconnues dans les paramètres.`,
+        `${message}\n\nSi le fichier est valide mais que l’installation ne démarre pas, vérifiez l’autorisation d’installation dans Android.`,
         [
           { text: 'Fermer', style: 'cancel' },
-          ...(applicationId
+          ...(Constants.expoConfig?.android?.package
             ? [{
-                text: 'Paramètres',
-                onPress: () => {
-                  void IntentLauncher.startActivityAsync(
-                    'android.settings.MANAGE_UNKNOWN_APP_SOURCES',
-                    { data: `package:${applicationId}` },
-                  ).catch(() => undefined);
-                },
+                text: 'Ouvrir les paramètres',
+                onPress: () => void openInstallSettings(),
               }]
             : []),
         ],
       );
     } finally {
       setDownloading(false);
+      setDownloadStage(null);
+    }
+  };
+
+  const openInstallSettings = async () => {
+    const applicationId = Constants.expoConfig?.android?.package;
+    if (!applicationId) return;
+
+    try {
+      await IntentLauncher.startActivityAsync(
+        'android.settings.MANAGE_UNKNOWN_APP_SOURCES',
+        { data: `package:${applicationId}` },
+      );
+    } catch {
+      Alert.alert(
+        'Paramètres indisponibles',
+        'Ouvrez les paramètres Android de MAXIMUS Chauffeur et autorisez l’installation d’applications inconnues.',
+      );
     }
   };
 
@@ -243,16 +288,26 @@ export function ReleaseCard({ colors }: { colors: Palette }) {
             onPress={() => void releaseQuery.refetch()}
           />
           {Platform.OS === 'android' && updateAvailable ? (
-            <Button
-              colors={colors}
-              accessibilityRole="button"
-              disabled={downloading}
-              loading={downloading}
-              onPress={() => void downloadAndInstall()}
-              style={styles.downloadButton}
-            >
-              Télécharger et installer
-            </Button>
+            <>
+              <Button
+                colors={colors}
+                accessibilityRole="button"
+                disabled={downloading}
+                loading={downloading}
+                onPress={() => void downloadAndInstall()}
+                style={styles.downloadButton}
+              >
+                Télécharger et installer
+              </Button>
+              {downloadStage ? (
+                <View style={styles.statusRow} accessibilityLiveRegion="polite">
+                  <Spinner size="small" color={colors.primary} />
+                  <Typography colors={colors} size="xs" tone="muted" style={styles.statusText}>
+                    {DOWNLOAD_STAGE_LABELS[downloadStage]}
+                  </Typography>
+                </View>
+              ) : null}
+            </>
           ) : null}
         </>
       ) : (

@@ -6,11 +6,14 @@ const appConfig = JSON.parse(
   await readFile(new URL("../app.json", import.meta.url), "utf8"),
 );
 
-test("Chauffeur release requests only foreground location permissions", () => {
+test("Chauffeur release requests foreground location and APK installation permissions", () => {
   assert.deepEqual(
-    [...appConfig.expo.android.permissions].sort(),
+    appConfig.expo.android.permissions
+      .filter((permission) => permission !== "REQUEST_INSTALL_PACKAGES")
+      .sort(),
     ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
   );
+  assert.ok(appConfig.expo.android.permissions.includes("REQUEST_INSTALL_PACKAGES"));
 
   const locationPlugin = appConfig.expo.plugins.find(
     (plugin) => Array.isArray(plugin) && plugin[0] === "expo-location",
