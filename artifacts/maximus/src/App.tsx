@@ -1316,8 +1316,8 @@ function AppContent() {
     (location.startsWith('/maximus/entreprises/')
       ? {
           kicker: 'Administration',
-          title: 'Détail entreprise',
-          description: 'Consultez et ajustez l’espace client sélectionné.',
+          title: 'Réglages de l’entreprise',
+          description: 'Gérez les modules, les autorisations et les accès de cette entreprise.',
         }
       : pageMeta[isAdmin ? '/maximus/dashboard' : '/entreprise/dashboard']);
   const companyRoutePath = normalizeRoutePath(location);
