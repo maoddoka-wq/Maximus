@@ -56,6 +56,17 @@ export function isFreshDriverLocation(
   return age >= 0 && age <= DRIVER_LOCATION_MAX_AGE_MS;
 }
 
+export function getFreshDriverLocationCoordinates(
+  location: DriverLocationSnapshot | null | undefined,
+  now = Date.now(),
+): MapPoint | null {
+  if (!isFreshDriverLocation(location, now)) return null;
+  return {
+    latitude: location.latitude,
+    longitude: location.longitude,
+  };
+}
+
 type NavigationTrip = {
   status: string;
   pickupLatitude?: unknown;

@@ -15,8 +15,8 @@ Ne pas considérer l’ancien indicateur de suivi comme un consentement GPS expl
 
 **How to apply:** Toute évolution du GPS doit garder séparés le consentement durable du chauffeur et l’état d’exécution. Ne démarrer la lecture que lorsque l’application est active; sérialiser activation, suspension, reprise et arrêt. Mettre en pause `AVAILABLE` à chaque transition hors premier plan si les permissions le permettent et s’il n’y a pas de course attribuée/en cours; exiger une action du chauffeur pour redevenir disponible. Après une migration sans consentement fiable, arrêter l’ancien mécanisme et demander une activation explicite.
 
-Un seuil de déplacement non nul dans le watcher peut empêcher les positions d’être renouvelées lorsqu’un chauffeur reste immobile; le `timeInterval` seul ne garantit pas un heartbeat serveur. Utiliser des relevés périodiques même sans déplacement et baser l’état « GPS actif » sur un envoi API récemment confirmé.
+Une lecture Android en cache peut être périmée même si le watcher la transmet. Vérifier le timestamp de chaque échantillon avant le PATCH GPS : l’API horodate sa réception, pas la mesure. Un seuil de déplacement non nul peut aussi empêcher les positions d’être renouvelées lorsqu’un chauffeur reste immobile; le `timeInterval` seul ne garantit pas un heartbeat serveur.
 
-**Why:** Le serveur écarte les coordonnées trop anciennes même si le téléphone affiche encore le GPS comme activé; un chauffeur immobile peut donc sembler disponible sans être proposé aux clients.
+**Why:** Le serveur écarte les coordonnées trop anciennes même si le téléphone affiche encore le GPS comme activé. Sans validation avant l’envoi, un ancien point en cache peut recevoir un horodatage serveur récent et donner une fausse confirmation GPS.
 
-**How to apply:** Garder des mises à jour périodiques en premier plan sans seuil de distance, conserver une fraîcheur serveur stricte et rendre visible la perte des confirmations d’envoi. Tester le cas d’un chauffeur immobile et celui d’une requête GPS refusée.
+**How to apply:** Rejeter avant chaque PATCH les points invalides, périmés ou datés dans le futur; publier une position comme active seulement après confirmation API. Garder des mises à jour périodiques au premier plan sans seuil de distance et tester un point Android en cache, un chauffeur immobile et une requête GPS refusée.
