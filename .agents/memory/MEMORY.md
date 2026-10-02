@@ -2,6 +2,7 @@
 - [Isolation des releases APK Chauffeur](chauffeur-release-isolation.md) — repartir du dernier APK publié si la branche de travail contient des changements GPS non approuvés.
 - [Ordre des releases Chauffeur](chauffeur-release-order.md) — sélectionner la release stable au numéro sémantique maximal, jamais le premier résultat GitHub.
 - [Sérialisation GPS Chauffeur](chauffeur-gps-lifecycle.md) — GPS au premier plan, disponibilité mise en pause à l’arrière-plan, consentement conservé à la suspension.
+- [Imports des tests Node strip-types](node-strip-types-tests.md) — les imports ESM relatifs doivent inclure `.ts` et être autorisés dans le tsconfig `noEmit`.
 - [Carte chauffeur en direct](chauffeur-live-map.md) — garder le GPS local frais et la même carte OSM sans clé que les clients, avec essai des sous-domaines OSM.
 - [Navigation Gestion de stock](stock-navigation.md) — reprendre exactement les dix rubriques de la référence, dans une barre horizontale et sans rubrique supplémentaire.
 - [Champs vides des mouvements Stock](stock-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel les convertit en null alors que référence et commentaire sont non nullables.

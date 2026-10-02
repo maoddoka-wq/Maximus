@@ -5,13 +5,13 @@ import {
   getDriverMapTileUrls,
 } from '../src/lib/map-tiles.ts';
 
-test('uses the canonical OpenStreetMap tile host and identifies the app', () => {
-  assert.deepEqual(getDriverMapTileUrls(2, 1, 1), [
-    'https://tile.openstreetmap.org/2/1/1.png',
+test('uses the canonical OpenStreetMap tile host and a stable app identifier', () => {
+  assert.deepEqual(getDriverMapTileUrls(12, 1849, 1878), [
+    'https://tile.openstreetmap.org/12/1849/1878.png',
   ]);
   assert.equal(
     DRIVER_MAP_TILE_HEADERS['User-Agent'],
-    'MAXIMUS Chauffeur (+https://github.com/maoddoka-wq/Maximus)',
+    'MAXIMUS-Chauffeur/1.0.10 (+https://github.com/maoddoka-wq/Maximus)',
   );
 });
 
@@ -22,6 +22,7 @@ test('wraps tiles across the horizontal world edge without changing tile hosts',
 });
 
 test('rejects tiles outside the valid zoom and vertical world bounds', () => {
+  assert.deepEqual(getDriverMapTileUrls(25, 0, 0), []);
   assert.deepEqual(getDriverMapTileUrls(2, 0, -1), []);
   assert.deepEqual(getDriverMapTileUrls(2, 0, 4), []);
   assert.deepEqual(getDriverMapTileUrls(-1, 0, 0), []);

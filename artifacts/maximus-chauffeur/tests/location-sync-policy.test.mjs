@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   FOREGROUND_LOCATION_UPDATE_OPTIONS,
+  getDriverLocationQualityMessage,
+  isPlausibleDriverLocationUpdate,
   reconcileGpsStateWithLocation,
 } from "../src/services/location-sync-policy.ts";
 import {
@@ -22,6 +24,7 @@ test("only uploads fresh, valid native GPS fixes", () => {
     latitude: 14.7167,
     longitude: -17.4677,
     timestamp: now,
+    accuracy: 12,
   };
 
   assert.deepEqual(getFreshDriverLocationCoordinates(current, now), {
@@ -42,6 +45,60 @@ test("only uploads fresh, valid native GPS fixes", () => {
   assert.equal(
     getFreshDriverLocationCoordinates({ ...current, latitude: 91 }, now),
     null,
+  );
+  assert.equal(
+    getFreshDriverLocationCoordinates({ ...current, accuracy: 76 }, now),
+    null,
+  );
+});
+
+test("warns about GPS readings with excessive or missing accuracy", () => {
+  const now = 1_800_000_000_000;
+  const current = {
+    latitude: 14.7167,
+    longitude: -17.4677,
+    timestamp: now,
+    accuracy: 12,
+  };
+
+  assert.equal(getDriverLocationQualityMessage(current, now), null);
+  assert.match(
+    getDriverLocationQualityMessage({ ...current, accuracy: 120 }, now),
+    /trop imprécis/,
+  );
+  assert.match(
+    getDriverLocationQualityMessage({ ...current, accuracy: null }, now),
+    /précision GPS exploitable/,
+  );
+});
+
+test("rejects impossible jumps while allowing realistic movement", () => {
+  const recentTimestamp = Date.now() - 10_000;
+  const previous = {
+    latitude: 14.7167,
+    longitude: -17.4677,
+    timestamp: recentTimestamp,
+    accuracy: 10,
+  };
+  const nearby = {
+    ...previous,
+    latitude: 14.7168,
+    timestamp: previous.timestamp + 5_000,
+  };
+  const teleport = {
+    ...previous,
+    latitude: 14.8,
+    timestamp: previous.timestamp + 5_000,
+  };
+
+  assert.equal(isPlausibleDriverLocationUpdate(previous, nearby), true);
+  assert.equal(isPlausibleDriverLocationUpdate(previous, teleport), false);
+  assert.equal(
+    isPlausibleDriverLocationUpdate(previous, {
+      ...nearby,
+      timestamp: previous.timestamp,
+    }),
+    false,
   );
 });
 

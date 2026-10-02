@@ -312,11 +312,17 @@ export const updateTransportDriverLocationBodyLatitudeMax = 90;
 export const updateTransportDriverLocationBodyLongitudeMin = -180;
 export const updateTransportDriverLocationBodyLongitudeMax = 180;
 
+export const updateTransportDriverLocationBodyAccuracyMin = 0;
+export const updateTransportDriverLocationBodyAccuracyMax = 75;
+
+
 
 
 export const UpdateTransportDriverLocationBody = zod.object({
   "latitude": zod.number().min(updateTransportDriverLocationBodyLatitudeMin).max(updateTransportDriverLocationBodyLatitudeMax),
-  "longitude": zod.number().min(updateTransportDriverLocationBodyLongitudeMin).max(updateTransportDriverLocationBodyLongitudeMax)
+  "longitude": zod.number().min(updateTransportDriverLocationBodyLongitudeMin).max(updateTransportDriverLocationBodyLongitudeMax),
+  "accuracy": zod.number().min(updateTransportDriverLocationBodyAccuracyMin).max(updateTransportDriverLocationBodyAccuracyMax).optional().describe('Estimated horizontal accuracy in meters. Required together with measuredAt when supplied.'),
+  "measuredAt": zod.int().min(1).optional().describe('Device measurement timestamp in milliseconds since Unix epoch. Required together with accuracy when supplied.')
 })
 
 export const UpdateTransportDriverLocationResponse = zod.object({

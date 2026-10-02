@@ -17,4 +17,15 @@ export interface TransportDriverLocationInput {
      * @maximum 180
      */
   longitude: number;
+  /**
+     * Estimated horizontal accuracy in meters. Required together with measuredAt when supplied.
+     * @minimum 0
+     * @maximum 75
+     */
+  accuracy?: number;
+  /**
+     * Device measurement timestamp in milliseconds since Unix epoch. Required together with accuracy when supplied.
+     * @minimum 1
+     */
+  measuredAt?: number;
 }

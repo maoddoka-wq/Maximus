@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Linking,
+  Pressable,
   StyleSheet,
   View,
 } from 'react-native';
@@ -344,11 +345,19 @@ export function TripRouteMap({
           </View>
         ) : null}
 
-        <View pointerEvents="none" style={[styles.attribution, { backgroundColor: colors.card }]}>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Licence OpenStreetMap contributors"
+          onPress={() => {
+            void Linking.openURL('https://www.openstreetmap.org/copyright').catch(() => {});
+          }}
+          style={[styles.attribution, { backgroundColor: colors.card }]}
+          testID="link-openstreetmap-attribution"
+        >
           <Typography colors={colors} size="xs" tone="muted">
             © OpenStreetMap contributors
           </Typography>
-        </View>
+        </Pressable>
       </View>
 
       {!fullScreen ? (

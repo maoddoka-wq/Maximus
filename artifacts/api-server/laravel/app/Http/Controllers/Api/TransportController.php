@@ -295,7 +295,22 @@ class TransportController extends Controller
         $input = $this->validated($request, [
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'accuracy' => ['sometimes', 'required', 'numeric', 'between:0,75'],
+            'measuredAt' => ['sometimes', 'required', 'integer', 'min:1'],
         ]);
+        if ($request->exists('accuracy') !== $request->exists('measuredAt')) {
+            return response()->json([
+                'error' => 'La précision et l’horodatage de la position GPS sont requis ensemble.',
+            ], 422);
+        }
+        if (isset($input['measuredAt'])) {
+            $ageMilliseconds = (int) floor(microtime(true) * 1000) - (int) $input['measuredAt'];
+            if ($ageMilliseconds < -5000 || $ageMilliseconds > 45000) {
+                return response()->json([
+                    'error' => 'La position GPS reçue est trop ancienne. Gardez l’application ouverte et réessayez.',
+                ], 422);
+            }
+        }
         $company = $this->company($request);
         if (! $this->isWithinDakar((float) $input['latitude'], (float) $input['longitude'])) {
             return response()->json(['error' => 'La position GPS doit se trouver dans la zone de Dakar.'], 422);

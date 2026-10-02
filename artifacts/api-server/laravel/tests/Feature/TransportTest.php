@@ -230,6 +230,47 @@ class TransportTest extends TestCase
         ]);
     }
 
+    public function test_driver_location_rejects_inaccurate_and_stale_measurements(): void
+    {
+        $request = $this->asActor();
+        $employeeId = $this->createDriverEmployee('gps-quality-driver');
+        $driver = $request->postJson('/api/transport/drivers?companyId=kora', [
+            'employeeId' => $employeeId,
+            'licenseNumber' => 'SN-GPS-QUALITY-001',
+        ])->assertCreated();
+        $driverId = $driver->json('id');
+        $path = '/api/transport/drivers/'.$driverId.'/location?companyId=kora';
+        $base = [
+            'latitude' => 14.7167,
+            'longitude' => -17.4677,
+        ];
+        $measuredAt = (int) floor(microtime(true) * 1000);
+
+        $request->patchJson($path, $base + [
+            'accuracy' => 76,
+            'measuredAt' => $measuredAt,
+        ])->assertStatus(422);
+        $request->patchJson($path, $base + [
+            'accuracy' => 10,
+            'measuredAt' => $measuredAt - 46_000,
+        ])->assertStatus(422);
+        $this->assertDatabaseHas('transport_drivers', [
+            'id' => $driverId,
+            'latitude' => null,
+            'longitude' => null,
+        ]);
+
+        $request->patchJson($path, $base + [
+            'accuracy' => 10,
+            'measuredAt' => $measuredAt,
+        ])->assertOk();
+        $this->assertDatabaseHas('transport_drivers', [
+            'id' => $driverId,
+            'latitude' => 14.7167,
+            'longitude' => -17.4677,
+        ]);
+    }
+
     public function test_driver_requires_fresh_gps_and_available_vehicle_before_becoming_available(): void
     {
         ModuleCatalog::ensureCompanyAccess('kora');
