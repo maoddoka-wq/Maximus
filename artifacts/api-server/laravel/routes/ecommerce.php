@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\EcommerceController;
 use App\Http\Controllers\Api\EcommerceCustomerController;
 use App\Http\Controllers\Api\EcommercePaymentController;
 use App\Http\Controllers\Api\EcommercePosController;
+use App\Http\Controllers\Api\EcommerceSalesReportController;
 use App\Http\Controllers\Api\SellerWalletController;
 use App\Http\Controllers\Api\CarRentalController;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +17,7 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription', 'm
         Route::get('/bootstrap', [EcommerceController::class, 'bootstrap']);
         Route::get('/pos-sales', [EcommercePosController::class, 'index']);
         Route::post('/pos-sales', [EcommercePosController::class, 'store'])->middleware('throttle:60,1');
+        Route::get('/sales-report', [EcommerceSalesReportController::class, 'index']);
         Route::get('/wallet', [SellerWalletController::class, 'bootstrap']);
         Route::post('/wallet/reconcile', [SellerWalletController::class, 'reconcilePayments']);
         Route::patch('/wallet/payout-account', [SellerWalletController::class, 'updatePayoutAccount']);

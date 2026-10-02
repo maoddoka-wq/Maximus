@@ -1,0 +1,90 @@
+.ecommerce-sales-report-print-root {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    min-height: 0 !important;
+    background: white !important;
+  }
+
+  body:has(> .ecommerce-sales-report-print-root) > *:not(.ecommerce-sales-report-print-root) {
+    display: none !important;
+  }
+
+  body:has(> .ecommerce-sales-report-print-root) > .ecommerce-sales-report-print-root {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .ecommerce-sales-report-print {
+    display: block !important;
+    width: 100% !important;
+    color: #111 !important;
+    background: white !important;
+    font-family: Arial, sans-serif !important;
+    font-size: 9pt !important;
+  }
+
+  .print-report-header {
+    margin-bottom: 14pt;
+    border-bottom: 1px solid #777;
+    padding-bottom: 9pt;
+  }
+
+  .print-report-header h1 {
+    margin: 0 0 6pt;
+    font-size: 18pt;
+  }
+
+  .print-report-header p {
+    margin: 2pt 0;
+  }
+
+  .print-report-kicker {
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .print-report-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4pt 16pt;
+    margin-bottom: 12pt;
+  }
+
+  .print-report-summary p {
+    margin: 0;
+  }
+
+  .print-report-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8pt;
+  }
+
+  .print-report-table th,
+  .print-report-table td {
+    border: 1px solid #999;
+    padding: 5pt 6pt;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .print-report-table th {
+    background: #eee !important;
+    font-weight: 700;
+  }
+
+  .print-report-table tr {
+    break-inside: avoid;
+  }
+}

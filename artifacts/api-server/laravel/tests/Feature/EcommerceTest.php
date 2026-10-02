@@ -44,6 +44,145 @@ class EcommerceTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_sales_report_combines_sources_scopes_company_and_groups_paid_revenue_by_currency(): void
+    {
+        $this->setEcommerceFeatures(['dashboard', 'catalogue', 'commandes', 'vente-comptoir']);
+        $now = now();
+        DB::table('ecommerce_stores')->updateOrInsert(
+            ['id' => 'ecommerce-store-kora'],
+            [
+                'company_id' => 'kora',
+                'slug' => 'kora-report-store',
+                'name' => 'Boutique rapport',
+                'description' => '',
+                'status' => 'PUBLISHED',
+                'currency' => 'USD',
+                'primary_color' => '#D69E2E',
+                'accent_color' => '#172033',
+                'logo_url' => '',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+        );
+        $createOrder = static function (
+            string $id,
+            string $companyId,
+            string $reference,
+            int $total,
+            string $status,
+            string $paymentStatus,
+            ?string $currency,
+            $createdAt,
+        ): void {
+            DB::table('ecommerce_orders')->insert([
+                'id' => $id,
+                'company_id' => $companyId,
+                'reference' => $reference,
+                'customer_name' => 'Client '.$reference,
+                'customer_email' => strtolower($reference).'@example.test',
+                'customer_phone' => '',
+                'shipping_address' => 'Dakar',
+                'note' => '',
+                'total' => $total,
+                'currency' => $currency,
+                'status' => $status,
+                'payment_status' => $paymentStatus,
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+            ]);
+        };
+        $createOrder('report-online-paid', 'kora', 'WEB-PAID', 10000, 'LIVRÉE', 'PAID', 'XOF', $now);
+        $createOrder('report-online-unpaid', 'kora', 'WEB-UNPAID', 2000, 'NOUVELLE', 'UNPAID', 'USD', $now->copy()->subMinute());
+        $createOrder('report-online-refunded', 'kora', 'WEB-REFUNDED', 3000, 'ANNULÉE', 'REFUNDED', null, $now->copy()->subMinutes(2));
+        $createOrder('report-online-legacy-paid', 'kora', 'WEB-LEGACY', 4000, 'LIVRÉE', 'PAID', null, $now->copy()->subMinutes(2));
+        $createOrder('report-other-company', 'other-company', 'WEB-OTHER', 99000, 'LIVRÉE', 'PAID', 'XOF', $now);
+
+        DB::table('ecommerce_pos_sales')->insert([
+            [
+                'id' => 'report-pos-paid',
+                'company_id' => 'kora',
+                'reference' => 'POS-PAID',
+                'idempotency_key' => 'report-pos-paid-key',
+                'customer_name' => 'Client comptoir',
+                'currency' => 'EUR',
+                'subtotal' => 25,
+                'total' => 25,
+                'amount_received' => 25,
+                'change_due' => 0,
+                'status' => 'PAID',
+                'payment_method' => 'WAVE',
+                'created_at' => $now->copy()->subMinutes(3),
+                'updated_at' => $now->copy()->subMinutes(3),
+            ],
+            [
+                'id' => 'report-pos-refunded',
+                'company_id' => 'kora',
+                'reference' => 'POS-REFUNDED',
+                'idempotency_key' => 'report-pos-refunded-key',
+                'customer_name' => 'Client remboursé',
+                'currency' => 'XOF',
+                'subtotal' => 500,
+                'total' => 500,
+                'amount_received' => 500,
+                'change_due' => 0,
+                'status' => 'REFUNDED',
+                'payment_method' => 'CASH',
+                'created_at' => $now->copy()->subMinutes(4),
+                'updated_at' => $now->copy()->subMinutes(4),
+            ],
+        ]);
+        DB::table('ecommerce_pos_sales')->insert([
+            'id' => 'report-pos-other-company',
+            'company_id' => 'other-company',
+            'reference' => 'POS-OTHER',
+            'idempotency_key' => 'report-pos-other-key',
+            'customer_name' => 'Autre entreprise',
+            'currency' => 'XOF',
+            'subtotal' => 80000,
+            'total' => 80000,
+            'amount_received' => 80000,
+            'change_due' => 0,
+            'status' => 'PAID',
+            'payment_method' => 'CASH',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $date = $now->toDateString();
+        $request = $this->asActor();
+        $response = $request
+            ->getJson("/api/ecommerce/sales-report?companyId=kora&dateFrom={$date}&dateTo={$date}&perPage=2")
+            ->assertOk()
+            ->assertJsonPath('summary.totalSales', 6)
+            ->assertJsonPath('summary.onlineSales', 4)
+            ->assertJsonPath('summary.counterSales', 2)
+            ->assertJsonPath('summary.paidSales', 3)
+            ->assertJsonPath('summary.refundedSales', 2)
+            ->assertJsonPath('pagination.total', 6)
+            ->assertJsonPath('pagination.lastPage', 3)
+            ->assertJsonFragment(['currency' => 'XOF', 'amount' => 10000])
+            ->assertJsonFragment(['currency' => 'INCONNUE', 'amount' => 4000])
+            ->assertJsonFragment(['currency' => 'EUR', 'amount' => 25])
+            ->assertJsonMissing(['reference' => 'WEB-OTHER'])
+            ->assertJsonMissing(['reference' => 'POS-OTHER']);
+
+        $this->assertCount(2, $response->json('sales'));
+        $request
+            ->getJson("/api/ecommerce/sales-report?companyId=kora&dateFrom={$date}&dateTo={$date}&source=COUNTER")
+            ->assertOk()
+            ->assertJsonPath('summary.totalSales', 2)
+            ->assertJsonPath('availableSources', ['ONLINE', 'COUNTER']);
+    }
+
+    public function test_sales_report_does_not_expose_a_source_without_its_view_permission(): void
+    {
+        $this->setEcommerceFeatures(['dashboard', 'catalogue', 'commandes']);
+
+        $this->asActor()
+            ->getJson('/api/ecommerce/sales-report?companyId=kora&source=COUNTER')
+            ->assertForbidden();
+    }
+
     public function test_cash_pos_sale_decrements_shared_stock_once_and_reports_the_change(): void
     {
         $this->setEcommerceFeatures(['dashboard', 'catalogue', 'vente-physique', 'vente-comptoir']);
@@ -139,7 +278,7 @@ class EcommerceTest extends TestCase
             ->assertJsonPath('summary.todayChangeGiven', 1000);
     }
 
-    public function test_pos_external_mobile_money_records_provider_reference_and_inventory_movement_once(): void
+    public function test_pos_mobile_money_needs_confirmation_but_no_provider_reference_and_records_inventory_once(): void
     {
         $this->setEcommerceFeatures(['dashboard', 'catalogue', 'vente-physique', 'vente-comptoir']);
         DB::table('ecommerce_products')->insert([
@@ -666,6 +805,12 @@ class EcommerceTest extends TestCase
 
         $order = DB::table('ecommerce_orders')->where('reference', $first->json('reference'))->first();
         $this->assertNotNull($order);
+        $this->assertSame('XOF', (string) $order->currency);
+        DB::table('ecommerce_stores')->where('company_id', 'kora')->update(['currency' => 'USD']);
+        $this->assertDatabaseHas('ecommerce_orders', [
+            'id' => $order->id,
+            'currency' => 'XOF',
+        ]);
         $this->assertDatabaseCount('ecommerce_orders', 1);
         $request->patchJson('/api/ecommerce/orders/'.$order->id.'/status?companyId=kora', ['status' => 'CONFIRMÉE'])
             ->assertOk()

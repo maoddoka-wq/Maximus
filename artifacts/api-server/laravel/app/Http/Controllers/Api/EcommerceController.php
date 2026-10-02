@@ -1920,6 +1920,7 @@ class EcommerceController extends Controller
                     'delivery_zone_name' => $hasPhysicalProduct ? $deliveryZone?->name : null,
                     'delivery_zone_fee' => $deliveryFee,
                     'total' => $total,
+                    'currency' => (string) ($store->currency ?? 'XOF'),
                     'status' => 'NOUVELLE',
                     'created_at' => now(),
                     'updated_at' => now(),

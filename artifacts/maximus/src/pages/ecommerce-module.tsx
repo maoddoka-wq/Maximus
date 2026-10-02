@@ -4,6 +4,7 @@ import {
   Archive,
   ArrowUpRight,
   ArrowDownToLine,
+  BarChart3,
   Clock3,
   Check,
   CheckCircle2,
@@ -55,19 +56,21 @@ import {
   type SellerWalletBootstrap,
 } from '@/lib/ecommerce-api';
 import EcommercePosPanel from '@/pages/ecommerce-pos-panel';
+import EcommerceSalesReportPanel from '@/pages/ecommerce-sales-report-panel';
 import { useQueryTab } from '@/lib/query-tab';
 import { useAppDialog } from '@/components/confirm-dialog';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
-type EcommerceTab = 'dashboard' | 'accueil' | 'catalogue' | 'vente-comptoir' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';
+type EcommerceTab = 'dashboard' | 'accueil' | 'catalogue' | 'vente-comptoir' | 'rapport-ventes' | 'categories' | 'commandes' | 'clients' | 'promotions' | 'location' | 'livraisons' | 'finances' | 'parametres';
 
 const tabs: { id: EcommerceTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
   { id: 'accueil', label: 'Accueil', icon: House },
   { id: 'catalogue', label: 'Catalogue', icon: Package },
   { id: 'vente-comptoir', label: 'Vente comptoir', icon: ShoppingBag },
+  { id: 'rapport-ventes', label: 'Rapport des ventes', icon: BarChart3 },
   { id: 'categories', label: 'Catégories', icon: Tags },
   { id: 'commandes', label: 'Commandes', icon: ClipboardList },
   { id: 'clients', label: 'Clients', icon: Users },
@@ -266,14 +269,23 @@ export default function EcommerceModulePage({
   const [data, setData] = useState<EcommerceBootstrap | null>(null);
   const [walletData, setWalletData] = useState<SellerWalletBootstrap | null>(null);
   const [posData, setPosData] = useState<EcommercePosSalesBootstrap | null>(null);
-  const visibleTabs = allowedFeatureIds
-    ? tabs.filter(item =>
-        item.id === 'dashboard'
-        || item.id === 'accueil'
-        || allowedFeatureIds.includes(item.id)
-        || (item.id === 'categories' && allowedFeatureIds.includes('catalogue')),
-      )
-    : tabs;
+  const reportSources = useMemo(() => {
+    const canViewSource = (featureId: 'commandes' | 'vente-comptoir') =>
+      (!allowedFeatureIds || allowedFeatureIds.includes(featureId))
+      && (!featurePermissions || Boolean(featurePermissions[featureId]?.includes('voir')));
+    return [
+      ...(canViewSource('commandes') ? ['ONLINE' as const] : []),
+      ...(canViewSource('vente-comptoir') ? ['COUNTER' as const] : []),
+    ];
+  }, [allowedFeatureIds, featurePermissions]);
+  const visibleTabs = tabs.filter(item => {
+    if (item.id === 'rapport-ventes') return reportSources.length > 0;
+    if (!allowedFeatureIds) return true;
+    return item.id === 'dashboard'
+      || item.id === 'accueil'
+      || allowedFeatureIds.includes(item.id)
+      || (item.id === 'categories' && allowedFeatureIds.includes('catalogue'));
+  });
   const visibleTabIds = visibleTabs.map(item => item.id);
   const [tab, setTab] = useQueryTab({ tabs: visibleTabIds, defaultTab: visibleTabIds[0] ?? 'dashboard' });
   const [loading, setLoading] = useState(true);
@@ -376,7 +388,11 @@ export default function EcommerceModulePage({
   const store = data.store;
   const publicShopUrl = `/shop/${encodeURIComponent(store.slug || slugify(store.name) || 'boutique')}`;
   const navigate = (next: EcommerceTab) => setTab(next);
-  const permissionFeatureId = tab === 'accueil' ? 'parametres' : tab;
+  const permissionFeatureId = tab === 'accueil'
+    ? 'parametres'
+    : tab === 'rapport-ventes'
+      ? (reportSources.includes('ONLINE') ? 'commandes' : 'vente-comptoir')
+      : tab;
   const currentFeaturePermissions = featurePermissions?.[permissionFeatureId];
   const currentCanCreate = Boolean(canCreate && (!featurePermissions || currentFeaturePermissions?.includes('créer')));
   const currentCanModify = Boolean(canModify && currentCanCreate && (!featurePermissions || currentFeaturePermissions?.includes('modifier')));
@@ -446,6 +462,14 @@ export default function EcommerceModulePage({
             void load(true);
             return result.sale;
           }}
+        />
+      )}
+      {tab === 'rapport-ventes' && (
+        <EcommerceSalesReportPanel
+          companyId={companyId}
+          availableSources={reportSources}
+          storeName={store.name}
+          preview={preview}
         />
       )}
       {tab === 'categories' && <CategoryManager data={data} canCreate={currentCanCreate} canModify={currentCanModify} run={run} />}

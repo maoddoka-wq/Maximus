@@ -54,6 +54,50 @@ export interface EcommercePosSalesBootstrap {
   };
 }
 
+export type EcommerceSalesReportSource = 'ONLINE' | 'COUNTER';
+export type EcommerceSalesReportSourceFilter = 'ALL' | EcommerceSalesReportSource;
+
+export interface EcommerceSalesReportSale {
+  id: string;
+  reference: string;
+  source: EcommerceSalesReportSource;
+  customerName: string;
+  amount: number;
+  currency: 'XOF' | 'EUR' | 'USD' | 'INCONNUE';
+  orderStatus: string;
+  paymentStatus: string;
+  paymentMethod: EcommercePosPaymentMethod | null;
+  createdAt: string;
+}
+
+export interface EcommerceSalesReportFilters {
+  dateFrom: string;
+  dateTo: string;
+  source: EcommerceSalesReportSourceFilter;
+  page?: number;
+  perPage?: number;
+}
+
+export interface EcommerceSalesReportResponse {
+  sales: EcommerceSalesReportSale[];
+  availableSources: EcommerceSalesReportSource[];
+  summary: {
+    totalSales: number;
+    onlineSales: number;
+    counterSales: number;
+    paidSales: number;
+    refundedSales: number;
+    revenueByCurrency: Array<{ currency: 'XOF' | 'EUR' | 'USD' | 'INCONNUE'; amount: number }>;
+  };
+  pagination: {
+    page: number;
+    perPage: number;
+    total: number;
+    lastPage: number;
+  };
+  filters: Pick<EcommerceSalesReportFilters, 'dateFrom' | 'dateTo' | 'source'>;
+}
+
 export interface CreateEcommercePosSale {
   lines: Array<{ productId: string; quantity: number }>;
   paymentMethod: EcommercePosPaymentMethod;
@@ -546,6 +590,20 @@ export const createEcommerceApi = (companyId: string) => {
   return {
     bootstrap: () => request<EcommerceBootstrap>(withCompany('/ecommerce/bootstrap')),
     posSales: () => request<EcommercePosSalesBootstrap>(withCompany('/ecommerce/pos-sales')),
+    salesReport: (filters: EcommerceSalesReportFilters) => {
+      const query = new URLSearchParams({
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+        source: filters.source,
+        page: String(filters.page ?? 1),
+        perPage: String(filters.perPage ?? 100),
+      });
+      return request<EcommerceSalesReportResponse>(
+        withCompany(`/ecommerce/sales-report?${query.toString()}`),
+        undefined,
+        { cacheTtlMs: 0 },
+      );
+    },
     createPosSale: (body: CreateEcommercePosSale) => {
       const { idempotencyKey, ...payload } = body;
       return request<{ sale: EcommercePosSale }>(withCompany('/ecommerce/pos-sales'), {
