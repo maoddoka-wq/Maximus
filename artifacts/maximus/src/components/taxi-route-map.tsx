@@ -89,9 +89,8 @@ export function TaxiRouteMap({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return undefined;
     const map = L.map(containerRef.current, { zoomControl: true, attributionControl: true });
-    const openStreetMapLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const openStreetMapLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
-      subdomains: 'abc',
       maxZoom: 19,
     });
     openStreetMapLayer.addTo(map);

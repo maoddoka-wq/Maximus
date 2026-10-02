@@ -1,4 +1,8 @@
-const TILE_HOSTS = ['a', 'b', 'c'] as const;
+const TILE_BASE_URL = 'https://tile.openstreetmap.org';
+
+export const DRIVER_MAP_TILE_HEADERS = {
+  'User-Agent': 'MAXIMUS Chauffeur (+https://github.com/maoddoka-wq/Maximus)',
+} as const;
 
 export function getDriverMapTileUrls(zoom: number, tileX: number, tileY: number): string[] {
   if (!Number.isInteger(zoom) || zoom < 0 || zoom > 24) return [];
@@ -9,13 +13,6 @@ export function getDriverMapTileUrls(zoom: number, tileX: number, tileY: number)
   }
 
   const wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
-  const firstHost = ((tileX + tileY) % TILE_HOSTS.length + TILE_HOSTS.length) % TILE_HOSTS.length;
-  const orderedHosts = [
-    ...TILE_HOSTS.slice(firstHost),
-    ...TILE_HOSTS.slice(0, firstHost),
-  ];
 
-  return orderedHosts.map(
-    (host) => `https://${host}.tile.openstreetmap.org/${zoom}/${wrappedX}/${tileY}.png`,
-  );
+  return [`${TILE_BASE_URL}/${zoom}/${wrappedX}/${tileY}.png`];
 }

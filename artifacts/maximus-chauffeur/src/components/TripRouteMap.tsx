@@ -11,7 +11,10 @@ import { Typography } from '@workspace/maximus-chauffeur-design-system/component
 import Svg, { Circle, Polyline } from 'react-native-svg';
 import type { TransportTrip } from '@workspace/api-client-react';
 import { cardRadius, space, type getPalette } from '../theme';
-import { getDriverMapTileUrls } from '../lib/map-tiles';
+import {
+  DRIVER_MAP_TILE_HEADERS,
+  getDriverMapTileUrls,
+} from '../lib/map-tiles';
 import {
   geometryPoints,
   getTripNavigationUrl,
@@ -25,7 +28,6 @@ type PixelPoint = { x: number; y: number };
 type Tile = { key: string; uris: string[]; left: number; top: number };
 
 const TILE_SIZE = 256;
-const TILE_USER_AGENT = 'MAXIMUS-Chauffeur';
 
 function project(point: Point, zoom: number): PixelPoint {
   const latitude = Math.max(-85.05112878, Math.min(85.05112878, point.latitude));
@@ -389,24 +391,19 @@ function RouteMapTile({
   tile: Tile;
   onFailed: (tileKey: string) => void;
 }) {
-  const [sourceIndex, setSourceIndex] = useState(0);
   const [failed, setFailed] = useState(false);
-  const uri = tile.uris[sourceIndex];
+  const uri = tile.uris[0];
 
   if (!uri || failed) return null;
 
   return (
     <Image
-      source={{ uri, headers: { 'User-Agent': TILE_USER_AGENT } }}
+      source={{ uri, headers: DRIVER_MAP_TILE_HEADERS, cache: 'default' }}
       resizeMode="stretch"
       style={[styles.tile, { left: tile.left, top: tile.top }]}
       onError={() => {
-        if (sourceIndex + 1 < tile.uris.length) {
-          setSourceIndex((current) => Math.min(current + 1, tile.uris.length - 1));
-        } else {
-          setFailed(true);
-          onFailed(tile.key);
-        }
+        setFailed(true);
+        onFailed(tile.key);
       }}
     />
   );

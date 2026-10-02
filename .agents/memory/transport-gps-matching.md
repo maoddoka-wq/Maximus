@@ -33,8 +33,8 @@ Le bouton de guidage chauffeur doit ouvrir uniquement la première étape, depui
 
 **How to apply:** générer une URL de navigation avec `destination` égal au couple latitude/longitude du pickup, sans waypoint de destination finale, et refuser le guidage si le pickup n’a pas de coordonnées.
 
-Les tuiles standard `tile.openstreetmap.org` peuvent être refusées par leur politique d’utilisation ; le fond Leaflet doit utiliser une source publique compatible et rester séparé des géométries GPS internes.
+Le fond de carte et les coordonnées GPS sont des systèmes distincts : une réponse 403 de tuile peut masquer un trajet et ses marqueurs pourtant correctement calculés. Les cartes Taxi utilisent exactement l’hôte canonique `https://tile.openstreetmap.org/{z}/{x}/{y}.png`; les alias `a/b/c` ne sont pas équivalents pour sa politique actuelle.
 
-**Why:** les lignes et marqueurs peuvent être correctement rendus alors que le fond cartographique reste vide si le fournisseur de tuiles bloque les requêtes.
+**Why:** Les captures Chauffeur montraient le tracé sur des tuiles de blocage 403, et la politique OSM demande son URL canonique. Confondre cela avec un GPS erroné ferait modifier des coordonnées qui sont déjà correctes.
 
-**How to apply:** conserver l’attribution du fournisseur de tuiles, tester le chargement du fond sur mobile et appeler `invalidateSize` après les transitions d’affichage plein écran.
+**How to apply:** Diagnostiquer séparément le chargement du fond et les coordonnées; partager la même URL canonique entre web et natif, conserver l’attribution et le User-Agent natif identifiable, puis vérifier le rendu mobile.

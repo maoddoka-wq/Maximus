@@ -1,20 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getDriverMapTileUrls } from '../src/lib/map-tiles.ts';
+import {
+  DRIVER_MAP_TILE_HEADERS,
+  getDriverMapTileUrls,
+} from '../src/lib/map-tiles.ts';
 
-test('uses the same public OpenStreetMap tiles as the customer map, without a keyed map API', () => {
+test('uses the canonical OpenStreetMap tile host and identifies the app', () => {
   assert.deepEqual(getDriverMapTileUrls(2, 1, 1), [
-    'https://c.tile.openstreetmap.org/2/1/1.png',
-    'https://a.tile.openstreetmap.org/2/1/1.png',
-    'https://b.tile.openstreetmap.org/2/1/1.png',
+    'https://tile.openstreetmap.org/2/1/1.png',
   ]);
+  assert.equal(
+    DRIVER_MAP_TILE_HEADERS['User-Agent'],
+    'MAXIMUS Chauffeur (+https://github.com/maoddoka-wq/Maximus)',
+  );
 });
 
-test('rotates among OpenStreetMap subdomains and wraps tiles across the horizontal world edge', () => {
+test('wraps tiles across the horizontal world edge without changing tile hosts', () => {
   assert.deepEqual(getDriverMapTileUrls(2, -1, 1), [
-    'https://a.tile.openstreetmap.org/2/3/1.png',
-    'https://b.tile.openstreetmap.org/2/3/1.png',
-    'https://c.tile.openstreetmap.org/2/3/1.png',
+    'https://tile.openstreetmap.org/2/3/1.png',
   ]);
 });
 
