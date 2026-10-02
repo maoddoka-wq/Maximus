@@ -883,10 +883,10 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
              : isTransportRoute ? enabledFeatures.transport ? <TransportPublicPage store={store} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
               : isImmobilierRoute ? enabledFeatures.immobilier ? <PublicImmobilierPage listings={data.immobilierListings ?? []} store={store} slug={slug} domain={domain} form={immobilierForm} setForm={setImmobilierForm} submitted={immobilierSubmitted} onSubmitted={() => setImmobilierSubmitted(true)} /> : <FeatureUnavailable title="Immobilier non activé" text="Cette entreprise n’a pas encore autorisé la vitrine immobilière." onBack={() => go('')} />
         : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} zones={data.deliveryZones} onBack={() => go('/boutique')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
-         : isHomeRoute && !store.homepageEnabled ? <DisabledHomepage />
+         : isHomeRoute && !store.homepageEnabled ? null
          : isHomeRoute ? <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />
         : isCatalogRoute ? <CatalogPage products={products} visibleProducts={visibleProducts} categories={categories} searchQuery={searchQuery} categoryFilter={categoryFilter} setSearchQuery={setSearchQuery} setCategoryFilter={setCategoryFilter} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} />
-         : !store.homepageEnabled ? <DisabledHomepage />
+         : !store.homepageEnabled ? null
          : <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />}
     </main>
       {mobileNavVisible && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,.08)] backdrop-blur lg:hidden" aria-label="Navigation mobile"><div className="mx-auto grid max-w-md grid-cols-4 gap-1">
@@ -2198,15 +2198,6 @@ function PublicTaxiTracking({ trip }: { trip: PublicTransportTrip | PublicTransp
       {pickup && <TaxiRouteMap clientStop={pickup} destination={destination} driver={driver} routeGeometry={trip.routeGeometry} pickupRouteGeometry={trip.pickupRouteGeometry} className="h-52 sm:h-80" />}
       {!trip.pickupRouteDistanceKm && <p className="px-1 text-xs text-muted-foreground">La distance et le temps d’arrivée seront recalculés dès que la position GPS du chauffeur est reçue.</p>}
    </CardContent></Card>;
-}
-
-function DisabledHomepage() {
-  return <section className="mx-auto max-w-2xl rounded-2xl border border-dashed bg-white px-6 py-12 text-center shadow-sm">
-    <h1 className="text-xl font-bold">Page d’accueil désactivée</h1>
-    <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-      Cette entreprise n’affiche pas de page d’accueil publique. Les rubriques actives restent accessibles depuis le menu.
-    </p>
-  </section>;
 }
 
 function ShopHomePage({

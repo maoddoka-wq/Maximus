@@ -86,8 +86,32 @@ class PublicSiteAccessTest extends TestCase
         ])->assertOk()
             ->assertJsonCount(1, 'store.heroImages');
 
+        $uploadedStore = $uploaded->json('store');
+        $publicSlug = 'public-site-banner-shop';
+        $request->patchJson('/api/company-public-site?companyId='.$company->id, [
+            'name' => $uploadedStore['name'],
+            'slug' => $publicSlug,
+            'status' => 'PUBLISHED',
+            'description' => $uploadedStore['description'],
+            'primaryColor' => $uploadedStore['primaryColor'],
+            'accentColor' => $uploadedStore['accentColor'],
+            'homepageEnabled' => true,
+        ])->assertOk();
+
+        $maximusAdmin = $this->createActor('public-site-banner-maximus', 'maximus_admin', null);
+        $this->authenticate($maximusAdmin)
+            ->patchJson('/api/companies/'.$company->id.'/public-site-access', ['enabled' => true])
+            ->assertOk();
+
+        $heroUrl = $uploaded->json('store.heroImages.0');
+        $this->getJson('/api/shop/'.$publicSlug)
+            ->assertOk()
+            ->assertJsonPath('store.heroImages.0', $heroUrl);
+        $this->get($heroUrl)->assertOk();
+
         $imageId = basename($uploaded->json('store.heroImages.0'));
-        $request->deleteJson('/api/company-public-site/hero-images/'.$imageId.'?companyId='.$company->id)
+        $this->authenticate($companyAdmin)
+            ->deleteJson('/api/company-public-site/hero-images/'.$imageId.'?companyId='.$company->id)
             ->assertOk()
             ->assertJsonCount(0, 'store.heroImages');
 

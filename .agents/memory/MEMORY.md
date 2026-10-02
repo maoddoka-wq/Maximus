@@ -69,7 +69,7 @@
 - [Chemins des artefacts Replit](replit-artifact-paths.md) — les commandes de production partent de la racine du dépôt, pas du dossier de l’artefact.
 - [Quantité des produits numériques](digital-cart-quantity.md) — le panier et la commande imposent une unité, avec le type de fulfillment présent dans le panier client.
 - [Notifications mobiles](mobile-feedback.md) — ancrer les toasts en bas avec la safe area pour garantir la visibilité des succès et erreurs.
-- [Performance réseau frontend](frontend-network-performance.md) — confirmer la mutation puis rafraîchir en arrière-plan, en partageant uniquement les GET simultanés.
+- [Performance réseau frontend](frontend-network-performance.md) — partager les GET simultanés, mais respecter `no-store` sur les vitrines modifiables après upload.
 - [Inscription publique](public-registration-policy.md) — le réglage global masque les parcours manuel et intelligent, sans bloquer la création manuelle depuis MAXIMUS.
 - [Routage Apache des PWA](apache-pwa-routing.md) — ne jamais rediriger les routes SPA profondes vers le port Apache interne de Render.
 - [Publication GitHub de secours](github-push-fallback.md) — distinguer les scopes OAuth/PAT; les fichiers workflow exigent `repo` + `workflow`, et la lecture API n’implique pas l’écriture.
