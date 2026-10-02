@@ -72,7 +72,7 @@ test('conserve les permissions du pack Transport dans un secteur', () => {
   const role = data.roles.find(item => item.packId === 'transport-gestion' && item.sectorId === node.id);
   assert.ok(role);
   assert.equal(role.packModuleId, 'transport');
-  assert.deepEqual(role.modulePermissions['transport'], ['voir']);
+  assert.equal(role.modulePermissions['transport'], undefined);
   assert.deepEqual(role.modulePermissions['transport:menu:overview'], ['voir']);
   assert.deepEqual(role.modulePermissions['transport:menu:trips'], ['voir', 'créer', 'modifier']);
   assert.deepEqual(role.modulePermissions['transport:menu:drivers'], ['voir', 'créer', 'modifier']);

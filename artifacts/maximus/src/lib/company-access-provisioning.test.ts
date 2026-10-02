@@ -86,7 +86,7 @@ test('propage le pack Paie et ses droits vers l’espace entreprise', () => {
   assert.ok(role);
   assert.equal(root.modulePackIds?.paie?.[0], 'paie-supervision');
   assert.deepEqual(company.requestedModulePermissions?.paie?.['préparer-une-paie'], ['voir', 'créer', 'modifier']);
-  assert.deepEqual(role.modulePermissions['paie'], ['voir']);
+  assert.equal(role.modulePermissions['paie'], undefined);
   assert.ok(role.modulePermissions['paie:menu:préparer-une-paie']?.includes('créer'));
   assert.ok(role.modulePermissions['paie:menu:virements']?.includes('modifier'));
 

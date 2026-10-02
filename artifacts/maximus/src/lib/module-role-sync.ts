@@ -53,7 +53,6 @@ function buildPackRolePermissions(
   );
 
   if (selected.size === 0) return permissions;
-  permissions[module.id] = ['voir'];
 
   [...selected]
     .filter(featureId => featureIdsForModule(module).includes(featureId))

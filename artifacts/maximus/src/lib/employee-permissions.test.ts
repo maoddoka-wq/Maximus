@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Company, OrgNode, Role } from './store';
 import { isRoleAssignableToUnit } from './employee-permissions';
-import { modules } from './store';
+import { emptyStoreData, modules } from './store';
+import { synchronizeUnitPackRoles } from './module-role-sync';
 
 function createCompany(): Company {
   return {
@@ -69,6 +70,30 @@ test('accepte un rôle borné par les droits actifs de l’entreprise et de l’
       createNodes(),
       modules,
     ),
+    true,
+  );
+});
+
+test('propose à la création d’employé un rôle généré depuis un pack de l’unité', () => {
+  const company = createCompany();
+  const nodes = createNodes();
+  const unit = nodes[0];
+  unit.modulePackIds = { transport: ['transport-gestion'] };
+  const data = emptyStoreData();
+  data.companies.push(company);
+  data.orgNodes.push(...nodes);
+
+  synchronizeUnitPackRoles(data, company, unit);
+
+  const packRole = data.roles.find(role =>
+    role.companyId === company.id
+    && role.sectorId === unit.id
+    && role.packId === 'transport-gestion',
+  );
+  assert.ok(packRole);
+  assert.equal(packRole.modulePermissions.transport, undefined);
+  assert.equal(
+    isRoleAssignableToUnit(packRole, company, unit.id, nodes, modules),
     true,
   );
 });

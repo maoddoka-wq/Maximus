@@ -21,6 +21,12 @@ Les permissions détaillées d’une fonctionnalité priment sur le droit global
 
 **How to apply:** Filtrer les menus, onglets et routes Transport par la permission détaillée `voir` lorsque des permissions détaillées sont présentes ; n’utiliser le droit global qu’en l’absence de détail.
 
+Les rôles générés depuis un pack doivent contenir les droits détaillés des fonctionnalités, sans ajouter un droit global `module: voir` comme repli.
+
+**Why:** Les permissions détaillées bornent précisément un pack ; un droit racine redondant peut réactiver l’accès global lorsque le détail manque et faisait aussi échouer la validation d’attribution à l’unité.
+
+**How to apply:** Lors de la synchronisation d’un rôle automatique de pack, enregistrer les clés détaillées et conserver les contrôles existants de plafonnement entreprise et unité.
+
 Pour un rôle issu d’un pack, les fonctionnalités du pack sont aussi une limite supérieure : une sélection de secteur plus large ne peut pas ajouter de fonctionnalité hors pack.
 
 **Why:** Les rôles chauffeur pouvaient hériter d’une liste de secteur contenant toutes les rubriques Transport, alors que le pack chauffeur n’en incluait que quatre.
