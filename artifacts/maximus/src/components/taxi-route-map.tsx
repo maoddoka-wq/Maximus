@@ -94,19 +94,6 @@ export function TaxiRouteMap({
       subdomains: 'abc',
       maxZoom: 19,
     });
-    const cartoFallbackLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
-      subdomains: 'abcd',
-      maxZoom: 19,
-    });
-    let fallbackActivated = false;
-    openStreetMapLayer.on('tileerror', () => {
-      if (fallbackActivated || !map.hasLayer(openStreetMapLayer)) return;
-      fallbackActivated = true;
-      map.removeLayer(openStreetMapLayer);
-      cartoFallbackLayer.addTo(map);
-      tileLayerRef.current = cartoFallbackLayer;
-    });
     openStreetMapLayer.addTo(map);
     tileLayerRef.current = openStreetMapLayer;
     layersRef.current = L.layerGroup().addTo(map);

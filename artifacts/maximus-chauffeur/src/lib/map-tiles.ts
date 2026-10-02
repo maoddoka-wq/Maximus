@@ -1,4 +1,4 @@
-const TILE_HOSTS = ['a', 'b', 'c', 'd'] as const;
+const TILE_HOSTS = ['a', 'b', 'c'] as const;
 
 export function getDriverMapTileUrls(zoom: number, tileX: number, tileY: number): string[] {
   if (!Number.isInteger(zoom) || zoom < 0 || zoom > 24) return [];
@@ -9,10 +9,13 @@ export function getDriverMapTileUrls(zoom: number, tileX: number, tileY: number)
   }
 
   const wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
-  const host = TILE_HOSTS[Math.abs(tileX + tileY) % TILE_HOSTS.length];
-
-  return [
-    `https://${host}.basemaps.cartocdn.com/light_all/${zoom}/${wrappedX}/${tileY}@2x.png`,
-    `https://tile.openstreetmap.org/${zoom}/${wrappedX}/${tileY}.png`,
+  const firstHost = ((tileX + tileY) % TILE_HOSTS.length + TILE_HOSTS.length) % TILE_HOSTS.length;
+  const orderedHosts = [
+    ...TILE_HOSTS.slice(firstHost),
+    ...TILE_HOSTS.slice(0, firstHost),
   ];
+
+  return orderedHosts.map(
+    (host) => `https://${host}.tile.openstreetmap.org/${zoom}/${wrappedX}/${tileY}.png`,
+  );
 }
