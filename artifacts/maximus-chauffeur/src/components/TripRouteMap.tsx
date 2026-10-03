@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '@workspace/maximus-chauffeur-design-system/components/native/button';
 import { Typography } from '@workspace/maximus-chauffeur-design-system/components/native/typography';
 import Svg, { Circle, Polyline } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { TransportTrip } from '@workspace/api-client-react';
 import { cardRadius, space, type getPalette } from '../theme';
 import {
@@ -26,35 +27,14 @@ import {
   getTripNavigationUrl,
   pointFromCoordinates,
 } from '../lib/trip-map-geometry';
+import { useMapCamera } from '../hooks/use-map-camera';
+import { fitMapCamera, project, TILE_SIZE, MIN_MAP_ZOOM, MAX_MAP_ZOOM } from '../lib/map-camera';
 
 type Palette = ReturnType<typeof getPalette>;
 type Point = { latitude: number; longitude: number };
 type DriverPosition = { latitude: number | null; longitude: number | null } | null;
 type PixelPoint = { x: number; y: number };
-type Tile = { key: string; uris: string[]; left: number; top: number };
-
-const TILE_SIZE = 256;
-
-function project(point: Point, zoom: number): PixelPoint {
-  const latitude = Math.max(-85.05112878, Math.min(85.05112878, point.latitude));
-  const sin = Math.sin((latitude * Math.PI) / 180);
-  const worldSize = TILE_SIZE * 2 ** zoom;
-
-  return {
-    x: ((point.longitude + 180) / 360) * worldSize,
-    y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * worldSize,
-  };
-}
-
-function fitZoom(points: Point[], width: number, height: number): number {
-  for (let zoom = 17; zoom >= 9; zoom -= 1) {
-    const pixels = points.map((point) => project(point, zoom));
-    const horizontalSpan = Math.max(...pixels.map((point) => point.x)) - Math.min(...pixels.map((point) => point.x));
-    const verticalSpan = Math.max(...pixels.map((point) => point.y)) - Math.min(...pixels.map((point) => point.y));
-    if (horizontalSpan <= width - 56 && verticalSpan <= height - 56) return zoom;
-  }
-  return 9;
-}
+type Tile = { key: string; uris: string[]; left: number; top: number; size: number };
 
 function screenPoint(
   point: Point,
@@ -85,6 +65,7 @@ export function TripRouteMap({
   const [navigationError, setNavigationError] = useState<string | null>(null);
   const [failedTileKeys, setFailedTileKeys] = useState<string[]>([]);
   const [tileRetry, setTileRetry] = useState(0);
+  const insets = useSafeAreaInsets();
 
   const driver = driverPosition
     ? pointFromCoordinates(driverPosition.latitude, driverPosition.longitude)
@@ -97,41 +78,40 @@ export function TripRouteMap({
   const pickupRoute = geometryPoints(trip.pickupRouteGeometry);
   const passengerRoute = geometryPoints(trip.routeGeometry);
 
-  const viewport = useMemo(() => {
-    if (mapSize.width <= 0 || mapSize.height <= 0) return null;
-
-    const allPoints = [
+  const automaticCamera = fitMapCamera([
       ...(driver ? [driver] : []),
       ...(pickup ? [pickup] : []),
       ...(destination ? [destination] : []),
       ...pickupRoute,
       ...passengerRoute,
-    ];
-    if (allPoints.length === 0) return null;
+    ], mapSize);
+  const mapCamera = useMapCamera(trip.id, automaticCamera, mapSize);
+  const camera = mapCamera.camera;
 
-    const zoom = fitZoom(allPoints, mapSize.width, mapSize.height);
-    const projected = allPoints.map((point) => project(point, zoom));
-    const minX = Math.min(...projected.map((point) => point.x));
-    const maxX = Math.max(...projected.map((point) => point.x));
-    const minY = Math.min(...projected.map((point) => point.y));
-    const maxY = Math.max(...projected.map((point) => point.y));
-    const startX = (minX + maxX) / 2 - mapSize.width / 2;
-    const startY = (minY + maxY) / 2 - mapSize.height / 2;
-    const firstTileX = Math.floor(startX / TILE_SIZE);
-    const lastTileX = Math.floor((startX + mapSize.width) / TILE_SIZE);
-    const firstTileY = Math.floor(startY / TILE_SIZE);
-    const lastTileY = Math.floor((startY + mapSize.height) / TILE_SIZE);
-    const tileCount = 2 ** zoom;
+  const viewport = useMemo(() => {
+    if (!camera || mapSize.width <= 0 || mapSize.height <= 0) return null;
+    const { zoom, center } = camera;
+    const worldSize = TILE_SIZE * 2 ** zoom;
+    const startX = center.x * worldSize - mapSize.width / 2;
+    const startY = center.y * worldSize - mapSize.height / 2;
+    const tileZoom = Math.floor(zoom);
+    const tileSize = TILE_SIZE * 2 ** (zoom - tileZoom);
+    const firstTileX = Math.floor(startX / tileSize);
+    const lastTileX = Math.floor((startX + mapSize.width) / tileSize);
+    const firstTileY = Math.floor(startY / tileSize);
+    const lastTileY = Math.floor((startY + mapSize.height) / tileSize);
+    const tileCount = 2 ** tileZoom;
     const tiles: Tile[] = [];
 
     for (let tileY = firstTileY; tileY <= lastTileY; tileY += 1) {
       if (tileY < 0 || tileY >= tileCount) continue;
       for (let tileX = firstTileX; tileX <= lastTileX; tileX += 1) {
         tiles.push({
-          key: `${zoom}-${tileX}-${tileY}`,
-          uris: getDriverMapTileUrls(zoom, tileX, tileY),
-          left: tileX * TILE_SIZE - startX,
-          top: tileY * TILE_SIZE - startY,
+          key: `${tileZoom}-${tileX}-${tileY}`,
+          uris: getDriverMapTileUrls(tileZoom, tileX, tileY),
+          left: tileX * tileSize - startX,
+          top: tileY * tileSize - startY,
+          size: tileSize,
         });
       }
     }
@@ -148,12 +128,11 @@ export function TripRouteMap({
       width: mapSize.width,
       height: mapSize.height,
     };
-  }, [destination, driver, mapSize, passengerRoute, pickup, pickupRoute]);
+  }, [camera, destination, driver, mapSize, passengerRoute, pickup, pickupRoute]);
 
   const tileSignature = viewport?.tiles.map((tile) => tile.key).join('|') ?? '';
   useEffect(() => {
     setFailedTileKeys([]);
-    setTileRetry((current) => current + 1);
   }, [tileSignature]);
 
   const tilesWithFallbackErrors = viewport?.tiles
@@ -234,6 +213,12 @@ export function TripRouteMap({
             </Typography>
           </View>
         ) : null}
+        <View
+          {...mapCamera.handlers}
+          style={StyleSheet.absoluteFill}
+          accessibilityLabel="Déplacez la carte avec un doigt et zoomez avec deux doigts"
+          testID="driver-map-gesture-surface"
+        />
         {tilesWithFallbackErrors > 0 ? (
           <View style={[styles.tileUnavailable, { backgroundColor: colors.card }]}>
             <Typography colors={colors} size="xs" tone="muted" style={styles.tileUnavailableText}>
@@ -350,6 +335,56 @@ export function TripRouteMap({
           </View>
         ) : null}
 
+        {viewport ? (
+          <View
+            style={[
+              styles.mapControls,
+              fullScreen
+                ? { top: Math.max(insets.top + space.xl * 3, mapSize.height * 0.3), right: space.sm }
+                : { bottom: space.lg, left: space.sm, flexDirection: 'row' },
+            ]}
+          >
+            <Button
+              colors={colors}
+              variant="outline"
+              size="icon"
+              style={{ backgroundColor: colors.card }}
+              accessibilityRole="button"
+              accessibilityLabel="Zoomer la carte"
+              disabled={!camera || camera.zoom >= MAX_MAP_ZOOM}
+              onPress={() => mapCamera.zoom(1)}
+              testID="button-driver-map-zoom-in"
+            >
+              <Ionicons name="add" size={20} color={colors.foreground} />
+            </Button>
+            <Button
+              colors={colors}
+              variant="outline"
+              size="icon"
+              style={{ backgroundColor: colors.card }}
+              accessibilityRole="button"
+              accessibilityLabel="Dézoomer la carte"
+              disabled={!camera || camera.zoom <= MIN_MAP_ZOOM}
+              onPress={() => mapCamera.zoom(-1)}
+              testID="button-driver-map-zoom-out"
+            >
+              <Ionicons name="remove" size={20} color={colors.foreground} />
+            </Button>
+            <Button
+              colors={colors}
+              variant="outline"
+              size="icon"
+              style={{ backgroundColor: colors.card }}
+              accessibilityRole="button"
+              accessibilityLabel="Recentrer sur la course"
+              onPress={mapCamera.recenter}
+              testID="button-driver-map-recenter"
+            >
+              <Ionicons name="scan-outline" size={20} color={colors.foreground} />
+            </Button>
+          </View>
+        ) : null}
+
         <Pressable
           accessibilityRole="link"
           accessibilityLabel="Licence OpenStreetMap contributors"
@@ -438,7 +473,7 @@ function RouteMapTile({
           : { uri: sourceUri }
       }
       resizeMode="stretch"
-      style={[styles.tile, { left: tile.left, top: tile.top }]}
+      style={[styles.tile, { left: tile.left, top: tile.top, width: tile.size, height: tile.size }]}
       onError={() => {
         setSourceUri(null);
         if (uri && Platform.OS !== 'web') {
@@ -501,6 +536,7 @@ const styles = StyleSheet.create({
     borderRadius: 0,
   },
   tile: { position: 'absolute', width: TILE_SIZE, height: TILE_SIZE },
+  mapControls: { position: 'absolute', gap: space.xs },
   mapPlaceholder: {
     flexDirection: 'row',
     alignItems: 'center',
