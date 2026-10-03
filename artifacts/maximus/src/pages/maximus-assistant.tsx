@@ -29,7 +29,6 @@ import {
   type MaximusAssistantMessage,
   type MaximusAssistantResponse,
 } from '@/lib/maximus-assistant-api';
-import { parseMaxiActionRequest } from '@/lib/maxi-actions';
 import { MaxiSupervisedPlans } from '@/components/maxi-supervised-plans';
 
 export type MaximusWorkspaceContext = {
@@ -87,8 +86,8 @@ type MaximusAssistantProps = {
 
 const suggestedPrompts = [
   'Quels modules et packs sont publiés actuellement ?',
-  'Construis une proposition précise pour une nouvelle entreprise selon ses besoins.',
-  'Quelles fonctionnalités manquent pour compléter une offre métier ?',
+  'Comment organiser la hiérarchie, les rôles et les employés ?',
+  'Quelles sont les limites de MAXI et comment préparer un plan local ?',
 ];
 
 const guidedPrompts = [
@@ -318,7 +317,6 @@ export function MaximusAssistantPage({
   workspaceContext,
   insightCards,
   onAsk,
-  onPreviewAction,
   onExecuteAction,
   loading = false,
   initialQuestion = '',
@@ -415,10 +413,7 @@ export function MaximusAssistantPage({
         role: entry.kind,
         content: entry.text,
       }));
-      const requestedAction = parseMaxiActionRequest(trimmed);
-      const response = requestedAction
-        ? await onPreviewAction(requestedAction)
-        : await Promise.resolve(onAsk(trimmed, history));
+      const response = await Promise.resolve(onAsk(trimmed, history));
       updateConversation(threadId, current => [
         ...current,
         {
@@ -620,7 +615,7 @@ export function MaximusAssistantPage({
                   </div>
                   <h2 className="mt-4 text-xl font-black tracking-[-.03em]">Comment puis-je vous aider ?</h2>
                   <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                     {workspaceContext.description ?? 'Posez une question sur le catalogue, les organisations ou la gouvernance.'} MAXI explique son raisonnement, affiche ses sources et demande une confirmation avant toute écriture.
+                     {workspaceContext.description ?? 'Posez une question sur le catalogue, les organisations ou la gouvernance.'} MAXI consulte les sources locales et les règles MAXIMUS, sans API d’IA externe. Ce moteur n’est pas un modèle génératif entraîné. Chaque modification exige votre confirmation.
                   </p>
                 </div>
                 <div className="mx-auto mt-7 grid w-full max-w-3xl gap-2 md:grid-cols-3">

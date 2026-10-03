@@ -1,6 +1,7 @@
 import type { MaxiPlan } from './maxi-plans-api';
 
 export const MAXI_PLAN_LIMITS = [
+  'Moteur local par règles et documentation, sans API d’IA externe ni modèle génératif entraîné.',
   'Six capacités seulement : module, pack, fonctionnalité, secteur, plan entreprise (sans activation) et unité d’organisation.',
   'Aucun code n’est généré.',
   'Aucun paiement ni publication automatique.',
