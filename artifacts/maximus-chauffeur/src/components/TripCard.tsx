@@ -32,6 +32,8 @@ function statusLabel(status: TripStatus): string {
   if (status === 'OFFERED') return 'Nouvelle proposition';
   if (status === 'ASSIGNED') return 'À prendre en charge';
   if (status === 'IN_PROGRESS') return 'En cours';
+  if (status === 'COMPLETED') return 'Terminée';
+  if (status === 'CANCELLED') return 'Annulée';
   return status;
 }
 
@@ -200,6 +202,7 @@ export function TripCard({
             loading={isBusy}
             onPress={() => void handleAction()}
             style={styles.actionButton}
+            testID={`trip-action-${action.status.toLowerCase()}`}
           >
             {action.label}
           </Button>

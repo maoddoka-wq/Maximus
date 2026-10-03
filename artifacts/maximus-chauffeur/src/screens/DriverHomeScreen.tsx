@@ -7,7 +7,6 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
-  useColorScheme,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -34,9 +33,7 @@ import type {
   TransportTrip,
 } from '@workspace/api-client-react';
 import { AvailabilityCard, type GpsState } from '../components/AvailabilityCard';
-import { ReleaseCard } from '../components/ReleaseCard';
 import { TripCard } from '../components/TripCard';
-import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import { formatApiMessage as apiMessage } from '../lib/api-message';
 import { hasLocationTrackingConsent } from '../lib/auth-storage';
@@ -99,10 +96,9 @@ function companyLogoUri(photo: string | null | undefined): string | null {
   return `${API_BASE_URL}${photo.startsWith('/') ? '' : '/'}${photo}`;
 }
 
-export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
-  const { signOut } = useAuth();
+export function DriverHomeScreen({ session, onOpenTrips }: { session: MobileSessionInfo; onOpenTrips: () => void }) {
   const queryClient = useQueryClient();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = 'dark';
   const colors = getPalette(scheme, session.company.primaryColor);
   const [gpsState, setGpsState] = useState<GpsState>('inactive');
   const [gpsMessage, setGpsMessage] = useState<string | null>(null);
@@ -468,29 +464,6 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
     month: 'long',
   }).format(new Date());
 
-  const requestSignOut = () => {
-    if (transportQuery.isLoading) {
-      Alert.alert('Vérification en cours', 'Attendez le chargement de vos courses avant de vous déconnecter.');
-      return;
-    }
-
-    const hasAcceptedTrip =
-      driver?.availability === 'ON_TRIP' ||
-      activeTrips.some((trip) => trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS');
-    if (hasAcceptedTrip) {
-      Alert.alert(
-        'Course à terminer',
-        'Terminez votre course en cours avant de vous déconnecter afin de conserver le suivi GPS.',
-      );
-      return;
-    }
-
-    Alert.alert('Se déconnecter ?', 'Le GPS sera arrêté et votre disponibilité mise en pause.', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Se déconnecter', style: 'destructive', onPress: () => void signOut() },
-    ]);
-  };
-
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <StatusBar
@@ -529,17 +502,6 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                 </Typography>
               </View>
             </View>
-            <Button
-              colors={colors}
-              variant="outline"
-              size="sm"
-              accessibilityRole="button"
-              accessibilityLabel="Se déconnecter"
-              onPress={requestSignOut}
-              style={styles.logoutButton}
-            >
-              Quitter
-            </Button>
           </View>
 
           <View style={styles.greeting}>
@@ -611,7 +573,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                 <>
                   <View style={styles.sectionHeading}>
                     <Typography colors={colors} size="lg" weight="bold">
-                      Mes courses
+                      Prochaine course
                     </Typography>
                     <Badge colors={colors} variant="secondary" style={styles.countBadge}>
                       {activeTrips.length}
@@ -620,7 +582,7 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
 
                   {activeTrips.length ? (
                     <View style={styles.tripList}>
-                      {activeTrips.map((trip) => (
+                      {activeTrips.slice(0, 1).map((trip) => (
                         <TripCard
                           key={trip.id}
                           trip={trip}
@@ -658,12 +620,22 @@ export function DriverHomeScreen({ session }: { session: MobileSessionInfo }) {
                       </Empty>
                     </Card>
                   )}
+                  <Button
+                    colors={colors}
+                    variant="outline"
+                    accessibilityRole="button"
+                    accessibilityLabel="Afficher toutes mes courses"
+                    testID="home-open-trips"
+                    onPress={onOpenTrips}
+                    style={styles.allTripsButton}
+                  >
+                    Toutes mes courses
+                  </Button>
                 </>
               ) : null}
             </>
           )}
 
-          <ReleaseCard colors={colors} />
           <Typography colors={colors} size="xs" tone="muted" style={styles.footer}>
             MAXIMUS Chauffeur · Accès sécurisé par votre entreprise
           </Typography>
@@ -684,7 +656,6 @@ const styles = StyleSheet.create({
   logoLetter: { fontSize: 20 },
   companyName: { fontSize: 14 },
   driverName: { fontSize: 12, marginTop: 2 },
-  logoutButton: { paddingHorizontal: space.sm },
   greeting: { paddingTop: space.sm, paddingBottom: space.xs },
   date: { textTransform: 'capitalize' },
   greetingTitle: { lineHeight: 32, marginTop: space.xs },
@@ -696,6 +667,7 @@ const styles = StyleSheet.create({
   sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.xs },
   countBadge: { minWidth: 26, height: 26, alignItems: 'center', justifyContent: 'center', borderRadius: 13, paddingHorizontal: space.xs, paddingVertical: 0 },
   tripList: { gap: space.sm },
+  allTripsButton: { minHeight: 46 },
   emptyCard: { padding: 0 },
   emptyContent: { padding: space.md, gap: space.xs },
   footer: { textAlign: 'center', paddingTop: space.xs, paddingBottom: space.md },

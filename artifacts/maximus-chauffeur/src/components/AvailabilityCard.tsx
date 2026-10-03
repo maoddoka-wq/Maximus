@@ -115,6 +115,7 @@ export function AvailabilityCard({
           variant={isAvailable ? 'secondary' : 'default'}
           accessibilityRole="button"
           accessibilityLabel={availabilityAccessibilityLabel}
+          testID="availability-toggle"
           disabled={isBusy}
           loading={isBusy}
           onPress={onToggle}
@@ -129,6 +130,8 @@ export function AvailabilityCard({
           colors={colors}
           variant="outline"
           accessibilityRole="button"
+          accessibilityLabel={gpsState === 'stale' ? 'Actualiser le GPS' : 'Réactiver le GPS'}
+          testID="availability-enable-gps"
           onPress={onEnableGps}
           style={styles.gpsButton}
         >
