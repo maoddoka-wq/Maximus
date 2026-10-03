@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Linking,
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -16,6 +17,10 @@ import {
   DRIVER_MAP_TILE_HEADERS,
   getDriverMapTileUrls,
 } from '../lib/map-tiles';
+import {
+  invalidateDriverMapTile,
+  loadDriverMapTile,
+} from '../services/map-tile-loader';
 import {
   geometryPoints,
   getTripNavigationUrl,
@@ -154,9 +159,9 @@ export function TripRouteMap({
   const tilesWithFallbackErrors = viewport?.tiles
     .filter((tile) => failedTileKeys.includes(tile.key)).length ?? 0;
   const allTilesFailed = !!viewport?.tiles.length && tilesWithFallbackErrors === viewport.tiles.length;
-  const markTileFailed = (tileKey: string) => {
+  const markTileFailed = useCallback((tileKey: string) => {
     setFailedTileKeys((current) => current.includes(tileKey) ? current : [...current, tileKey]);
-  };
+  }, []);
   const retryMapTiles = () => {
     setFailedTileKeys([]);
     setTileRetry((current) => current + 1);
@@ -233,7 +238,7 @@ export function TripRouteMap({
           <View style={[styles.tileUnavailable, { backgroundColor: colors.card }]}>
             <Typography colors={colors} size="xs" tone="muted" style={styles.tileUnavailableText}>
               {allTilesFailed
-                ? 'Le fond de carte est indisponible. Réessayez après avoir vérifié votre connexion.'
+                ? 'Le fond OpenStreetMap est indisponible. Cette erreur est distincte du GPS. Vous pouvez ouvrir le guidage.'
                 : 'Certaines tuiles de la carte sont indisponibles. Réessayez si le fond reste incomplet.'}
             </Typography>
             <Button
@@ -400,18 +405,47 @@ function RouteMapTile({
   tile: Tile;
   onFailed: (tileKey: string) => void;
 }) {
-  const [failed, setFailed] = useState(false);
+  const [sourceUri, setSourceUri] = useState<string | null>(null);
   const uri = tile.uris[0];
 
-  if (!uri || failed) return null;
+  useEffect(() => {
+    let mounted = true;
+    setSourceUri(null);
+    if (!uri) return;
+    if (Platform.OS === 'web') {
+      setSourceUri(uri);
+      return;
+    }
+    void loadDriverMapTile(uri)
+      .then((localUri) => {
+        if (mounted) setSourceUri(localUri);
+      })
+      .catch((error: unknown) => {
+        if (!mounted) return;
+        console.warn('Driver map tile unavailable:', error);
+        onFailed(tile.key);
+      });
+    return () => { mounted = false; };
+  }, [uri, tile.key, onFailed]);
+
+  if (!sourceUri) return null;
 
   return (
     <Image
-      source={{ uri, headers: DRIVER_MAP_TILE_HEADERS, cache: 'default' }}
+      source={
+        Platform.OS === 'web'
+          ? { uri: sourceUri, headers: DRIVER_MAP_TILE_HEADERS, cache: 'default' }
+          : { uri: sourceUri }
+      }
       resizeMode="stretch"
       style={[styles.tile, { left: tile.left, top: tile.top }]}
       onError={() => {
-        setFailed(true);
+        setSourceUri(null);
+        if (uri && Platform.OS !== 'web') {
+          void invalidateDriverMapTile(uri).catch((error: unknown) => {
+            console.warn('Could not discard an unreadable map tile:', error);
+          });
+        }
         onFailed(tile.key);
       }}
     />
