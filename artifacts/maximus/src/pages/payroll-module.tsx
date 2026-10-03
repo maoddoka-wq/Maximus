@@ -514,7 +514,7 @@ export default function PayrollModulePage({
       </div>
       {(
         <WorkspaceTabs
-          mobileOnly={singleModuleNavigation}
+          sidebarNavigation={singleModuleNavigation}
           items={payrollFeatureDefinitions
             .filter(feature => visibleFeatures.has(feature.id))
             .map(feature => ({ ...feature, icon: payrollFeatureIcons[feature.id] }))}

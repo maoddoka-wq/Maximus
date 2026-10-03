@@ -3,7 +3,6 @@ import test from 'node:test';
 import * as React from 'react';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { resolveMobileModuleRail } from './mobile-module-rail';
 import { countActiveFilters, filterToggleLabel } from './filter-group';
 import { railScrollTarget } from './rail-scroll';
 
@@ -11,23 +10,6 @@ import { railScrollTarget } from './rail-scroll';
 (globalThis as { React?: typeof React }).React = React;
 const { ResponsiveFilterGroup } = await import('../components/responsive-filter-group');
 const { WorkspaceTabs } = await import('../components/workspace-tabs');
-
-const groups = [{ label: 'Immobilier', items: [
-  { href: '/entreprise/immobilier?feature=dashboard', label: 'Tableau de bord', icon: (() => null) as never },
-  { href: '/entreprise/immobilier?feature=biens', label: 'Biens', icon: (() => null) as never },
-] }];
-
-test('rail contains only permitted sidebar items and tracks the active feature', () => {
-  const rail = resolveMobileModuleRail('/entreprise/immobilier?feature=biens', groups, '/entreprise/immobilier');
-  assert.deepEqual(rail?.items.map(item => item.label), ['Tableau de bord', 'Biens']);
-  assert.equal(rail?.activeId, '/entreprise/immobilier?feature=biens');
-  assert.equal(resolveMobileModuleRail('/entreprise/immobilier', groups, '/entreprise/immobilier')?.activeId, groups[0].items[0].href);
-  assert.equal(resolveMobileModuleRail('/entreprise/stocks', groups, '/entreprise/immobilier'), null);
-});
-
-test('rail is hidden when only one section is permitted', () => {
-  assert.equal(resolveMobileModuleRail('/entreprise/immobilier', [{ label: 'x', items: [groups[0].items[0]] }], '/entreprise/immobilier'), null);
-});
 
 test('filter helpers count and label active filters', () => {
   assert.equal(countActiveFilters([['ALL', 'ALL'], ['DRAFT', 'ALL']]), 1);
@@ -51,8 +33,13 @@ test('filter group keeps supplementary controls mounted and exposes an accessibl
   assert.match(html, /Effacer les filtres/);
 });
 
-test('mobile-only tab rail is marked and keeps real button labels', () => {
-  const html = renderToStaticMarkup(createElement(WorkspaceTabs, { items: [{ id: 'a', label: 'Articles' }], activeId: 'a', onChange: () => undefined, ariaLabel: 'Menu', testIdPrefix: 'x', mobileOnly: true }));
-  assert.match(html, /company-mobile-rail md:hidden/);
+test('company features remain exclusively in the menu, without a second tab navigation', () => {
+  const html = renderToStaticMarkup(createElement(WorkspaceTabs, { items: [{ id: 'a', label: 'Articles' }], activeId: 'a', onChange: () => undefined, ariaLabel: 'Menu', testIdPrefix: 'x', sidebarNavigation: true }));
+  assert.equal(html, '');
+});
+
+test('standalone module previews retain their own navigation', () => {
+  const html = renderToStaticMarkup(createElement(WorkspaceTabs, { items: [{ id: 'a', label: 'Articles' }], activeId: 'a', onChange: () => undefined, ariaLabel: 'Menu', testIdPrefix: 'x' }));
+  assert.match(html, /Articles/);
   assert.match(html, /aria-current="page"/);
 });

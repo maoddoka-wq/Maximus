@@ -420,18 +420,10 @@ export default function EcommerceModulePage({
         </div>
       </section>
 
-      {singleModuleNavigation ? (
-        <WorkspaceTabs
-          mobileOnly
-          items={visibleTabs}
-          activeId={tab}
-          onChange={id => navigate(id as EcommerceTab)}
-          ariaLabel="Fonctionnalités e-commerce"
-          testIdPrefix="ecommerce-tab"
-        />
-      ) : (
+      {!singleModuleNavigation && (
         <section className="sticky top-0 z-20 rounded-2xl border bg-[hsl(var(--card))] p-2 shadow-sm">
           <WorkspaceTabs
+            sidebarNavigation={singleModuleNavigation}
             items={visibleTabs}
             activeId={tab}
             onChange={id => navigate(id as EcommerceTab)}

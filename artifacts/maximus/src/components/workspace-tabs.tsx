@@ -16,8 +16,8 @@ type WorkspaceTabsProps = {
   ariaLabel: string;
   testIdPrefix?: string;
   className?: string;
-  /** Show the rail only below the md breakpoint (company modules whose desktop navigation is the sidebar). */
-  mobileOnly?: boolean;
+  /** Company workspaces already expose these features in the main menu. */
+  sidebarNavigation?: boolean;
 };
 
 export function WorkspaceTabs({
@@ -27,7 +27,7 @@ export function WorkspaceTabs({
   ariaLabel,
   testIdPrefix,
   className = '',
-  mobileOnly = false,
+  sidebarNavigation = false,
 }: WorkspaceTabsProps) {
   const railRef = useRef<HTMLElement | null>(null);
   const activeRef = useRef<HTMLButtonElement | null>(null);
@@ -44,13 +44,14 @@ export function WorkspaceTabs({
         { left: chipBox.left - railBox.left + rail.scrollLeft, width: chipBox.width },
       ),
     });
-  }, [activeId]);
+  }, [activeId, sidebarNavigation]);
+  if (sidebarNavigation) return null;
   return (
     <nav
       ref={railRef}
       aria-label={ariaLabel}
       data-testid={testIdPrefix ? `${testIdPrefix}-rail` : undefined}
-      className={`module-tabs flex min-w-0 gap-1.5 overflow-x-auto ${mobileOnly ? 'company-mobile-rail md:hidden' : ''} ${className}`}
+      className={`module-tabs flex min-w-0 gap-1.5 overflow-x-auto ${className}`}
     >
       {items.map(item => {
         const Icon = item.icon;

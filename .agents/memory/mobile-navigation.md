@@ -9,8 +9,8 @@ Sur mobile, le menu de l’espace entreprise doit séparer l’administration de
 
 **How to apply:** Conserver les fonctionnalités regroupées par module, garder uniquement le libellé et la flèche dans l’en-tête de section, afficher l’identité de l’entreprise dans un en-tête fixe et fermer le tiroir après une navigation.
 
-Dans les modules entreprise, privilégier un accès direct aux rubriques autorisées sur téléphone et une présentation compacte des en-têtes, bilans et filtres. Ne pas résoudre l’excès de défilement en rendant les commandes minuscules. Conserver la présentation sur ordinateur.
+Les fonctionnalités des modules entreprise doivent apparaître uniquement dans le menu principal, sur téléphone comme sur ordinateur. Ne pas ajouter de barre horizontale ou d’onglets de fonctionnalités dans les pages. Garder une présentation compacte des en-têtes, bilans et filtres, sans rendre les commandes minuscules.
 
-**Why:** L’utilisateur a signalé : « la navigation mobile est très difficile […] trop de scroll verticale, les tailles des éléments ne sont pas adaptés ». Le besoin concerne aussi le contenu des pages, pas seulement le tiroir de navigation.
+**Why:** L’utilisateur a corrigé l’ajout de barres horizontales : « les fonctionnalités des modules […] doivent être seulement dans le menu ». Réduire le défilement et adapter les tailles ne doit pas créer une deuxième navigation.
 
-**How to apply:** Garder les zones tactiles confortables, les recherches et actions principales accessibles, les filtres secondaires repliables sans perdre leurs valeurs, et la navigation des rubriques liée à l’historique du navigateur. Limiter ces adaptations à l’espace entreprise, sans modifier les vitrines publiques.
+**How to apply:** Utiliser le menu existant pour les fonctionnalités, respecter ses permissions et son historique de navigation. Garder les zones tactiles confortables, les recherches et actions principales accessibles et les filtres secondaires repliables sans perdre leurs valeurs. Limiter ces adaptations à l’espace entreprise, sans modifier les vitrines publiques.

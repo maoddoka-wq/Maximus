@@ -287,7 +287,7 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
      return <SettingsPanel item={items.find(item => item.type === 'settings')} settings={settings} canManage={canManageAsSupervisor} onCreate={create} onUpdate={update} />;
   };
   const tabNav = (className?: string) => <WorkspaceTabs
-    mobileOnly={singleModuleNavigation}
+    sidebarNavigation={singleModuleNavigation}
     items={tabs.map(([id, label, icon]) => ({ id, label, icon }))}
     activeId={tab}
     onChange={id => setTab(id as Tab)}
@@ -298,7 +298,6 @@ export default function PresenceModulePage({ companyId, employees, nodes, curren
   return <div className="space-y-5">
        <div className="presence-hero mobile-hero card-surface rounded-2xl p-4 sm:p-8"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><p className="mono text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Gestion des Présences</p><h1 className="presence-hero__title mt-2 text-3xl font-bold tracking-[-.03em] sm:text-4xl">Le rythme de vos équipes, en clair.</h1><p className="presence-hero__description mt-2 max-w-2xl text-base leading-6 text-[hsl(var(--muted-foreground))]">Pointage, absences, horaires et temps travaillé dans un seul espace.</p><p className="mt-3 text-xs font-semibold text-[hsl(var(--primary))]">Actualisation automatique active · données vérifiées toutes les 5 secondes.</p></div><div className="flex flex-wrap gap-2"><Field label="Date active" value={date} onChange={setDate} type="date" /><Button onClick={() => void refresh()}><RefreshCw size={14} />Actualiser</Button></div></div>
          {!singleModuleNavigation && tabNav('mt-7 border-t pt-5')}</div>
-    {singleModuleNavigation && tabNav()}
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]">{error}<button onClick={() => setError('')}><X size={16} /></button></div>}
     {loading ? <div className="card-surface min-h-80 rounded-2xl p-5"><div className="mb-5 h-5 w-48 animate-pulse rounded bg-[hsl(var(--muted))]" /><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /><div className="h-24 animate-pulse rounded-xl bg-[hsl(var(--muted))]" /></div><div className="mt-6 h-48 animate-pulse rounded-xl bg-[hsl(var(--muted)/.7)]" /></div> : render()}
      {selected && <EditAttendance item={selected} employee={employeeById.get(selected.employeeId ?? '')} canCorrect={canCorrectFeature('Pointage')} onSave={payload => update(selected, payload)} onClose={() => setSelected(null)} />}

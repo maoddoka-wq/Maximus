@@ -131,7 +131,7 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
   const currentCanModify = canModify && (!stockPermissions || (currentTabPermissions?.includes('voir') && currentTabPermissions.includes('créer') && currentTabPermissions.includes('modifier')));
 
   const tabNav = (className?: string) => <WorkspaceTabs
-    mobileOnly={singleModuleNavigation}
+    sidebarNavigation={singleModuleNavigation}
     items={tabs
       .filter(([id]) => visibleTabs.some(([visibleId]) => visibleId === id))
       .map(([id, label, icon]) => ({ id, label, icon }))}
@@ -146,7 +146,6 @@ export default function StockModulePage({ companyId, companyUsers = [], companyS
     {pendingAction && <div className="flex items-center gap-2 rounded-xl border border-[hsl(var(--primary)/.24)] bg-[hsl(var(--primary)/.07)] px-4 py-3 text-sm font-semibold text-[hsl(var(--primary))]" role="status"><RefreshCw size={15} className="animate-spin" aria-hidden="true" />Enregistrement en cours…</div>}
     {error && <div className="flex items-center justify-between rounded-xl border border-[hsl(var(--destructive)/.25)] bg-[hsl(var(--destructive)/.07)] px-4 py-3 text-sm text-[hsl(var(--destructive))]"><span>{error}</span><button onClick={() => setError('')}><X size={16} /></button></div>}
        <div className="space-y-5">
-        {singleModuleNavigation && tabNav()}
         <div className={`flex items-center justify-between gap-3 ${singleModuleNavigation ? 'justify-end' : 'border-b border-[hsl(var(--border))] pb-2'}`}>
           {!singleModuleNavigation && tabNav('flex-1 pb-1')}
         <button title="Actualiser" aria-label="Actualiser" onClick={() => void load(true)} className="shrink-0 rounded-lg border p-2.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">{refreshing ? <RefreshCw className="animate-spin" size={15} /> : <RefreshCw size={15} />}</button>

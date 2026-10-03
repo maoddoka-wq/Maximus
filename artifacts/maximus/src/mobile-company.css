@@ -13,18 +13,6 @@
   .company-workspace .page-header h1 { font-size: var(--text-xl); line-height: var(--text-xl--line-height); }
   .company-workspace .page-header p:not(.mono) { margin-top: var(--spacing); font-size: var(--text-sm); line-height: var(--text-sm--line-height); }
 
-  /* Module rail: the nav element itself is sticky inside its long parent.
-     No ancestor sets a competing sticky offset. Opaque background, 44px targets. */
-  .company-workspace .company-mobile-rail {
-    position: sticky; top: var(--company-topbar-height); z-index: 15;
-    padding-block: calc(var(--spacing) * 1);
-    background: hsl(var(--background));
-    border-bottom: 1px solid hsl(var(--border));
-    scroll-snap-type: x proximity; scrollbar-width: none;
-  }
-  .company-workspace .company-mobile-rail::-webkit-scrollbar { display: none; }
-  .company-workspace .company-mobile-rail > button { scroll-snap-align: center; min-height: calc(var(--spacing) * 11); white-space: nowrap; font-size: var(--text-sm); }
-
   /* Metric cards: two columns, compact padding. Values keep their own size classes. */
   .company-workspace .page-pad .grid:has(> .metric-card) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--spacing) * 2); }
   .company-workspace .page-pad .metric-card { min-height: 0; padding: calc(var(--spacing) * 3); }

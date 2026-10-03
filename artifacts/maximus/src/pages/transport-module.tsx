@@ -684,7 +684,7 @@ export default function TransportModulePage({
       )}
 
        {<WorkspaceTabs
-         mobileOnly={singleModuleNavigation}
+         sidebarNavigation={singleModuleNavigation}
          items={visibleTabs}
          activeId={tab}
          onChange={id => setTab(id as TransportTab)}

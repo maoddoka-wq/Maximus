@@ -110,8 +110,6 @@ import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
 import { canonicalAppPath, normalizeRoutePath, type Session } from '@/lib/navigation';
 import { AdminRouter, CompanyRouter } from '@/routes/app-routes';
 import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
-import { WorkspaceTabs as CompanyWorkspaceTabs } from '@/components/workspace-tabs';
-import { resolveMobileModuleRail } from '@/lib/mobile-module-rail';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
 import {
   getEffectiveModuleFeatureIds,
@@ -1347,7 +1345,6 @@ function AppContent() {
   const unreadNotifications = getVisibleNotifications(data.notifications, notificationContext).filter(
     (notification) => !notification.read,
   ).length;
-  const immobilierRail = resolveMobileModuleRail(location, sidebarFeatureGroups ?? [], '/entreprise/immobilier');
   return (
     <div className={`app-shell ${isAdmin ? '' : 'company-workspace'} flex h-[100dvh] min-h-0 overflow-hidden`} style={activeCompanyTheme as CSSProperties}>
       <Sidebar
@@ -1440,16 +1437,6 @@ function AppContent() {
                 resynchroniser cette entreprise avant sa prochaine utilisation.
               </span>
             </div>
-          )}
-          {!isAdmin && immobilierRail && (
-            <CompanyWorkspaceTabs
-              mobileOnly
-              items={immobilierRail.items}
-              activeId={immobilierRail.activeId}
-              onChange={navigate}
-              ariaLabel="Fonctionnalités immobilier"
-              testIdPrefix="immobilier-tab"
-            />
           )}
           <ErrorBoundary resetKey={location}>
             <Suspense
