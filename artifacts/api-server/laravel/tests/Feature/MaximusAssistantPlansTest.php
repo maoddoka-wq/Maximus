@@ -21,7 +21,8 @@ class MaximusAssistantPlansTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config()->set('services.maxi_local.url', 'http://127.0.0.1:11434/v1/messages');
+        config()->set('services.anthropic.key', 'unit-test-only');
+        config()->set('services.anthropic.url', 'https://api.anthropic.com/v1/messages');
         DB::table('maximus_app_states')->insert([
             'scope' => 'workspace', 'company_id' => null,
             'payload' => json_encode(['companies' => [], 'orgNodes' => [], 'audit' => []]),
@@ -148,13 +149,10 @@ class MaximusAssistantPlansTest extends TestCase
         $this->assertSame(1, DB::table('maximus_app_states')->count());
     }
 
-    public function test_planning_never_contacts_an_external_model_or_credentialed_url(): void
+    public function test_planning_without_an_api_key_fails_without_contacting_the_provider(): void
     {
-        foreach ([
-            '', 'https://api.anthropic.com/v1/messages', 'http://other-host.test/messages',
-            'http://127.0.0.1@other-host.test/messages', 'http://user:password@127.0.0.1/messages',
-        ] as $url) {
-            config()->set('services.maxi_local.url', $url);
+        foreach (['', ' '] as $key) {
+            config()->set('services.anthropic.key', $key);
             $this->postJson('/api/maximus-assistant/plans', ['goal' => 'Créer un catalogue'])
                 ->assertUnprocessable();
         }

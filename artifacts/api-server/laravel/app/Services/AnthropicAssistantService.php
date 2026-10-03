@@ -15,7 +15,7 @@ final class AnthropicAssistantService
      */
     public function ask(string $question, array $context, array $history = []): array
     {
-        $model = (string) config('services.maxi_local.model', 'maxi-local');
+        $model = (string) config('services.anthropic.model', 'claude-sonnet-4-5');
 
         $messages = [];
         foreach (array_slice($history, -8) as $message) {
@@ -33,7 +33,7 @@ final class AnthropicAssistantService
         }
         $messages[] = ['role' => 'user', 'content' => $question];
 
-        $response = $this->localModelRequest([
+        $response = $this->providerRequest([
             'model' => $model,
             'max_tokens' => 2048,
             'system' => $this->systemPrompt($context),
@@ -57,7 +57,7 @@ final class AnthropicAssistantService
                 'Catalogue des modules et packs',
                 'Organisation et accès',
             ],
-            'provider' => 'local',
+            'provider' => 'anthropic',
             'model' => $model,
         ];
     }
@@ -89,8 +89,8 @@ final class AnthropicAssistantService
                 ], 'required' => ['name', 'description', 'featureIds'], 'additionalProperties' => false,
             ],
         ];
-        $response = $this->localModelRequest([
-            'model' => (string) config('services.maxi_local.model', 'maxi-local'),
+        $response = $this->providerRequest([
+            'model' => (string) config('services.anthropic.model', 'claude-sonnet-4-5'),
             'max_tokens' => 4096,
             'system' => $this->systemPrompt($context)."\n".implode("\n", [
                 'Mode plan supervisé : propose au maximum huit étapes concrètes, ordonnées selon leurs dépendances.',
@@ -137,32 +137,38 @@ final class AnthropicAssistantService
         return $blocks->first()['input'];
     }
 
-    private function localModelRequest(array $body): Response
+    private function providerRequest(array $body): Response
     {
-        $url = (string) config('services.maxi_local.url', '');
-        $parts = parse_url($url);
-        if (!is_array($parts) || ($parts['scheme'] ?? '') !== 'http'
-            || !in_array($parts['host'] ?? '', ['127.0.0.1', '[::1]'], true)
-            || isset($parts['user']) || isset($parts['pass'])) {
-            throw new RuntimeException('Les API d’IA externes sont désactivées pour MAXI. Son modèle local n’est pas encore configuré.');
+        $apiKey = (string) config('services.anthropic.key');
+        if (trim($apiKey) === '') {
+            throw new RuntimeException('MAXI n’est pas configuré sur le serveur.');
         }
         $response = Http::withHeaders([
+            'x-api-key' => $apiKey,
+            'anthropic-version' => '2023-06-01',
             'accept' => 'application/json',
         ])->withOptions(['allow_redirects' => false])->timeout(60)->post(
-            $url,
+            (string) config('services.anthropic.url', 'https://api.anthropic.com/v1/messages'),
             $body,
         );
         if ($response->failed()) {
+            $errorMessage = strtolower((string) $response->json('error.message', ''));
             $errorType = (string) $response->json('error.type', 'unknown_error');
             report(new RuntimeException(
-                'MAXI local model failed with HTTP '.$response->status().' ('.$errorType.').'
+                'Anthropic request failed with HTTP '.$response->status().' ('.$errorType.').'
             ));
 
+            if (str_contains($errorMessage, 'credit balance') || str_contains($errorMessage, 'purchase credits')) {
+                throw new RuntimeException('Le compte Anthropic n’a plus de crédit disponible. Ajoutez des crédits dans Plans & Billing, puis réessayez.');
+            }
+            if ($response->status() === 401) {
+                throw new RuntimeException('La clé Anthropic configurée sur le serveur est invalide.');
+            }
             if ($response->status() === 429) {
                 throw new RuntimeException('MAXI a atteint une limite temporaire. Réessayez dans quelques instants.');
             }
 
-            throw new RuntimeException('Le modèle local de MAXI n’a pas pu répondre pour le moment.');
+            throw new RuntimeException('MAXI n’a pas pu répondre pour le moment.');
         }
 
         return $response;

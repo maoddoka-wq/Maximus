@@ -15,8 +15,8 @@ MAXI doit demander une validation « Avant chaque modification », même lorsqu�
 
 **How to apply:** Présenter la portée de chaque étape avant sa confirmation, s’arrêter entre les modifications et préserver les résultats déjà confirmés en cas d’interruption ou d’abandon.
 
-MAXI doit être autonome, sans API externe, et disposer de tout le savoir nécessaire à ses fonctions MAXIMUS.
+MAXI utilise l’API Anthropic et son contexte métier MAXIMUS. Le choix d’un modèle local sans API externe n’est plus demandé.
 
-**Why:** L’utilisateur a demandé « aucun api externe » et un MAXI « autonome entrainé sur tout ce qu’il doit savoir », remplaçant la solution Anthropic précédemment utilisée.
+**Why:** Après avoir demandé un fonctionnement sans API externe, l’utilisateur a confirmé : « finalement tu peut laisser jutilise lapi antropic ».
 
-**How to apply:** Ne pas réactiver un fournisseur IA extérieur pour MAXI. Héberger son modèle sous contrôle MAXIMUS et actualiser ses connaissances depuis les sources métier autorisées ; conserver la validation humaine de chaque modification.
+**How to apply:** Garder la clé Anthropic côté serveur et le contexte limité aux sources administratives autorisées ; conserver la validation humaine de chaque modification.
