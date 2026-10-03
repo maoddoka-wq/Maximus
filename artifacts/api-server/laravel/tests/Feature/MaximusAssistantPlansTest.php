@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\AuthUser;
-use App\Services\MaximusLocalAssistantService;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
 use App\Support\ModuleCatalog;
@@ -17,11 +16,12 @@ class MaximusAssistantPlansTest extends TestCase
 {
     use RefreshDatabase;
 
-    private array $proposalInput;
+    private array $providerResponse;
 
     protected function setUp(): void
     {
         parent::setUp();
+        config()->set('services.maxi_local.url', 'http://127.0.0.1:11434/v1/messages');
         DB::table('maximus_app_states')->insert([
             'scope' => 'workspace', 'company_id' => null,
             'payload' => json_encode(['companies' => [], 'orgNodes' => [], 'audit' => []]),
@@ -29,11 +29,7 @@ class MaximusAssistantPlansTest extends TestCase
         ]);
         $this->login();
         $this->provider($this->proposal());
-        // Isolate orchestration from the rule parser; real parser integration is
-        // covered by MaximusLocalAssistantTest. Never fake a remote AI provider.
-        $this->mock(MaximusLocalAssistantService::class)->shouldReceive('plan')
-            ->andReturnUsing(fn () => $this->proposalInput);
-        Http::fake();
+        Http::fake(fn () => Http::response($this->providerResponse));
     }
 
     public function test_planning_simulates_dependencies_without_any_business_mutation(): void
@@ -47,7 +43,7 @@ class MaximusAssistantPlansTest extends TestCase
         $response = $this->getJson('/api/maximus-assistant/plans/'.$plan['id'])
             ->assertOk()->assertJsonPath('currentStep', 0);
         $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
-        Http::assertNothingSent();
+        Http::assertSent(fn ($request): bool => $request['tool_choice']['name'] === 'propose_supervised_plan');
     }
 
     public function test_preview_is_read_only_and_confirmation_is_bound_to_one_step(): void
@@ -154,17 +150,13 @@ class MaximusAssistantPlansTest extends TestCase
 
     public function test_planning_never_contacts_an_external_model_or_credentialed_url(): void
     {
-        $this->provider([
-            'title' => 'Préciser', 'summary' => 'Préciser les champs.',
-            'steps' => [], 'questions' => ['Quel module souhaitez-vous créer ?'],
-        ]);
         foreach ([
             '', 'https://api.anthropic.com/v1/messages', 'http://other-host.test/messages',
             'http://127.0.0.1@other-host.test/messages', 'http://user:password@127.0.0.1/messages',
         ] as $url) {
             config()->set('services.maxi_local.url', $url);
             $this->postJson('/api/maximus-assistant/plans', ['goal' => 'Créer un catalogue'])
-                ->assertOk()->assertJsonPath('plan', null);
+                ->assertUnprocessable();
         }
         Http::assertNothingSent();
         $this->assertSame(1, DB::table('maximus_app_states')->count());
@@ -194,13 +186,13 @@ class MaximusAssistantPlansTest extends TestCase
         $this->assertSame(1, DB::table('maximus_app_states')->count());
     }
 
-    public function test_incomplete_internal_proposals_fail_explicitly(): void
+    public function test_empty_truncated_and_text_only_provider_responses_fail_explicitly(): void
     {
         foreach ([
-            [],
-            ['title' => 'Proposition incomplète'],
+            ['content' => [['type' => 'text', 'text' => 'Déjà créé.']]],
+            ['content' => [], 'stop_reason' => 'max_tokens'],
         ] as $response) {
-            $this->proposalInput = $response;
+            $this->providerResponse = $response;
             $this->postJson('/api/maximus-assistant/plans', ['goal' => 'Créer un catalogue'])
                 ->assertUnprocessable();
         }
@@ -335,7 +327,11 @@ class MaximusAssistantPlansTest extends TestCase
 
     private function provider(array $input): void
     {
-        $this->proposalInput = $input;
+        $this->providerResponse = [
+            'stop_reason' => 'tool_use', 'content' => [[
+                'type' => 'tool_use', 'id' => 'tool-plan', 'name' => 'propose_supervised_plan', 'input' => $input,
+            ]],
+        ];
     }
 
     private function prepare(): array

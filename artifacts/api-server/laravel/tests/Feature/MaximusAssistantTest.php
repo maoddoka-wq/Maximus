@@ -17,10 +17,10 @@ class MaximusAssistantTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Http::fake();
+        config()->set('services.maxi_local.url', 'http://127.0.0.1:11434/v1/messages');
     }
 
-    public function test_only_the_main_maximus_admin_can_use_the_local_assistant(): void
+    public function test_only_the_main_maximus_admin_can_use_the_claude_assistant(): void
     {
         $companyAdmin = AuthUser::query()->create([
             'id' => 'assistant-company-admin',
@@ -43,8 +43,18 @@ class MaximusAssistantTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_main_maximus_admin_receives_local_knowledge_from_server_context_without_http(): void
+    public function test_main_maximus_admin_receives_a_local_model_answer_from_server_context(): void
     {
+        config()->set('services.anthropic.key', 'test-anthropic-key');
+        config()->set('services.anthropic.model', 'claude-sonnet-4-5');
+        Http::fake([
+            'http://127.0.0.1:11434/v1/messages' => Http::response([
+                'content' => [
+                    ['type' => 'text', 'text' => 'Le catalogue contient plusieurs modules configurables.'],
+                ],
+            ], 200),
+        ]);
+
         $admin = AuthUser::query()->create([
             'id' => 'assistant-maximus-admin',
             'email' => 'admin@maximus.test',
@@ -65,14 +75,19 @@ class MaximusAssistantTest extends TestCase
 
         $response
             ->assertOk()
+            ->assertJsonPath('answer', 'Le catalogue contient plusieurs modules configurables.')
             ->assertJsonPath('provider', 'local')
-            ->assertJsonPath('model', 'maxi-regles-locales');
-        $this->assertStringContainsString('Catalogue publié', $response->json('answer'));
-        $this->assertNotEmpty($response->json('citations'));
-        Http::assertNothingSent();
+            ->assertJsonPath('model', 'maxi-local');
+
+        Http::assertSent(function ($request): bool {
+            return $request->url() === 'http://127.0.0.1:11434/v1/messages'
+                && $request->header('x-api-key') === []
+                && $request['messages'][0]['content'] === 'Quels modules sont disponibles ?'
+                && str_contains($request['system'], 'administration principale');
+        });
     }
 
-    public function test_external_provider_configuration_is_ignored_without_sending_any_request(): void
+    public function test_it_refuses_external_ai_without_sending_any_request(): void
     {
         config()->set('services.maxi_local.url', 'https://api.anthropic.com/v1/messages');
         Http::fake();
@@ -93,9 +108,11 @@ class MaximusAssistantTest extends TestCase
             ->postJson('/api/maximus-assistant/ask', [
                 'question' => 'Vérifier la disponibilité de MAXI',
             ])
-            ->assertOk()
-            ->assertJsonPath('provider', 'local')
-            ->assertJsonPath('model', 'maxi-regles-locales');
+            ->assertStatus(503)
+            ->assertJsonPath(
+                'error',
+                'Les API d’IA externes sont désactivées pour MAXI. Son modèle local n’est pas encore configuré.'
+            );
         Http::assertNothingSent();
     }
 

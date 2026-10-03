@@ -20,15 +20,3 @@ MAXI doit être autonome, sans API externe, et disposer de tout le savoir néces
 **Why:** L’utilisateur a demandé « aucun api externe » et un MAXI « autonome entrainé sur tout ce qu’il doit savoir », remplaçant la solution Anthropic précédemment utilisée.
 
 **How to apply:** Ne pas réactiver un fournisseur IA extérieur pour MAXI. Héberger son modèle sous contrôle MAXIMUS et actualiser ses connaissances depuis les sources métier autorisées ; conserver la validation humaine de chaque modification.
-
-Le modèle local de MAXI doit utiliser l’hébergement actuel de MAXIMUS.
-
-**Why:** L’utilisateur a choisi « Hébergement actuel de MAXIMUS » pour son installation.
-
-**How to apply:** Évaluer d’abord les ressources disponibles sur cet hébergement. Ne pas déplacer MAXI vers un autre serveur ni augmenter les coûts sans un nouvel accord explicite.
-
-Conserver le forfait actuel de 512 Mo. Dans cette contrainte, MAXI utilise une aide locale par règles et documentation, sans prétendre être un modèle génératif entraîné.
-
-**Why:** L’utilisateur a choisi « Garder 512 Mo — forfait actuel » après présentation explicite des limites de cette option et du coût des modèles locaux.
-
-**How to apply:** Ne pas installer un gros modèle ni augmenter les ressources automatiquement. Afficher les limites de compréhension et de création, et ne pas présenter la recherche documentaire comme un entraînement neuronal.

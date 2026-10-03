@@ -184,7 +184,7 @@ export function MaxiSupervisedPlans({ onWorkspaceChanged, disabled = false, thre
           <CardTitle id="maxi-plans-title" className="flex items-center gap-2 text-base">
             <ClipboardList size={16} aria-hidden="true" /> Plans supervisés
           </CardTitle>
-          <CardDescription>Indiquez des créations explicites avec leurs champs. Le moteur local prépare les étapes reconnues ; vous confirmez chacune avant toute modification.</CardDescription>
+          <CardDescription>Décrivez un objectif : MAXI propose des étapes, vous confirmez chacune avant toute modification.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert>
@@ -203,7 +203,7 @@ export function MaxiSupervisedPlans({ onWorkspaceChanged, disabled = false, thre
             <label htmlFor="maxi-plan-goal" className="text-xs font-semibold">Objectif</label>
             <Textarea id="maxi-plan-goal" data-testid="input-plan-goal" value={goal} disabled={off} rows={3}
               onChange={ev => setGoal(ev.target.value)}
-              placeholder={'Créer le module « Atelier » description : Gestion de l’atelier fonctionnalités : Interventions, Planning\nPuis créer le pack « Essentiel » pour le module « Atelier » description : Accès de base fonctionnalités : Interventions'} />
+              placeholder="Ex. : préparer une offre pour une agence immobilière avec modules, pack et secteur" />
             <Button type="submit" disabled={off || !goal.trim()} data-testid="button-prepare-plan">
               {busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}
               Proposer un plan

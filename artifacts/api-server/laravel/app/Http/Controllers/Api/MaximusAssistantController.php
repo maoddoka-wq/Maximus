@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\MaximusLocalAssistantService;
+use App\Services\AnthropicAssistantService;
 use App\Services\MaximusAssistantActionService;
 use App\Services\MaximusAssistantPlanService;
 use App\Support\ModuleCatalog;
@@ -20,7 +20,7 @@ class MaximusAssistantController extends Controller
             ->header('Cache-Control', 'private, no-store');
     }
 
-    public function preparePlan(Request $request, MaximusLocalAssistantService $assistant, MaximusAssistantPlanService $plans): JsonResponse
+    public function preparePlan(Request $request, AnthropicAssistantService $assistant, MaximusAssistantPlanService $plans): JsonResponse
     {
         if (!$this->isMaximusAdmin($request)) return $this->adminOnlyResponse();
         $data = $request->validate(['goal' => ['required', 'string', 'min:3', 'max:4000']]);
@@ -95,7 +95,7 @@ class MaximusAssistantController extends Controller
         ];
     }
 
-    public function ask(Request $request, MaximusLocalAssistantService $assistant): JsonResponse
+    public function ask(Request $request, AnthropicAssistantService $assistant): JsonResponse
     {
         $actor = $request->attributes->get('authActor');
         if (! is_array($actor) || ($actor['role'] ?? null) !== 'maximus_admin') {
@@ -197,7 +197,7 @@ class MaximusAssistantController extends Controller
 
         return [
             'catalog' => [
-                'modules' => collect(ModuleCatalog::publishedDefinitionsWithCustom())->map(fn (array $module): array => [
+                'modules' => collect(ModuleCatalog::definitions())->map(fn (array $module): array => [
                     'id' => $module['id'],
                     'name' => $module['name'],
                     'description' => $module['description'],
@@ -286,29 +286,29 @@ class MaximusAssistantController extends Controller
             'moduleCount' => is_array($draft['moduleOverrides'] ?? null) ? count($draft['moduleOverrides']) : 0,
             'sectorCount' => is_array($draft['sectorPresets'] ?? null) ? count($draft['sectorPresets']) : 0,
             'hasChanges' => (bool) ($draft['hasChanges'] ?? true),
-            'customModules' => collect($draft['customModules'] ?? [])->filter(fn (mixed $item): bool => is_array($item))
+            'customModules' => collect($draft['customModules'] ?? [])->filter('is_array')
                 ->map(fn (array $module): array => [
                     'id' => $module['id'] ?? '', 'name' => $module['name'] ?? '',
                     'description' => $module['description'] ?? '',
                     'features' => $module['features'] ?? [],
-                    'packs' => collect($module['featurePacks'] ?? [])->filter(fn (mixed $item): bool => is_array($item))->map(
+                    'packs' => collect($module['featurePacks'] ?? [])->filter('is_array')->map(
                         fn (array $pack): array => [
                             'id' => $pack['id'] ?? '', 'name' => $pack['name'] ?? '',
                             'featureIds' => $pack['featureIds'] ?? [],
                         ],
                     )->values()->all(),
                 ])->values()->all(),
-            'moduleOverrides' => collect($draft['moduleOverrides'] ?? [])->filter(fn (mixed $item): bool => is_array($item))
+            'moduleOverrides' => collect($draft['moduleOverrides'] ?? [])->filter('is_array')
                 ->map(fn (array $module): array => [
                     'features' => $module['features'] ?? [],
-                    'packs' => collect($module['featurePacks'] ?? [])->filter(fn (mixed $item): bool => is_array($item))->map(
+                    'packs' => collect($module['featurePacks'] ?? [])->filter('is_array')->map(
                         fn (array $pack): array => [
                             'id' => $pack['id'] ?? '', 'name' => $pack['name'] ?? '',
                             'featureIds' => $pack['featureIds'] ?? [],
                         ],
                     )->values()->all(),
                 ])->all(),
-            'sectors' => collect($draft['sectorPresets'] ?? [])->filter(fn (mixed $item): bool => is_array($item))
+            'sectors' => collect($draft['sectorPresets'] ?? [])->filter('is_array')
                 ->map(fn (array $sector): array => [
                     'id' => $sector['id'] ?? '', 'name' => $sector['name'] ?? '',
                     'moduleIds' => $sector['moduleIds'] ?? [],
