@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AppStateController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MobileAuthController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\CompanyNavigationSettingsController;
 use App\Http\Controllers\Api\CompanyPaymentController;
 use App\Http\Controllers\Api\CompanyPublicSiteAccessController;
 use App\Http\Controllers\Api\CompanyPublicSiteSettingsController;
@@ -86,6 +87,11 @@ Route::middleware(['maximus.central', 'maximus.auth'])->prefix('company-requests
     Route::get('/', [CompanyController::class, 'index']);
     Route::post('/{companyId}/approve', [CompanyController::class, 'approve']);
     Route::post('/{companyId}/reject', [CompanyController::class, 'reject']);
+});
+
+Route::middleware('maximus.auth')->prefix('companies')->group(function (): void {
+    Route::get('/{companyId}/navigation-settings', [CompanyNavigationSettingsController::class, 'show']);
+    Route::patch('/{companyId}/navigation-settings', [CompanyNavigationSettingsController::class, 'update']);
 });
 
 Route::middleware(['maximus.central', 'maximus.auth'])->prefix('companies')->group(function (): void {

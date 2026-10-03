@@ -164,8 +164,6 @@ class AppStateController extends Controller
         // Company branding is persisted in the companies registry. The shared
         // app-state payload may have been written by an older browser, so it
         // must not be the source of truth for logos and theme colors.
-        $state = $this->hydrateCompanyBranding($state);
-
         if (($actor['role'] ?? null) !== 'maximus_admin') {
             $state = $this->mergeCurrentCompanyFromRegistry(
                 $state,
@@ -175,6 +173,7 @@ class AppStateController extends Controller
         } else {
             $state = $this->mergeRegistryCompanies($state);
         }
+        $state = $this->hydrateCompanyBranding($state);
         $state = $this->stripCredentials($state);
 
         return response()->json([
@@ -222,6 +221,8 @@ class AppStateController extends Controller
                     'accentColor' => $company->accent_color,
                     'sidebarColor' => $company->sidebar_color,
                     'deletionLocked' => (bool) ($company->deletion_locked ?? true),
+                    'moduleNavigationMode' => $company->module_navigation_mode ?? 'menu',
+                    'navigationCustomAllowed' => (bool) $company->navigation_custom_allowed,
                 ];
             },
         );
@@ -965,6 +966,8 @@ class AppStateController extends Controller
                     'accentColor' => $company->accent_color,
                     'sidebarColor' => $company->sidebar_color,
                     'deletionLocked' => (bool) ($company->deletion_locked ?? true),
+                    'moduleNavigationMode' => $company->module_navigation_mode ?? 'menu',
+                    'navigationCustomAllowed' => (bool) $company->navigation_custom_allowed,
                     'primaryInstallationId' => $company->erp_installation_id,
                     'primaryInstallationMode' => $installations->get($company->erp_installation_id)?->mode,
                 ]);

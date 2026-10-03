@@ -4,7 +4,7 @@
 - [Sérialisation GPS Chauffeur](chauffeur-gps-lifecycle.md) — GPS au premier plan, disponibilité mise en pause à l’arrière-plan, consentement conservé à la suspension.
 - [Imports des tests Node strip-types](node-strip-types-tests.md) — les imports ESM relatifs doivent inclure `.ts` et être autorisés dans le tsconfig `noEmit`.
 - [Carte chauffeur en direct](chauffeur-live-map.md) — garder le GPS local frais et la même carte OSM sans clé que les clients, avec essai des sous-domaines OSM.
-- [Navigation Gestion de stock](stock-navigation.md) — conserver les dix rubriques et leur ordre ; dans l’espace entreprise, les afficher uniquement dans le menu principal.
+- [Navigation Gestion de stock](stock-navigation.md) — conserver les dix rubriques et leur ordre, avec le mode de navigation choisi par entreprise.
 - [Champs vides des mouvements Stock](stock-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel les convertit en null alors que référence et commentaire sont non nullables.
 - [Gouvernance par unité](sector-governance.md) — les managers de secteur définissent les droits de leurs employés, sans accès aux autres unités.
 - [Périmètre des dossiers employés](employee-record-scope.md) — employé limité à lui-même sans sélecteur, manager à ses unités autorisées, admin d’entreprise à tous les employés du tenant.
@@ -36,7 +36,8 @@
 - [Stockage des téléversements en production](render-upload-storage.md) — ne pas dépendre du disque local Render pour conserver les ressources publiques.
 - [Limites des téléversements PHP](php-upload-limits.md) — aligner les plafonds client et Laravel sur les directives PHP réelles pour éviter une image omise sans message.
 - [Champs vides du catalogue](catalogue-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel peut les convertir en null.
-- [Navigation mobile MAXIMUS](mobile-navigation.md) — fonctionnalités uniquement dans le menu principal ; contenu compact et zones tactiles confortables, sans navigation horizontale doublonnée.
+- [Navigation mobile MAXIMUS](mobile-navigation.md) — menu par défaut, navigation horizontale seulement si choisie ; contenu compact et zones tactiles confortables.
+- [Choix de navigation et verrouillage](company-navigation-policy.md) — personnalisation accordée par MAXIMUS, deux modes exclusifs et autorisations verrouillées contre les clics accidentels.
 - [Limites du défilement mobile](mobile-scroll-boundary.md) — confiner le débordement de page sans supprimer le défilement nécessaire aux tableaux et rails de produits.
 - [Portefeuille vendeur](vendor-wallet-policy.md) — confirmer le solde après paiement, puis le rendre retirable après livraison ou sept jours sans litige.
 - [Réponse DiamanoPay](diamanopay-response-shape.md) — les charges peuvent être enveloppées dans `data` et utiliser `chargeId`/`checkoutUrl`, pas seulement les clés snake_case racine.

@@ -46,6 +46,8 @@ export interface Company {
   allowedModules: ModuleId[];
   refusedModules: ModuleId[];
   hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
+  moduleNavigationMode?: 'menu' | 'horizontal';
+  navigationCustomAllowed?: boolean;
   createdAt: string;
   profilePhoto?: string;
   primaryColor?: string;
@@ -551,6 +553,8 @@ export function normalizeStoreData(input: Partial<StoreData> | null | undefined)
         refusedModules: normalizeStringArray(raw.refusedModules) as ModuleId[],
         deletionLocked: typeof raw.deletionLocked === 'boolean' ? raw.deletionLocked : true,
       };
+      normalizedCompany.moduleNavigationMode = raw.moduleNavigationMode === 'horizontal' ? 'horizontal' : 'menu';
+      normalizedCompany.navigationCustomAllowed = raw.navigationCustomAllowed === true;
       if (raw.hiddenWorkspaceFeatures !== undefined) {
         normalizedCompany.hiddenWorkspaceFeatures = normalizeStringArray(raw.hiddenWorkspaceFeatures)
           .filter((featureId): featureId is CompanyWorkspaceFeatureId =>

@@ -121,6 +121,20 @@ final class InstallationSyncService
                 ? $this->validatePublicSiteAccess($payload['publicSiteAccess'], $payload['company']['id'] ?? null)
                 : null;
             $companyData = is_array($payload['company'] ?? null) ? $payload['company'] : [];
+            if (array_key_exists('moduleNavigationMode', $companyData)
+                && ! in_array($companyData['moduleNavigationMode'], ['menu', 'horizontal'], true)) {
+                throw new RuntimeException('Mode de navigation reçu invalide.');
+            }
+            if (array_key_exists('navigationCustomAllowed', $companyData)
+                && ! is_bool($companyData['navigationCustomAllowed'])) {
+                throw new RuntimeException('Autorisation de navigation reçue invalide.');
+            }
+            if (array_key_exists('navigationRevision', $companyData)
+                && (! is_int($companyData['navigationRevision'])
+                    || $companyData['navigationRevision'] < 0
+                    || ! array_key_exists('moduleNavigationMode', $companyData))) {
+                throw new RuntimeException('Version de navigation reçue invalide.');
+            }
             $hiddenWorkspaceFeatures = array_key_exists('hiddenWorkspaceFeatures', $companyData)
                 ? CompanyWorkspaceVisibility::validateHidden($companyData['hiddenWorkspaceFeatures'])
                 : null;
@@ -288,6 +302,20 @@ final class InstallationSyncService
             }
             if (array_key_exists('loginSlug', $companyData)) {
                 $branding['login_slug'] = trim((string) $companyData['loginSlug']) ?: null;
+            }
+            if (array_key_exists('moduleNavigationMode', $companyData)) {
+                $hasRevision = array_key_exists('navigationRevision', $companyData);
+                $newDirective = ! $existing || $existing->navigation_revision === null
+                    || ($hasRevision && $companyData['navigationRevision'] > $existing->navigation_revision);
+                if (! $hasRevision || $newDirective) {
+                    $branding['module_navigation_mode'] = $companyData['moduleNavigationMode'];
+                    if ($hasRevision) {
+                        $branding['navigation_revision'] = $companyData['navigationRevision'];
+                    }
+                }
+            }
+            if (array_key_exists('navigationCustomAllowed', $companyData)) {
+                $branding['navigation_custom_allowed'] = $companyData['navigationCustomAllowed'];
             }
             $company = Company::query()->updateOrCreate(
                 ['id' => $companyId],

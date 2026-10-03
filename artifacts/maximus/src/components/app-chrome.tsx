@@ -19,6 +19,11 @@ import { Input } from '@workspace/maximus-design-system/components/ui/input';
 import type { ModuleId, StoreData } from '@/lib/store';
 import { companyWorkspaceFeatureForPath, type CompanyWorkspaceFeatureId } from '@/lib/company-workspace-features';
 import {
+  buildModuleEntries,
+  isModuleEntryActive,
+  type CompanyNavigationMode,
+} from '@/lib/company-navigation';
+import {
   adminNav,
   companyNav,
   type Icon,
@@ -47,6 +52,7 @@ type SidebarProps = {
   onToggleCollapse: () => void;
   activeNavStyle?: CSSProperties;
   hiddenWorkspaceFeatures?: CompanyWorkspaceFeatureId[];
+  navigationMode?: CompanyNavigationMode;
 };
 
 export function Sidebar({
@@ -67,6 +73,7 @@ export function Sidebar({
   onToggleCollapse,
   activeNavStyle,
   hiddenWorkspaceFeatures = [],
+  navigationMode = 'menu',
 }: SidebarProps) {
   const isAdmin = session === 'admin';
   const companyAdmin = session.startsWith('company:');
@@ -85,12 +92,22 @@ export function Sidebar({
     !isAdmin && allowed.length >= 1 && sidebarFeatureGroups?.length,
   );
   const compact = collapsed && !mobileOpen;
-  const navigationGroups = isAdmin ? adminNavGroups : (sidebarFeatureGroups ?? []);
+  const fullGroups = isAdmin ? adminNavGroups : (sidebarFeatureGroups ?? []);
+  const horizontalMode = !isAdmin && verticalModuleMenu && navigationMode === 'horizontal';
   const activeHref = getMostSpecificNavigationHref(location, [
     ...nav.map(item => item.href),
-    ...navigationGroups.flatMap(group => group.items.map(item => item.href)),
+    ...fullGroups.flatMap(group => group.items.map(item => item.href)),
   ]);
-  const active = (href: string) => href === activeHref;
+  const moduleEntries = horizontalMode ? buildModuleEntries(fullGroups) : [];
+  const moduleEntryByHref = new Map(moduleEntries.map(entry => [entry.href, entry]));
+  // Horizontal mode: the sidebar lists module names only (one entry per permitted group).
+  const navigationGroups: SidebarFeatureGroup[] = horizontalMode
+    ? [{ label: 'Modules', items: moduleEntries.map(entry => ({ href: entry.href, label: entry.label, icon: entry.icon })) }]
+    : fullGroups;
+  const active = (href: string) => {
+    const entry = moduleEntryByHref.get(href);
+    return entry ? isModuleEntryActive(entry, activeHref) : href === activeHref;
+  };
   const activeCompanyModule = companyModuleItems.some(item => item.href === activeHref);
   const activeFeatureGroupLabel =
     navigationGroups.find(group => group.items.some(item => active(item.href)))?.label ?? '';

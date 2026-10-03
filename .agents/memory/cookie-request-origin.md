@@ -8,3 +8,9 @@ Pour les mutations API, exiger une origine `Origin` ou `Referer` de même origin
 **Why:** Les sessions navigateur doivent résister aux requêtes CSRF, tandis que les synchronisations machine peuvent être inter-origines et ne reposent pas sur les cookies du navigateur.
 
 **How to apply:** Conserver cette frontière lors de l’ajout de routes et de domaines de boutiques; n’ajouter une origine externe qu’à la liste autorisée explicite.
+
+L’aperçu Replit arrive en HTTPS côté navigateur, mais peut atteindre PHP en HTTP après terminaison TLS. Les origines HTTPS des hôtes d’aperçu exacts fournis par le serveur doivent être reconnues, sans wildcard ni confiance dans `X-Forwarded-Host` fourni par un client.
+
+**Why:** Une session et les lectures GET fonctionnaient dans le vrai aperçu HTTPS alors que toutes les sauvegardes avec cookie étaient rejetées pour origine interdite. Vérifier uniquement une lecture authentifiée ne prouve donc pas que les mutations fonctionnent.
+
+**How to apply:** Tester au moins une mutation réelle dans l’aperçu HTTPS après changement de la frontière d’origine. Garder les refus pour les domaines ressemblants, sous-domaines non autorisés, ports supplémentaires et requêtes sans origine.

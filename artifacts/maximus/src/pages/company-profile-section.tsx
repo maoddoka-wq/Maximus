@@ -7,6 +7,7 @@ import { companyThemePresets, defaultCompanyTheme, isHexColor } from './organiza
 import {
   Field,
 } from './organization-shared';
+import { CompanyNavigationSettingsPanel } from '@/components/company-navigation-settings';
 
 type Mutate = (fn: (data: StoreData) => void, message?: string) => void;
 
@@ -269,6 +270,7 @@ export function CompanyProfileSection({
           </div>
         </section>
       </div>
+      <CompanyNavigationSettingsPanel company={company} />
       {error && <p data-testid="profile-error" className="rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">{error}</p>}
       <div className="flex justify-end border-t pt-5">
         <button data-testid="button-save-profile" onClick={save} className="btn rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]">Enregistrer les modifications</button>

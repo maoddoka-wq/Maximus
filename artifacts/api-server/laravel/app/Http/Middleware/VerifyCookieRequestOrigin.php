@@ -36,6 +36,13 @@ final class VerifyCookieRequestOrigin
         foreach (config('maximus.allowed_origins', []) as $origin) {
             $allowedOrigins[] = $this->normalizeOrigin((string) $origin);
         }
+        // Replit terminates HTTPS before PHP. Trust only exact server-configured
+        // preview hosts, never a browser's Origin or forwarded-host claim.
+        foreach ((array) config('maximus.preview_hosts', []) as $host) {
+            if (is_string($host) && preg_match('/^[a-z0-9.-]+$/iD', $host)) {
+                $allowedOrigins[] = $this->normalizeOrigin('https://'.$host);
+            }
+        }
 
         $allowedOrigins = array_values(array_filter($allowedOrigins));
         if ($requestOrigin === null || ! in_array($requestOrigin, $allowedOrigins, true)) {

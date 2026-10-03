@@ -422,6 +422,70 @@ class InstallationResilienceTest extends TestCase
         $this->assertSame('never_synced', InstallationSyncState::summary()['state']);
     }
 
+    public function test_company_navigation_configuration_is_synchronized_without_defaulting_legacy_payloads(): void
+    {
+        $service = app(InstallationSyncService::class);
+        $payload = $this->payload();
+        $payload['company']['moduleNavigationMode'] = 'horizontal';
+        $payload['company']['navigationCustomAllowed'] = true;
+        $company = $service->apply($payload, true);
+        $this->assertSame('horizontal', $company->module_navigation_mode);
+        $this->assertTrue($company->navigation_custom_allowed);
+
+        $company = $service->apply($this->payload());
+        $this->assertSame('horizontal', $company->module_navigation_mode);
+        $this->assertTrue($company->navigation_custom_allowed);
+
+        $payload['company']['navigationCustomAllowed'] = false;
+        $company = $service->apply($payload);
+        $this->assertFalse($company->navigation_custom_allowed);
+        $this->assertSame('horizontal', $company->module_navigation_mode);
+    }
+
+    public function test_invalid_navigation_snapshot_is_rejected_before_applying_company_changes(): void
+    {
+        $service = app(InstallationSyncService::class);
+        $company = $service->apply($this->payload(), true);
+        foreach ([
+            ['moduleNavigationMode' => 'invalid'],
+            ['navigationCustomAllowed' => 'true'],
+            ['navigationRevision' => -1],
+        ] as $invalid) {
+            $payload = $this->payload();
+            $payload['company'] = [...$payload['company'], 'name' => 'Must not apply', ...$invalid];
+            try {
+                $service->apply($payload);
+                $this->fail('Invalid navigation settings must be rejected.');
+            } catch (\RuntimeException) {
+                $this->assertSame('Sync Company', $company->fresh()->name);
+            }
+        }
+    }
+
+    public function test_routine_sync_preserves_local_navigation_until_a_new_central_directive(): void
+    {
+        $service = app(InstallationSyncService::class);
+        $payload = $this->payload();
+        $payload['company']['moduleNavigationMode'] = 'horizontal';
+        $payload['company']['navigationCustomAllowed'] = true;
+        $payload['company']['navigationRevision'] = 2;
+        $company = $service->apply($payload, true);
+        $company->update(['module_navigation_mode' => 'menu']);
+        $company = $service->apply($payload);
+        $this->assertSame('menu', $company->module_navigation_mode);
+
+        $payload['company']['navigationRevision'] = 3;
+        $company = $service->apply($payload);
+        $this->assertSame('horizontal', $company->module_navigation_mode);
+        $this->assertSame(3, $company->navigation_revision);
+
+        $company->update(['module_navigation_mode' => 'menu']);
+        $payload['company']['navigationRevision'] = 1;
+        $company = $service->apply($payload);
+        $this->assertSame('menu', $company->module_navigation_mode);
+        $this->assertSame(3, $company->navigation_revision);
+    }
+
     private function payload(): array
     {
         return [

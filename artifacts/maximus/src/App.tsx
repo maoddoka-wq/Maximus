@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   ArrowDownToLine,
@@ -54,6 +54,12 @@ import { ActionButton as DesignSystemActionButton } from '@workspace/maximus-des
 import { Badge } from '@workspace/maximus-design-system/components/ui/badge';
 import { Card } from '@workspace/maximus-design-system/components/ui/card';
 import { Checkbox } from '@workspace/maximus-design-system/components/ui/checkbox';
+import { AuthorizationGate } from '@/components/authorization-gate';
+import { useAuthorizationGate } from '@/lib/authorization-gate';
+import { NavigationSettingsContext } from '@/lib/navigation-settings-context';
+import { CompanyFeatureRail } from '@/components/company-feature-rail';
+import { MaximusNavigationSettings } from '@/components/company-navigation-settings';
+import { companyNavigationMode } from '@/lib/company-navigation';
 import { WorkspaceTabs } from '@workspace/maximus-design-system/components/ui/workspace-tabs';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { parseClientPwaPath } from '@/lib/pwa';
@@ -1346,6 +1352,7 @@ function AppContent() {
     (notification) => !notification.read,
   ).length;
   return (
+    <NavigationSettingsContext.Provider value={{ isCompanyAdmin: companyAdmin && !isAdmin, onSaved: () => refreshAppState() }}>
     <div className={`app-shell ${isAdmin ? '' : 'company-workspace'} flex h-[100dvh] min-h-0 overflow-hidden`} style={activeCompanyTheme as CSSProperties}>
       <Sidebar
         session={session}
@@ -1365,6 +1372,7 @@ function AppContent() {
         onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
         activeNavStyle={activeNavStyle}
         hiddenWorkspaceFeatures={effectiveHiddenWorkspaceFeatures}
+        navigationMode={companyNavigationMode(currentCompany)}
       />
       <main className="app-main min-w-0 flex-1 overflow-y-auto overscroll-contain" tabIndex={-1}>
         <Topbar
@@ -1418,6 +1426,9 @@ function AppContent() {
                 Quitter le test
               </button>
             </div>
+          )}
+          {!isAdmin && companyId && companyNavigationMode(currentCompany) === 'horizontal' && (
+            <CompanyFeatureRail groups={sidebarFeatureGroups} location={location} onNavigate={navigate} />
           )}
           {!hidePageHeader && (
             <PageHeader
@@ -1549,6 +1560,7 @@ function AppContent() {
       </main>
       <Toaster />
     </div>
+    </NavigationSettingsContext.Provider>
   );
 }
 
@@ -3749,6 +3761,11 @@ function CompanyDetail({
   onBack: () => void;
 }) {
   const { confirm } = useAppDialog();
+  const authGate = useAuthorizationGate({
+    resetKey: company.id,
+    confirm,
+    onError: (error) => showAppToast(error instanceof Error ? error.message : 'La modification n’a pas pu être enregistrée.', 'error'),
+  });
   const usesDedicatedPrimary = Boolean(company.primaryInstallationId);
   const [active, setActive] = useState(company.allowedModules);
   const [installationBusy, setInstallationBusy] = useState(false);
@@ -3805,7 +3822,7 @@ function CompanyDetail({
     };
   }, [company.id]);
 
-  const saveLoginSettings = async (input: { customAllowed?: boolean; mode?: 'MAXIMUS' | 'CUSTOM' }) => {
+  const saveLoginSettings = async (input: { customAllowed?: boolean; mode?: 'MAXIMUS' | 'CUSTOM' }): Promise<boolean> => {
     setLoginSaving(true);
     try {
       const result = await companyRequestApi.updateLoginSettings(company.id, input);
@@ -3814,8 +3831,10 @@ function CompanyDetail({
         const target = draft.companies.find((item) => item.id === company.id);
         if (target) Object.assign(target, result.company);
       }, input.customAllowed === false ? 'La connexion personnalisée a été désactivée.' : 'Paramètres de connexion enregistrés.');
+      return true;
     } catch (error) {
       showAppToast(error instanceof Error ? error.message : 'Les paramètres de connexion n’ont pas pu être enregistrés.', 'error');
+      return false;
     } finally {
       setLoginSaving(false);
     }
@@ -4130,13 +4149,24 @@ function CompanyDetail({
             {loginSettings?.customAllowed ? 'Autorisé' : 'Non autorisé'}
           </span>
         </div>
-        {!usesDedicatedPrimary && <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${loginSettings?.customAllowed ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
+        {!usesDedicatedPrimary && <div className="mt-5"><AuthorizationGate gate={authGate} testId="legacy-login-authorization-gate"><label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${loginSettings?.customAllowed ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
           <input
             type="checkbox"
             data-testid="checkbox-company-custom-login"
             checked={Boolean(loginSettings?.customAllowed)}
-            disabled={!loginSettings || loginSaving}
-            onChange={(event) => void saveLoginSettings({ customAllowed: event.target.checked })}
+            disabled={!loginSettings || loginSaving || authGate.locked}
+            onChange={(event) => {
+              if (authGate.locked) return;
+              const customAllowed = event.target.checked;
+              void authGate.confirmAndRun(
+                {
+                  title: 'Confirmer la modification des autorisations',
+                  description: customAllowed ? 'Autoriser la page de connexion personnalisée pour cette entreprise.' : 'Retirer la page de connexion personnalisée de cette entreprise.',
+                  confirmLabel: 'Enregistrer',
+                },
+                () => saveLoginSettings({ customAllowed }),
+              );
+            }}
             className="mt-1"
           />
           <span>
@@ -4145,7 +4175,7 @@ function CompanyDetail({
               Le lien est généré à partir du nom de l’entreprise et reste stable même si son nom est modifié plus tard.
             </span>
           </span>
-        </label>}
+        </label></AuthorizationGate></div>}
         {!usesDedicatedPrimary && <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <label className="block text-sm font-semibold">
             Mode actuellement utilisé
@@ -8279,6 +8309,17 @@ function CompanyModulesDetail({
   onBack: () => void;
 }) {
   const { confirm } = useAppDialog();
+  const { onSaved: onNavigationSaved } = useContext(NavigationSettingsContext);
+  const authGate = useAuthorizationGate({
+    resetKey: company.id,
+    confirm,
+    onError: (error) => showAppToast(error instanceof Error ? error.message : 'La modification n’a pas pu être enregistrée.', 'error'),
+  });
+  const askAuthorizationSave = (description: string, action: () => Promise<boolean | void> | boolean | void) =>
+    authGate.confirmAndRun(
+      { title: 'Confirmer la modification des autorisations', description, confirmLabel: 'Enregistrer' },
+      action,
+    );
   const configuredModules = getConfiguredModules({
     moduleOverrides: data.moduleOverrides ?? {},
     removedModules: data.removedModules ?? [],
@@ -8544,7 +8585,7 @@ function CompanyModulesDetail({
     setModuleStatuses((previous) => ({ ...previous, [id]: status }));
   };
 
-  const saveLoginSettings = async (input: { customAllowed?: boolean; mode?: 'MAXIMUS' | 'CUSTOM' }) => {
+  const saveLoginSettings = async (input: { customAllowed?: boolean; mode?: 'MAXIMUS' | 'CUSTOM' }): Promise<boolean> => {
     setLoginSaving(true);
     try {
       const result = await companyRequestApi.updateLoginSettings(company.id, input);
@@ -8553,8 +8594,10 @@ function CompanyModulesDetail({
         const target = draft.companies.find((item) => item.id === company.id);
         if (target) Object.assign(target, result.company);
       }, input.customAllowed === false ? 'La connexion personnalisée a été désactivée.' : 'Paramètres de connexion enregistrés.');
+      return true;
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Les paramètres de connexion n’ont pas pu être enregistrés.');
+      showAppToast(error instanceof Error ? error.message : 'Les paramètres de connexion n’ont pas pu être enregistrés.', 'error');
+      return false;
     } finally {
       setLoginSaving(false);
     }
@@ -8758,6 +8801,7 @@ function CompanyModulesDetail({
       if (target) target.hiddenWorkspaceFeatures = [...hiddenWorkspaceFeatures];
     }, 'Visibilité de l’espace entreprise enregistrée.');
     setSavedHiddenWorkspaceFeatures(hiddenWorkspaceFeatures);
+    return true;
   };
 
   const save = async () => {
@@ -8819,6 +8863,7 @@ function CompanyModulesDetail({
       setSavedFeaturePermissions(normalizedFeaturePermissions);
       setSavedPackSelections(packSelections);
       setSavedPaymentEnabled(paymentEnabled);
+      return true;
     } catch (error) {
        setModuleStatuses(savedStatuses);
        setFeatureSelections(savedFeatureSelections);
@@ -8826,6 +8871,7 @@ function CompanyModulesDetail({
        setPackSelections(savedPackSelections);
        setPaymentEnabled(savedPaymentEnabled);
       showAppToast(error instanceof Error ? error.message : 'La configuration n’a pas pu être enregistrée.', 'error');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -8914,7 +8960,9 @@ function CompanyModulesDetail({
               {publicSiteLoading ? 'Chargement…' : publicSiteEnabled ? 'Site autorisé' : 'Site bloqué'}
             </Badge>
           </div>
-          <div className="mt-5 grid gap-3">
+          <div className="mt-5">
+          <AuthorizationGate gate={authGate} testId="public-site-authorization-gate">
+          <div className="grid gap-3">
             <label className={`flex items-start gap-3 rounded-xl border p-4 transition ${publicSiteEnabled ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.05)]' : 'bg-[hsl(var(--muted)/.4)]'}`}>
               <Checkbox
                 data-testid="checkbox-company-public-site-access"
@@ -8987,7 +9035,7 @@ function CompanyModulesDetail({
                   && publicBannerEnabled === savedPublicBannerEnabled
                 )
               }
-              onClick={async () => {
+              onClick={() => void askAuthorizationSave('Enregistrer les autorisations du site public de cette entreprise.', async () => {
                 const targetCompanyId = company.id;
                 setPublicSiteSaving(true);
                 setPublicSiteError('');
@@ -8997,26 +9045,30 @@ function CompanyModulesDetail({
                     homepageEnabled: publicHomepageEnabled,
                     bannerEnabled: publicBannerEnabled,
                   });
-                  if (publicSiteCompanyIdRef.current !== targetCompanyId) return;
+                  if (publicSiteCompanyIdRef.current !== targetCompanyId) return false;
                   setPublicSiteEnabled(settings.enabled);
                   setSavedPublicSiteEnabled(settings.enabled);
                   setPublicHomepageEnabled(settings.homepageEnabled);
                   setSavedPublicHomepageEnabled(settings.homepageEnabled);
                   setPublicBannerEnabled(settings.bannerEnabled);
                   setSavedPublicBannerEnabled(settings.bannerEnabled);
+                  return true;
                 } catch (error) {
-                  if (publicSiteCompanyIdRef.current !== targetCompanyId) return;
+                  if (publicSiteCompanyIdRef.current !== targetCompanyId) return false;
                   setPublicSiteEnabled(savedPublicSiteEnabled);
                   setPublicHomepageEnabled(savedPublicHomepageEnabled);
                   setPublicBannerEnabled(savedPublicBannerEnabled);
                   setPublicSiteError(error instanceof Error ? error.message : 'Les réglages du site public n’ont pas pu être enregistrés.');
+                  return false;
                 } finally {
                   if (publicSiteCompanyIdRef.current === targetCompanyId) setPublicSiteSaving(false);
                 }
-              }}
+              })}
             >
               {publicSiteSaving ? 'Enregistrement…' : 'Enregistrer les réglages'}
             </DesignSystemActionButton>
+          </div>
+          </AuthorizationGate>
           </div>
         </Card>
       </div>
@@ -9117,13 +9169,22 @@ function CompanyModulesDetail({
             {loginSettings?.customAllowed ? 'Autorisé' : 'Non autorisé'}
           </span>
         </div>
-        <label className={`mt-5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${loginSettings?.customAllowed ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
+        <div className="mt-5">
+        <AuthorizationGate gate={authGate} testId="login-authorization-gate">
+        <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${loginSettings?.customAllowed ? 'border-emerald-300 bg-emerald-50/60' : 'bg-[hsl(var(--muted)/.4)]'}`}>
           <input
             type="checkbox"
             data-testid="checkbox-company-custom-login"
             checked={Boolean(loginSettings?.customAllowed)}
-            disabled={!loginSettings || loginSaving}
-            onChange={(event) => void saveLoginSettings({ customAllowed: event.target.checked })}
+            disabled={!loginSettings || loginSaving || authGate.locked}
+            onChange={(event) => {
+              if (authGate.locked) return;
+              const customAllowed = event.target.checked;
+              void askAuthorizationSave(
+                customAllowed ? 'Autoriser la page de connexion personnalisée pour cette entreprise.' : 'Retirer la page de connexion personnalisée de cette entreprise.',
+                () => saveLoginSettings({ customAllowed }),
+              );
+            }}
             className="mt-1"
           />
           <span>
@@ -9133,6 +9194,8 @@ function CompanyModulesDetail({
             </span>
           </span>
         </label>
+        </AuthorizationGate>
+        </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <label className="block text-sm font-semibold">
             Mode actuellement utilisé
@@ -9247,6 +9310,9 @@ function CompanyModulesDetail({
       )}
       </div>
       <div className={activeCompanySettingsTab === 'access' ? 'space-y-5' : 'hidden'}>
+      <MaximusNavigationSettings company={company} gate={authGate} onSaved={onNavigationSaved} />
+      <AuthorizationGate gate={authGate} testId="access-authorization-gate" title="Accès et autorisations verrouillés">
+      <div className="space-y-5">
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -9298,7 +9364,7 @@ function CompanyModulesDetail({
             primary
             testId="button-save-company-workspace-features"
             disabled={JSON.stringify(hiddenWorkspaceFeatures) === JSON.stringify(savedHiddenWorkspaceFeatures)}
-            onClick={saveWorkspaceFeatures}
+            onClick={() => void askAuthorizationSave('Enregistrer la visibilité des fonctionnalités de l’espace entreprise.', saveWorkspaceFeatures)}
           >
             Enregistrer la visibilité
           </ActionButton>
@@ -9339,19 +9405,21 @@ function CompanyModulesDetail({
             primary
             testId="button-save-company-payment-systems"
             disabled={paymentLoading || paymentEnabled === savedPaymentEnabled}
-            onClick={async () => {
+            onClick={() => void askAuthorizationSave('Enregistrer l’autorisation des systèmes de paiement.', async () => {
               setSaving(true);
               try {
                 const access = await setCompanyPaymentAccess(company.id, paymentEnabled, paymentProviders);
                 setPaymentEnabled(access.enabled);
                 setSavedPaymentEnabled(access.enabled);
+                return true;
               } catch (error) {
                 setPaymentEnabled(savedPaymentEnabled);
                 showAppToast(error instanceof Error ? error.message : 'La configuration des paiements n’a pas pu être enregistrée.', 'error');
+                return false;
               } finally {
                 setSaving(false);
               }
-            }}
+            })}
           >
             Enregistrer le paiement
           </ActionButton>
@@ -9487,13 +9555,15 @@ function CompanyModulesDetail({
             primary
             testId="button-save-company-modules"
             onClick={() => {
-              if (!saving) void save();
+              if (!saving) void askAuthorizationSave('Enregistrer les modules, packs et droits des fonctionnalités de cette entreprise.', save);
             }}
           >
             {saving ? 'Enregistrement…' : 'Enregistrer la configuration'}
           </ActionButton>
         </div>
       </section>
+      </div>
+      </AuthorizationGate>
       </div>
       {editing && <CompanyEditModal company={company} data={data} mutate={mutate} onClose={() => setEditing(false)} />}
     </div>

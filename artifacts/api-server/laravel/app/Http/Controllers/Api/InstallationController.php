@@ -162,6 +162,9 @@ final class InstallationController extends Controller
                 'accentColor' => $company->accent_color ?: ($company->primary_color ?: '#F2B705'),
                 'sidebarColor' => $company->sidebar_color ?: '#161D27',
                 'hiddenWorkspaceFeatures' => $hiddenWorkspaceFeatures,
+                'moduleNavigationMode' => $company->module_navigation_mode ?? 'menu',
+                'navigationCustomAllowed' => (bool) $company->navigation_custom_allowed,
+                'navigationRevision' => (int) $company->navigation_revision,
             ],
             'modules' => [
                 'ids' => $moduleIds,

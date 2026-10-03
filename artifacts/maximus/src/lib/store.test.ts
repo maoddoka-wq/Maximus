@@ -50,6 +50,8 @@ test('normalise les champs textuels optionnels d’une entreprise avant le formu
     phone: '',
     country: '',
     sector: '',
+    moduleNavigationMode: 'menu',
+    navigationCustomAllowed: false,
     status: 'ACTIF',
     requestedModules: ['commerce'],
     allowedModules: ['commerce'],

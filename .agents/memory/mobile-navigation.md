@@ -9,8 +9,8 @@ Sur mobile, le menu de l’espace entreprise doit séparer l’administration de
 
 **How to apply:** Conserver les fonctionnalités regroupées par module, garder uniquement le libellé et la flèche dans l’en-tête de section, afficher l’identité de l’entreprise dans un en-tête fixe et fermer le tiroir après une navigation.
 
-Les fonctionnalités des modules entreprise doivent apparaître uniquement dans le menu principal, sur téléphone comme sur ordinateur. Ne pas ajouter de barre horizontale ou d’onglets de fonctionnalités dans les pages. Garder une présentation compacte des en-têtes, bilans et filtres, sans rendre les commandes minuscules.
+Par défaut, les fonctionnalités des modules entreprise apparaissent uniquement dans le menu principal, sur téléphone comme sur ordinateur. Une barre horizontale est facultative, uniquement selon le mode choisi pour cette entreprise ; elle ne doit pas doubler les fonctionnalités dans le menu. Voir [le choix de navigation et ses autorisations](company-navigation-policy.md). Garder une présentation compacte des en-têtes, bilans et filtres, sans rendre les commandes minuscules.
 
-**Why:** L’utilisateur a corrigé l’ajout de barres horizontales : « les fonctionnalités des modules […] doivent être seulement dans le menu ». Réduire le défilement et adapter les tailles ne doit pas créer une deuxième navigation.
+**Why:** L’utilisateur a refusé les barres horizontales imposées, puis a demandé un choix explicite par entreprise entre les fonctionnalités dans le menu et les fonctionnalités horizontalement en haut. Réduire le défilement ne doit pas imposer ni doubler une navigation.
 
-**How to apply:** Utiliser le menu existant pour les fonctionnalités, respecter ses permissions et son historique de navigation. Garder les zones tactiles confortables, les recherches et actions principales accessibles et les filtres secondaires repliables sans perdre leurs valeurs. Limiter ces adaptations à l’espace entreprise, sans modifier les vitrines publiques.
+**How to apply:** Respecter le mode enregistré, les permissions et l’historique de navigation. Garder les zones tactiles confortables, les recherches et actions principales accessibles et les filtres secondaires repliables sans perdre leurs valeurs. Limiter ces adaptations à l’espace entreprise, sans modifier les vitrines publiques.

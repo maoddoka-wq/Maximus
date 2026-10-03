@@ -85,6 +85,42 @@ class CookieRequestOriginTest extends TestCase
         $this->assertSame(204, $response->getStatusCode());
     }
 
+    public function test_exact_https_preview_origin_is_accepted_after_tls_termination(): void
+    {
+        config([
+            'app.url' => 'http://localhost',
+            'maximus.preview_hosts' => ['workspace.replit.dev'],
+        ]);
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, 'session-token')
+            ->withHeader('Origin', 'https://workspace.replit.dev')
+            ->postJson('/api/auth/logout')
+            ->assertNoContent();
+    }
+
+    public function test_preview_origin_does_not_trust_other_hosts_ports_or_forwarded_headers(): void
+    {
+        config([
+            'app.url' => 'http://localhost',
+            'maximus.preview_hosts' => ['workspace.replit.dev'],
+        ]);
+        foreach ([
+            'https://workspace.replit.dev.evil.example',
+            'https://evil.workspace.replit.dev',
+            'https://workspace.replit.dev:9443',
+            'http://workspace.replit.dev',
+            'https://attacker.example',
+        ] as $origin) {
+            $this->withCredentials()
+                ->withUnencryptedCookie(MaximusAuth::COOKIE, 'session-token')
+                ->withHeader('Origin', $origin)
+                ->withHeader('X-Forwarded-Host', 'workspace.replit.dev')
+                ->postJson('/api/auth/logout')
+                ->assertForbidden()
+                ->assertJsonPath('code', 'COOKIE_REQUEST_ORIGIN_FORBIDDEN');
+        }
+    }
+
     public function test_cross_site_mutation_with_ecommerce_customer_cookie_is_rejected(): void
     {
         $this->withCredentials()
