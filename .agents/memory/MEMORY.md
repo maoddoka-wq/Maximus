@@ -3,7 +3,7 @@
 - [Ordre des releases Chauffeur](chauffeur-release-order.md) — sélectionner la release stable au numéro sémantique maximal, jamais le premier résultat GitHub.
 - [Sérialisation GPS Chauffeur](chauffeur-gps-lifecycle.md) — GPS au premier plan, disponibilité mise en pause à l’arrière-plan, consentement conservé à la suspension.
 - [Imports des tests Node strip-types](node-strip-types-tests.md) — les imports ESM relatifs doivent inclure `.ts` et être autorisés dans le tsconfig `noEmit`.
-- [Carte chauffeur en direct](chauffeur-live-map.md) — garder le GPS local frais et la même carte OSM sans clé que les clients, avec essai des sous-domaines OSM.
+- [Carte chauffeur en direct](chauffeur-live-map.md) — GPS local frais, tuiles OSM canoniques sans clé et cadrage tactile conservé lors des mises à jour GPS.
 - [Navigation Gestion de stock](stock-navigation.md) — conserver les dix rubriques et leur ordre, avec le mode de navigation choisi par entreprise.
 - [Champs vides des mouvements Stock](stock-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel les convertit en null alors que référence et commentaire sont non nullables.
 - [Gouvernance par unité](sector-governance.md) — les managers de secteur définissent les droits de leurs employés, sans accès aux autres unités.
