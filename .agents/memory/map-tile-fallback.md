@@ -10,3 +10,9 @@ Pour les cartes Taxi client et chauffeur, utiliser la même URL canonique `https
 **How to apply:** Garder la même URL canonique sur web et natif, fournir un User-Agent qui identifie l’app native, conserver attribution et cache HTTP, et ne charger que les tuiles visibles. Si l’hôte canonique renvoie encore 403, afficher l’indisponibilité et choisir un fournisseur autorisé plutôt que de réessayer les sous-domaines.
 
 Les données OSM sont libres, mais les serveurs de tuiles sont à capacité limitée, sans SLA. Ne pas précharger ni proposer de cartes hors ligne avec le service public standard; respecter son User-Agent, son attribution et ses en-têtes de cache.
+
+Une image de refus HTTP 403 peut apparaître comme un fond de carte dans le chargeur d’images natif ; `Image.onError` seul ne suffit pas à protéger l’affichage.
+
+**Why:** L’utilisateur a signalé à nouveau des bitmaps « Access blocked » alors que l’identifiant natif et l’hôte canonique étaient déjà configurés. Le tracé restait visible : ce n’est pas une preuve de panne du capteur GPS.
+
+**How to apply:** Vérifier statut HTTP et type PNG avant de fournir une image locale au composant natif, rejeter les réponses refusées et utiliser un cache distinct des anciennes images d’erreur. Ne pas promettre que cela lève un blocage réseau du fournisseur ; si le refus persiste, choisir un fournisseur autorisé.

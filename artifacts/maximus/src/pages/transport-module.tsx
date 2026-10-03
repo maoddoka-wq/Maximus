@@ -58,6 +58,8 @@ import { Button } from '@workspace/maximus-design-system/components/ui/button';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { TaxiRouteMap } from '@/components/taxi-route-map';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
+import { ResponsiveFilterGroup } from '@/components/responsive-filter-group';
+import { countActiveFilters } from '@/lib/filter-group';
 import { buildDriverNavigationUrl } from '@/lib/transport-routing';
 import { useQueryTab } from '@/lib/query-tab';
 import { resolveTransportTab, transportTabByFeatureId, type TransportTabId } from '@/lib/transport-tabs';
@@ -681,12 +683,14 @@ export default function TransportModulePage({
         <DriverMobileAppCard loadRelease={api.latestMobileRelease} />
       )}
 
-       {!singleModuleNavigation && <WorkspaceTabs
+       {<WorkspaceTabs
+         mobileOnly={singleModuleNavigation}
          items={visibleTabs}
          activeId={tab}
          onChange={id => setTab(id as TransportTab)}
          ariaLabel="Navigation transport"
-         className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/.9)] p-1 shadow-sm sm:p-1.5"
+         testIdPrefix="transport-tab"
+         className={singleModuleNavigation ? undefined : 'rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card)/.9)] p-1 shadow-sm sm:p-1.5'}
        />}
 
       {visibleTabs.length === 0 ? <EmptyState icon={ShieldCheck} title="Aucune fonctionnalité disponible" text="Votre rôle n’a pas encore reçu de fonctionnalité pour cet espace." /> : <>
@@ -1052,7 +1056,7 @@ function TripsPanel({ data, drivers, vehicles, canCreate, canModify, onCreate, o
   return <div className="fade-up space-y-4">
      <div className="section-heading"><div><p className="mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Dispatch en cours</p><h2 className="mt-1 text-xl font-black tracking-[-.03em]">Courses</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Seules les courses actuellement ouvertes sont affichées ici. Les courses terminées ou annulées sont dans Historique.</p></div>{canCreate && <button type="button" onClick={onCreate} className="btn inline-flex items-center gap-2 bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Créer une course</button>}</div>
     <section className="card-surface overflow-hidden">
-       <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center"><div className="relative min-w-0 flex-1"><MapPin size={15} className="absolute left-3 top-3 text-[hsl(var(--muted-foreground))]" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher une course en cours" className="w-full border px-9 py-2.5 text-sm" /></div><select value={filter} onChange={event => setFilter(event.target.value as TripStatus | 'ALL')} className="border px-3 py-2.5 text-sm sm:w-48"><option value="ALL">Tous les statuts actifs</option>{['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS'].map(status => <option key={status} value={status}>{statusLabels[status as TripStatus]}</option>)}</select></div>
+       <div className="border-b p-4 pb-0"><ResponsiveFilterGroup testId="transport-trips-filters" activeCount={countActiveFilters([[filter, 'ALL']])} onClear={() => setFilter('ALL')} search={<div className="relative min-w-0 flex-1"><MapPin size={15} className="absolute left-3 top-3 text-[hsl(var(--muted-foreground))]" /><input aria-label="Rechercher une course" value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher une course en cours" className="w-full border px-9 py-2.5 text-sm" /></div>}><select aria-label="Filtrer par statut" value={filter} onChange={event => setFilter(event.target.value as TripStatus | 'ALL')} className="border px-3 py-2.5 text-sm sm:w-48"><option value="ALL">Tous les statuts actifs</option>{['REQUESTED', 'OFFERED', 'ASSIGNED', 'IN_PROGRESS'].map(status => <option key={status} value={status}>{statusLabels[status as TripStatus]}</option>)}</select></ResponsiveFilterGroup></div>
        {trips.length ? <TripTable trips={trips} drivers={drivers} vehicles={vehicles} canModify={canModify} onStatusChange={onStatusChange} onAssign={onAssign} /> : <EmptyState icon={Route} title={query || filter !== 'ALL' ? 'Aucun résultat' : 'Le carnet de courses est vide'} text={query || filter !== 'ALL' ? 'Essayez un autre filtre ou une autre recherche.' : 'Créez une course pour commencer à organiser le dispatch.'} />}
     </section>
   </div>;

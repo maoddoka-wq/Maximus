@@ -1,0 +1,48 @@
+/* Mobile (<768px) adaptation of the company workspace chrome and module layouts.
+   Scoped to `.company-workspace` (set on the App shell for company sessions only).
+   Sizes come from the design-system --text-* and --spacing tokens. */
+.company-workspace { --company-topbar-height: calc(var(--spacing) * 14); }
+
+@media (max-width: 767px) {
+  .company-workspace .topbar { min-height: var(--company-topbar-height); }
+  .company-workspace .page-content { min-height: calc(100dvh - var(--company-topbar-height)); }
+
+  /* Page header: tighter stack. */
+  .company-workspace .page-header { margin-bottom: calc(var(--spacing) * 3); padding-bottom: calc(var(--spacing) * 3); gap: calc(var(--spacing) * 2); }
+  .company-workspace .page-header > :last-child { align-self: stretch; }
+  .company-workspace .page-header h1 { font-size: var(--text-xl); line-height: var(--text-xl--line-height); }
+  .company-workspace .page-header p:not(.mono) { margin-top: var(--spacing); font-size: var(--text-sm); line-height: var(--text-sm--line-height); }
+
+  /* Module rail: the nav element itself is sticky inside its long parent.
+     No ancestor sets a competing sticky offset. Opaque background, 44px targets. */
+  .company-workspace .company-mobile-rail {
+    position: sticky; top: var(--company-topbar-height); z-index: 15;
+    padding-block: calc(var(--spacing) * 1);
+    background: hsl(var(--background));
+    border-bottom: 1px solid hsl(var(--border));
+    scroll-snap-type: x proximity; scrollbar-width: none;
+  }
+  .company-workspace .company-mobile-rail::-webkit-scrollbar { display: none; }
+  .company-workspace .company-mobile-rail > button { scroll-snap-align: center; min-height: calc(var(--spacing) * 11); white-space: nowrap; font-size: var(--text-sm); }
+
+  /* Metric cards: two columns, compact padding. Values keep their own size classes. */
+  .company-workspace .page-pad .grid:has(> .metric-card) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--spacing) * 2); }
+  .company-workspace .page-pad .metric-card { min-height: 0; padding: calc(var(--spacing) * 3); }
+
+  /* Controls: legible text, 44px touch height. */
+  .company-workspace .page-pad input:not([type="checkbox"]):not([type="radio"]),
+  .company-workspace .page-pad select,
+  .company-workspace .page-pad textarea { font-size: var(--text-base); min-height: calc(var(--spacing) * 11); }
+  .company-workspace .page-pad .btn,
+  .company-workspace .page-pad .app-action,
+  .company-workspace .responsive-filters__toggle { min-height: calc(var(--spacing) * 11); }
+  .company-workspace .data-table td, .company-workspace .data-table th { padding: calc(var(--spacing) * 2.5) calc(var(--spacing) * 3); }
+
+  /* Presence hero: keep date + refresh, drop the marketing description. */
+  .company-workspace .presence-hero__title { font-size: var(--text-2xl); line-height: var(--text-2xl--line-height); margin-top: var(--spacing); }
+  .company-workspace .presence-hero__description { display: none; }
+
+  /* Ecommerce storefront identity bar: single row. */
+  .company-workspace .ecommerce-identity a,
+  .company-workspace .ecommerce-identity button { min-height: calc(var(--spacing) * 11); }
+}

@@ -512,8 +512,9 @@ export default function PayrollModulePage({
         </div>
         <Button onClick={() => void refresh()} loading={loading}><RefreshCw size={15} />Actualiser</Button>
       </div>
-      {!singleModuleNavigation && (
+      {(
         <WorkspaceTabs
+          mobileOnly={singleModuleNavigation}
           items={payrollFeatureDefinitions
             .filter(feature => visibleFeatures.has(feature.id))
             .map(feature => ({ ...feature, icon: payrollFeatureIcons[feature.id] }))}

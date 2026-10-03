@@ -143,7 +143,7 @@ export function Metric({
   warning?: boolean;
 }) {
   return (
-    <div className={`metric-card card-surface fade-up min-w-0 rounded-2xl p-5 ${accent ? 'border-[hsl(var(--primary)/.25)]' : ''}`}>
+    <div className={`metric-card card-surface fade-up min-w-0 rounded-2xl p-3 sm:p-5 ${accent ? 'border-[hsl(var(--primary)/.25)]' : ''}`}>
       <div className="flex items-start justify-between">
         <span
           className={`flex h-9 w-9 items-center justify-center rounded-lg ${
@@ -162,8 +162,8 @@ export function Metric({
           </span>
         )}
       </div>
-      <p className="mt-5 min-w-0 break-words text-xs font-medium text-[hsl(var(--muted-foreground))]">{label}</p>
-      <p data-testid={`metric-value-${label}`} className="mt-1 min-w-0 break-words text-2xl font-bold tracking-[-.05em]">
+      <p className="mt-3 min-w-0 break-words text-xs sm:mt-5 font-medium text-[hsl(var(--muted-foreground))]">{label}</p>
+      <p data-testid={`metric-value-${label}`} className="mt-1 min-w-0 break-words text-xl font-bold sm:text-2xl tracking-[-.05em]">
         {value}
         <span className="text-sm font-medium">{suffix}</span>
       </p>
@@ -284,6 +284,7 @@ export function Toolbar({
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Rechercher..."
+          aria-label="Rechercher"
           className="w-full rounded-lg border bg-[hsl(var(--card))] py-2.5 pl-9 pr-3 text-sm"
         />
       </div>

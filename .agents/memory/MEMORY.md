@@ -36,7 +36,7 @@
 - [Stockage des téléversements en production](render-upload-storage.md) — ne pas dépendre du disque local Render pour conserver les ressources publiques.
 - [Limites des téléversements PHP](php-upload-limits.md) — aligner les plafonds client et Laravel sur les directives PHP réelles pour éviter une image omise sans message.
 - [Champs vides du catalogue](catalogue-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel peut les convertir en null.
-- [Navigation mobile MAXIMUS](mobile-navigation.md) — replier les modules non actifs et garder la section courante ouverte dans le tiroir mobile.
+- [Navigation mobile MAXIMUS](mobile-navigation.md) — tiroir repliable, rubriques accessibles dans les pages et contenu compact sans réduire les zones tactiles.
 - [Limites du défilement mobile](mobile-scroll-boundary.md) — confiner le débordement de page sans supprimer le défilement nécessaire aux tableaux et rails de produits.
 - [Portefeuille vendeur](vendor-wallet-policy.md) — confirmer le solde après paiement, puis le rendre retirable après livraison ou sept jours sans litige.
 - [Réponse DiamanoPay](diamanopay-response-shape.md) — les charges peuvent être enveloppées dans `data` et utiliser `chargeId`/`checkoutUrl`, pas seulement les clés snake_case racine.
@@ -88,7 +88,7 @@
 - [Identifiants canoniques des fonctionnalités](canonical-feature-identities.md) — normaliser libellés, slugs et alias avant de filtrer permissions, menu et onglets internes.
 - [Qualification des chauffeurs](transport-driver-organization.md) — créer l’employé dans Organisation, puis ajouter dans Transport uniquement les données Taxi.
 - [Tuiles de carte publiques](map-tile-fallback.md) — les cartes Taxi client/chauffeur restent sur OSM sans clé; les autres cartes gardent leur fournisseur de repli documenté.
-- [Accès aux APK Chauffeur](chauffeur-apk-access.md) — publier en brouillon, servir via l’API et vérifier que le jeton Render lit les releases privées.
+- [Publication des APK Chauffeur](chauffeur-apk-access.md) — toujours publier les releases APK Chauffeur, jamais les laisser en brouillon.
 - [Paiement récurrent Transport](transport-recurring-payment-boundary.md) — ne jamais simuler un renouvellement automatique avec le checkout DiamanoPay ponctuel ; il faut un mandat réutilisable documenté.
 - [Contrôle paiement par entreprise](company-payment-control.md) — l’autorisation de paiement est indépendante des modules et de l’abonnement, avec blocage serveur des nouveaux encaissements et retraits.
 - [Synchronisation rôles et comptes](role-auth-permissions-sync.md) — toute modification de rôle doit mettre à jour les permissions du compte authentifié des employés affectés avant confirmation.

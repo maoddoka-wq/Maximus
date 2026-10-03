@@ -540,7 +540,7 @@ export function Topbar({
           disabled={refreshing}
           className="topbar-icon inline-flex w-10 shrink-0 items-center justify-center gap-2 rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] disabled:cursor-wait disabled:opacity-60 sm:w-auto sm:justify-start sm:px-3"
         >
-          <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+          <RefreshCw size={18} aria-hidden="true" className={refreshing ? 'animate-spin' : ''} />
           <span className="hidden text-xs font-bold sm:inline">Actualiser</span>
         </Button>
         <Button

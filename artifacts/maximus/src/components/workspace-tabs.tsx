@@ -1,4 +1,7 @@
+import { useEffect, useRef } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { Button } from '@workspace/maximus-design-system/components/ui/button';
+import { railScrollTarget } from '@/lib/rail-scroll';
 
 export type WorkspaceTabItem = {
   id: string;
@@ -13,6 +16,8 @@ type WorkspaceTabsProps = {
   ariaLabel: string;
   testIdPrefix?: string;
   className?: string;
+  /** Show the rail only below the md breakpoint (company modules whose desktop navigation is the sidebar). */
+  mobileOnly?: boolean;
 };
 
 export function WorkspaceTabs({
@@ -22,31 +27,52 @@ export function WorkspaceTabs({
   ariaLabel,
   testIdPrefix,
   className = '',
+  mobileOnly = false,
 }: WorkspaceTabsProps) {
+  const railRef = useRef<HTMLElement | null>(null);
+  const activeRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    // Scroll only this rail: scrollIntoView would also move every scrollable ancestor.
+    const rail = railRef.current;
+    const chip = activeRef.current;
+    if (!rail || !chip || typeof rail.scrollTo !== 'function') return;
+    const railBox = rail.getBoundingClientRect();
+    const chipBox = chip.getBoundingClientRect();
+    rail.scrollTo({
+      left: railScrollTarget(
+        { width: rail.clientWidth, scrollWidth: rail.scrollWidth },
+        { left: chipBox.left - railBox.left + rail.scrollLeft, width: chipBox.width },
+      ),
+    });
+  }, [activeId]);
   return (
     <nav
+      ref={railRef}
       aria-label={ariaLabel}
-      className={`module-tabs flex min-w-0 gap-1.5 overflow-x-auto ${className}`}
+      data-testid={testIdPrefix ? `${testIdPrefix}-rail` : undefined}
+      className={`module-tabs flex min-w-0 gap-1.5 overflow-x-auto ${mobileOnly ? 'company-mobile-rail md:hidden' : ''} ${className}`}
     >
       {items.map(item => {
         const Icon = item.icon;
         const isActive = activeId === item.id;
         return (
-          <button
+          <Button
             key={item.id}
+            ref={isActive ? activeRef : undefined}
             type="button"
+            variant="ghost"
             data-testid={testIdPrefix ? `${testIdPrefix}-${item.id}` : undefined}
             aria-current={isActive ? 'page' : undefined}
             onClick={() => onChange(item.id)}
-            className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-3 text-sm font-bold transition ${
+            className={`inline-flex h-auto shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm md:px-3.5 md:py-3 font-bold transition ${
               isActive
-                ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-sm'
+                ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary))] hover:text-[hsl(var(--primary-foreground))] shadow-sm'
                 : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]'
             }`}
           >
             {Icon && <Icon size={16} aria-hidden="true" />}
             {item.label}
-          </button>
+          </Button>
         );
       })}
     </nav>

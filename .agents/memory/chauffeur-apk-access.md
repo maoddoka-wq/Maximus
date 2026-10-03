@@ -3,14 +3,14 @@ name: Accès aux APK Chauffeur
 description: Politique de publication et de téléchargement des versions Android Chauffeur.
 ---
 
-Les releases APK Chauffeur restent en brouillon dans le dépôt GitHub public. Seuls les comptes MAXIMUS autorisés au Transport obtiennent l’APK via l’API serveur authentifiée; l’application web et le QR code ne doivent jamais pointer directement vers l’asset GitHub.
+Les releases APK Chauffeur doivent toujours être publiées, jamais laissées en brouillon. Dans le dépôt public, cela rend l’APK accessible publiquement.
 
-**Why:** L’utilisateur a choisi un téléchargement restreint après avoir constaté que les assets d’un dépôt public sont accessibles sans session MAXIMUS. Le jeton de lecture actuellement configuré a renvoyé 403 sur la release brouillon.
+**Why:** L’utilisateur a explicitement corrigé la règle précédente : « Il ne faut pas mettre en brouillon il faut toujours publié », puis « Toujours ».
 
-**How to apply:** Configurer le workflow Android pour créer des releases brouillon; avant distribution, vérifier que le jeton de lecture Render a la permission `Contents: read` sur les releases privées. Le contrôleur PHP diffuse l’APK uniquement après contrôle de session et de permission; ne pas remplacer le jeton de lecture par un jeton d’écriture plus large.
+**How to apply:** Configurer les workflows Android avec `draft: false`, puis vérifier après la construction que la release est publiée et que son APK est présent. Conserver les contrôles d’accès existants dans l’API MAXIMUS ; ils ne rendent pas privé l’asset d’une release publique GitHub.
 
-Pour un événement `push` sur un tag, GitHub Actions exécute la définition du workflow présente sur la branche par défaut. Le réglage `draft: true` doit donc être vérifié sur cette branche, pas seulement sur la branche qui porte le tag.
+Vérifier la configuration de publication dans le commit portant le tag ainsi que sur la branche par défaut ; ne pas déduire la visibilité finale du seul workflow local.
 
-**Why:** Une release Chauffeur s’est retrouvée publiée parce que le workflow de la branche par défaut ne déclarait pas le brouillon, même si la branche de travail le faisait.
+**Why:** Les historiques des tags APK et de la branche de développement peuvent diverger et contenir des configurations différentes.
 
-**How to apply:** Avant tout nouveau tag APK, contrôler le workflow de la branche par défaut et vérifier après le run que la release est en brouillon, qu’une requête anonyme sur sa page renvoie 404 et qu’aucun asset n’est public.
+**How to apply:** Contrôler le workflow effectivement utilisé et la visibilité réelle de la release après le run.
