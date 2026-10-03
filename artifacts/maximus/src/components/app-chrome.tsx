@@ -17,6 +17,7 @@ import { Link } from 'wouter';
 import { Button } from '@workspace/maximus-design-system/components/ui/button';
 import { Input } from '@workspace/maximus-design-system/components/ui/input';
 import type { ModuleId, StoreData } from '@/lib/store';
+import { SidebarSectionLabel } from '@/components/sidebar-section-label';
 import { companyWorkspaceFeatureForPath, type CompanyWorkspaceFeatureId } from '@/lib/company-workspace-features';
 import {
   buildModuleEntries,
@@ -304,11 +305,7 @@ export function Sidebar({
               {employeeAdministrationItems.length > 0 && (
                 <>
                   {!compact && (
-                    <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
-                        Administration
-                      </span>
-                    </div>
+                    <SidebarSectionLabel>Administration</SidebarSectionLabel>
                   )}
                   <div className="space-y-1">
                     {employeeAdministrationItems.map(item => link(item))}
@@ -347,10 +344,10 @@ export function Sidebar({
                           [group.label]: !groupIsOpen,
                         }));
                       }}
-                      className="mb-2 flex w-full items-center justify-between border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2 text-left md:cursor-default"
+                      className="sidebar-section-toggle mb-1 flex h-auto w-full items-center justify-between rounded-md px-3 py-2 text-left md:cursor-default"
                     >
                       <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
+                        <span className="truncate sidebar-section-label p-0">
                           {group.label}
                         </span>
                       </span>
@@ -370,11 +367,7 @@ export function Sidebar({
           ) : (
             <>
               {!compact && (
-                <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
-                    Administration
-                  </span>
-                </div>
+                <SidebarSectionLabel>Administration</SidebarSectionLabel>
               )}
               <div className="space-y-1">{companyCoreItems.map(item => link(item))}</div>
               {companyModuleItems.length > 0 && (
@@ -390,9 +383,9 @@ export function Sidebar({
                         if (!mobileOpen) return;
                         setExpandedMobileModules(open => !open);
                       }}
-                      className="mb-2 flex w-full items-center justify-between border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2 text-left md:cursor-default"
+                      className="sidebar-section-toggle mb-1 flex h-auto w-full items-center justify-between rounded-md px-3 py-2 text-left md:cursor-default"
                     >
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
+                      <span className="sidebar-section-label p-0">
                         Modules
                       </span>
                       <span className="text-[hsl(var(--sidebar-foreground)/.5)] md:hidden">
@@ -401,11 +394,7 @@ export function Sidebar({
                     </Button>
                   )}
                   {!compact && !mobileOpen && (
-                    <div className="mb-2 flex items-center border-l-2 border-[hsl(var(--accent))] bg-[hsl(var(--sidebar-accent)/.4)] px-3 py-2">
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.7)]">
-                        Modules
-                      </span>
-                    </div>
+                    <SidebarSectionLabel>Modules</SidebarSectionLabel>
                   )}
                   <div
                     id="company-module-navigation"
@@ -495,7 +484,7 @@ export function Topbar({
   };
 
   return (
-    <header className="topbar flex min-h-[68px] w-full min-w-0 items-center justify-between gap-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.88)] px-3 backdrop-blur sm:px-6 lg:px-8">
+    <header className="topbar sticky top-0 z-20 flex min-h-[64px] w-full min-w-0 items-center justify-between gap-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.9)] px-3 backdrop-blur sm:px-6 lg:px-8">
       <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         <Button
           type="button"
@@ -511,10 +500,12 @@ export function Topbar({
         >
           <Menu size={19} />
         </Button>
+        <span aria-hidden="true" className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.12)] text-xs font-black text-[hsl(var(--primary))] sm:flex">
+          {workspaceName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase()}
+        </span>
         <div className="min-w-0 flex-1 sm:max-w-[38rem]">
           <p className="hidden items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))] sm:flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--accent))]" aria-hidden="true" />
-            Espace de travail
+            {isAdmin ? 'Centre de contrôle' : 'Espace de travail'}
           </p>
           <div
             data-testid="text-workspace-name"
@@ -543,7 +534,8 @@ export function Topbar({
                 }
               }}
               placeholder="Rechercher une entreprise..."
-              className="topbar-search w-64 rounded-lg border border-transparent bg-[hsl(var(--muted))] py-2.5 pl-9 pr-3 text-xs outline-none focus:border-[hsl(var(--primary))]"
+              aria-label="Rechercher une entreprise"
+              className="topbar-search h-10 w-72 rounded-lg border-[hsl(var(--border))] bg-[hsl(var(--muted)/.6)] pl-9 pr-3 text-xs"
             />
           </div>
         )}
@@ -641,11 +633,6 @@ export function PageHeader({
             <ArrowLeft size={14} />
             Retour
           </Button>
-        )}
-        {location !== '/maximus/dashboard' && location !== '/entreprise/dashboard' && (
-          <div className="mono hidden text-[9px] uppercase tracking-[.12em] text-[hsl(var(--muted-foreground))] sm:block">
-            Mis à jour à l’instant
-          </div>
         )}
       </div>
     </div>

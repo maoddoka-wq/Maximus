@@ -116,6 +116,10 @@ import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
 import { canonicalAppPath, normalizeRoutePath, type Session } from '@/lib/navigation';
 import { AdminRouter, CompanyRouter } from '@/routes/app-routes';
 import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
+import { AuthCard, AuthHighlights, AuthLayout } from '@/components/auth-layout';
+import { DashboardHero, DashboardPanel, PanelEmpty, QuickLinkTile, SignalItem } from '@/components/dashboard-parts';
+import { Button } from '@workspace/maximus-design-system/components/ui/button';
+import { Alert, AlertDescription } from '@workspace/maximus-design-system/components/ui/alert';
 import { featureSlug, permissionFeatureKey } from '@/lib/permission-keys';
 import {
   getEffectiveModuleFeatureIds,
@@ -1615,47 +1619,63 @@ function Login({
     loginWithCredentials(account.id === 'maximus-admin' ? 'admin' : 'company', account.email, account.password);
   };
   return (
-    <div className="grid min-h-[100dvh] lg:grid-cols-[1.1fr_.9fr]">
-      <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-start">
-        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full border-[32px] border-[hsl(var(--accent)/.16)]" />
-        <div className="absolute bottom-16 right-16 h-44 w-44 rounded-full border border-[hsl(var(--accent)/.45)]" />
-        <Brand inverse large />
-        <div className="relative mt-32 max-w-xl pb-16">
-          <p className="mb-6 mono text-xs uppercase tracking-[.24em] text-[hsl(var(--accent))]">
-            La gestion d’entreprise, simplement
+    <AuthLayout
+      testId="page-login"
+      showcase={
+        <>
+          <Brand inverse large />
+          <div className="mt-auto max-w-xl pt-16">
+            <p className="mono mb-5 text-[10px] font-bold uppercase tracking-[.24em] text-[hsl(var(--accent))]">
+              La gestion d’entreprise, simplement
+            </p>
+            <h2 className="text-5xl font-bold leading-[1.02] tracking-[-.055em] xl:text-6xl">
+              Toute votre entreprise.
+              <br />
+              <span className="text-[hsl(var(--accent))]">Au même endroit.</span>
+            </h2>
+            <p className="mt-6 max-w-md text-base leading-7 text-[hsl(var(--sidebar-foreground)/.7)]">
+              MAXIMUS réunit vos équipes, vos opérations et vos chiffres essentiels pour vous aider à mieux gérer
+              aujourd’hui et à grandir demain.
+            </p>
+            <div className="mt-10">
+              <AuthHighlights
+                items={[
+                  { icon: LayoutGrid, title: 'Modules métier', text: 'Stock, commerce, finance, présences, paie et plus, activés selon votre entreprise.' },
+                  { icon: ShieldCheck, title: 'Accès par rôle', text: 'Chaque employé voit uniquement les fonctionnalités qui lui sont autorisées.' },
+                  { icon: Building2, title: 'Espaces entreprises', text: 'Chaque entreprise dispose de son espace, de ses couleurs et de son organisation.' },
+                ]}
+              />
+            </div>
+          </div>
+          <p className="mono mt-12 text-[10px] uppercase tracking-[.18em] text-[hsl(var(--sidebar-foreground)/.5)]">
+            Sénégal · Côte d’Ivoire · UEMOA
           </p>
-          <h1 className="text-6xl font-bold leading-[.98] tracking-[-.06em]">
-            Toute votre entreprise.
-            <br />
-            <span className="text-[hsl(var(--accent))]">Au même endroit.</span>
-          </h1>
-          <p className="mt-8 max-w-md text-lg leading-8 text-[hsl(var(--sidebar-foreground)/.7)]">
-            MAXIMUS réunit vos équipes, vos opérations et vos chiffres essentiels pour vous aider à mieux gérer
-            aujourd’hui et à grandir demain.
-          </p>
-        </div>
-        <p className="mt-auto mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--sidebar-foreground)/.5)]">
-          Sénégal · Côte d’Ivoire · UEMOA
-        </p>
-      </section>
-      <section className="flex items-center justify-center bg-[hsl(var(--background))] p-6 sm:p-12">
-        <div className="w-full max-w-md fade-up">
-          <div className="mb-10 lg:hidden">
+        </>
+      }
+    >
+          <div className="mb-8 lg:hidden">
             <Brand large />
           </div>
-          <div className="mb-8">
-             <p className="mono mb-3 text-[11px] uppercase tracking-[.2em] text-[hsl(var(--muted-foreground))]">
-               {installationProfile?.companyOnly ? 'Espace entreprise dédié' : 'Accédez à votre espace'}
-             </p>
-             <h2 className="text-3xl font-bold tracking-[-.04em]">
-               {installationProfile?.companyOnly && installationProfile.company
-                 ? `Bienvenue chez ${installationProfile.company.name}`
-                 : 'Gérez votre activité en toute simplicité'}
-             </h2>
-            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-              Connectez-vous pour retrouver les outils et les informations de votre entreprise au même endroit.
-            </p>
-          </div>
+          <AuthCard
+            eyebrow={installationProfile?.companyOnly ? 'Espace entreprise dédié' : 'Accédez à votre espace'}
+            title={installationProfile?.companyOnly && installationProfile.company
+              ? `Bienvenue chez ${installationProfile.company.name}`
+              : 'Connexion à MAXIMUS'}
+            description="Connectez-vous pour retrouver les outils et les informations de votre entreprise au même endroit."
+            footer={!installationProfile?.companyOnly ? (
+              <div className="text-center text-sm text-[hsl(var(--muted-foreground))]">
+                Pas encore d’espace ?{' '}
+                <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))] underline-offset-4 hover:underline">
+                  Créer une entreprise
+                </Link>
+                {!registrationEnabled && (
+                  <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+                    L’inscription automatique est momentanément indisponible. Le formulaire manuel reste disponible.
+                  </p>
+                )}
+              </div>
+            ) : undefined}
+          >
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -1680,52 +1700,43 @@ function Login({
               help="Mot de passe associé à l’adresse email saisie."
             />
             <div className="flex justify-end">
-              <button
+              <Button
                 type="button"
+                variant="link"
+                size="sm"
                 data-testid="button-forgot-password"
+                aria-expanded={loginHelp}
                 onClick={() => setLoginHelp((value) => !value)}
-                className="text-xs font-semibold text-[hsl(var(--primary))]"
+                className="h-auto min-h-0 px-0"
               >
                 Aide à la connexion
-              </button>
+              </Button>
             </div>
             {loginHelp && (
-              <p className="rounded-lg bg-[hsl(var(--muted))] px-3 py-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                Utilisez l’adresse email et le mot de passe fournis par votre administrateur. Tous les comptes se
-                connectent depuis ce même formulaire.
-              </p>
+              <Alert>
+                <AlertDescription className="text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                  Utilisez l’adresse email et le mot de passe fournis par votre administrateur. Tous les comptes se
+                  connectent depuis ce même formulaire.
+                </AlertDescription>
+              </Alert>
             )}
             {error && (
-              <p
-                data-testid="login-error"
-                className="rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]"
-              >
-                {error}
-              </p>
+              <Alert variant="destructive" data-testid="login-error">
+                <AlertDescription className="text-xs font-semibold">{error}</AlertDescription>
+              </Alert>
             )}
-            <button
+            <Button
               data-testid="button-login"
               disabled={Boolean(pendingEmail)}
-              className="btn flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-4 py-3.5 text-sm font-bold text-[hsl(var(--primary-foreground))] shadow-lg shadow-[hsl(var(--primary)/.18)] disabled:cursor-wait disabled:opacity-70"
+              size="lg"
+              className="w-full gap-2 font-bold disabled:cursor-wait"
               type="submit"
             >
               <LogIn size={17} className={pendingEmail ? 'animate-pulse' : ''} />
               {pendingEmail ? 'Connexion en cours…' : 'Se connecter'}
-            </button>
+            </Button>
           </form>
-           {!installationProfile?.companyOnly && (
-             <div className="mt-8 border-t border-[hsl(var(--border))] pt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
-               Pas encore d’espace ?{' '}
-               <Link data-testid="link-signup" href="/inscription" className="font-bold text-[hsl(var(--primary))]">
-                 Créer une entreprise
-               </Link>
-               {!registrationEnabled && (
-                 <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
-                   L’inscription automatique est momentanément indisponible. Le formulaire manuel reste disponible.
-                 </p>
-               )}
-             </div>
-           )}
+          </AuthCard>
           {showDemoAccounts && demoAccounts.length > 0 && (
             <div className="mt-8 rounded-xl border border-dashed border-[hsl(var(--border))] p-4">
               <span className="text-xs font-bold text-[hsl(var(--foreground))]">Comptes de démonstration</span>
@@ -1755,9 +1766,7 @@ function Login({
               </div>
             </div>
           )}
-        </div>
-      </section>
-    </div>
+    </AuthLayout>
   );
 }
 
@@ -2045,7 +2054,7 @@ function Signup({
 
   return (
     <div className="min-h-[100dvh] bg-[hsl(var(--background))]">
-      <header className="flex items-center justify-between border-b border-[hsl(var(--border))] px-6 py-5 lg:px-12">
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.9)] px-4 py-4 backdrop-blur sm:px-6 lg:px-12">
         <Brand />
         <Link
           data-testid="link-back-login"
@@ -2055,12 +2064,12 @@ function Signup({
           Retour à la connexion
         </Link>
       </header>
-      <div className="mx-auto max-w-3xl p-6 py-12 lg:py-20 fade-up">
-        <div className="mb-10">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)] lg:gap-14 lg:py-16 fade-up">
+        <div className="lg:sticky lg:top-24 lg:self-start">
           <p className="mono text-[11px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">
             Nouvel espace entreprise
           </p>
-          <h1 className="mt-3 text-4xl font-bold tracking-[-.05em]">Commencez avec une base claire.</h1>
+          <h1 className="mt-3 text-3xl font-bold leading-tight tracking-[-.05em] sm:text-4xl">Commencez avec une base claire.</h1>
           <p className="mt-3 text-[hsl(var(--muted-foreground))]">
             Renseignez votre entreprise et choisissez les fonctionnalités dont vous avez besoin. L’organisation pourra
             être construite après l’activation de votre espace.
@@ -2080,6 +2089,7 @@ function Signup({
             </p>
           )}
         </div>
+        <div className="min-w-0">
         <div className="mb-10 flex items-center gap-3">
           <Step n={1} label="Votre entreprise" active={step === 1} done={step > 1} />
           <div className="h-px flex-1 bg-[hsl(var(--border))]" />
@@ -2484,6 +2494,7 @@ function Signup({
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -2911,95 +2922,96 @@ function AdminDashboard({ data, onNavigate }: { data: StoreData; onNavigate: (pa
   }, []);
   useAutoRefresh(refreshPendingRequests);
   const pending = pendingRequests ?? data.companies.filter((c) => c.status === 'EN ATTENTE').length;
+  const activeCompanies = data.companies.filter((c) => c.status === 'ACTIF');
+  const catalogModules = getConfiguredModules(data);
+  const activatedModuleIds = new Set(activeCompanies.flatMap((company) => company.allowedModules));
   return (
     <div className="space-y-6">
+      <DashboardHero
+        eyebrow="Centre de contrôle"
+        title="Vue d’ensemble des espaces clients"
+        description="Consultez les demandes, ajustez les modules autorisés et gardez une trace de chaque décision."
+        actions={
+          <>
+            <Button type="button" data-testid="button-dashboard-requests" onClick={() => onNavigate('/maximus/demandes')} className="gap-2">
+              <FileClock size={15} aria-hidden="true" />
+              Traiter les demandes
+            </Button>
+            <Button type="button" variant="outline" data-testid="button-dashboard-companies" onClick={() => onNavigate('/maximus/entreprises')} className="gap-2">
+              <Building2 size={15} aria-hidden="true" />
+              Entreprises
+            </Button>
+          </>
+        }
+      />
       <div className="mobile-stat-grid grid gap-4 md:grid-cols-3">
         <Metric
           label="Entreprises actives"
-          value={String(data.companies.filter((c) => c.status === 'ACTIF').length)}
-          detail="+1 ce mois"
+          value={String(activeCompanies.length)}
+          detail={`${data.companies.length} espace(s) au total`}
           icon={Building2}
           accent
         />
         <Metric
           label="Demandes à traiter"
           value={String(pending).padStart(2, '0')}
-          detail="requiert votre attention"
+          detail={pending ? 'requiert votre attention' : 'aucune demande en attente'}
           icon={FileClock}
+          warning={pending > 0}
         />
-        <Metric label="Modules activés" value="05" detail="sur 05 disponibles" icon={LayoutGrid} />
+        <Metric
+          label="Modules activés"
+          value={String(activatedModuleIds.size).padStart(2, '0')}
+          detail={`sur ${catalogModules.length} au catalogue`}
+          icon={LayoutGrid}
+        />
       </div>
-      <div className="grid gap-6 lg:grid-cols-[1.25fr_.75fr]">
-        <section className="card-surface overflow-hidden rounded-2xl">
-          <div className="flex items-center justify-between border-b p-5">
-            <div>
-              <h2 className="font-bold">Activité récente</h2>
-              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-                Les derniers mouvements dans vos espaces
-              </p>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,.75fr)]">
+        <DashboardPanel
+          eyebrow="Traçabilité"
+          title="Activité récente"
+          icon={History}
+          flush
+          action={{ label: 'Voir le journal', onClick: () => onNavigate('/maximus/journal'), testId: 'button-see-journal' }}
+        >
+          {data.activities.length ? (
+            <div className="divide-y">
+              {data.activities.slice(0, 5).map((a, i) => (
+                <ActivityRow key={a.id} activity={a} delay={i} />
+              ))}
             </div>
-            <button
-              data-testid="button-see-journal"
-              onClick={() => onNavigate('/maximus/journal')}
-              className="text-xs font-bold text-[hsl(var(--primary))]"
-            >
-              Voir le journal <ChevronRight className="inline" size={14} />
-            </button>
-          </div>
-          <div className="divide-y">
-            {data.activities.slice(0, 4).map((a, i) => (
-              <ActivityRow key={a.id} activity={a} delay={i} />
-            ))}
-          </div>
-        </section>
-        <section className="card-surface rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-bold">État des espaces</h2>
-              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Aujourd’hui</p>
-            </div>
-            <button
-              data-testid="button-see-companies"
-              onClick={() => onNavigate('/maximus/entreprises')}
-              className="rounded-lg p-2 hover:bg-[hsl(var(--muted))]"
-            >
-              <ChevronRight size={17} />
-            </button>
-          </div>
-          <div className="mt-5 space-y-4">
-            {data.companies.map((c) => (
-              <div data-testid={`row-company-status-${c.id}`} key={c.id} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-xs font-black text-[hsl(var(--primary))]">
-                    {c.name.slice(0, 2).toUpperCase()}
-                  </span>
-                  <div>
-                    <p className="text-sm font-bold">{c.name}</p>
-                    <p className="text-[11px] text-[hsl(var(--muted-foreground))]">
-                      {c.allowedModules.length} modules actifs
-                    </p>
+          ) : (
+            <div className="p-5"><PanelEmpty icon={History} title="Aucune activité récente" /></div>
+          )}
+        </DashboardPanel>
+        <DashboardPanel
+          eyebrow="Espaces"
+          title="État des entreprises"
+          icon={Building2}
+          action={{ label: 'Tout voir', onClick: () => onNavigate('/maximus/entreprises'), testId: 'button-see-companies' }}
+        >
+          {data.companies.length ? (
+            <ul className="space-y-1">
+              {data.companies.slice(0, 8).map((c) => (
+                <li data-testid={`row-company-status-${c.id}`} key={c.id} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 hover:bg-[hsl(var(--muted)/.5)]">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-xs font-black text-[hsl(var(--primary))]">
+                      {c.name.slice(0, 2).toUpperCase()}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold">{c.name}</p>
+                      <p className="text-[11px] text-[hsl(var(--muted-foreground))]">{c.allowedModules.length} module(s) actif(s)</p>
+                    </div>
                   </div>
-                </div>
-                <StatusBadge status={c.status} />
-              </div>
-            ))}
-          </div>
-        </section>
+                  <StatusBadge status={c.status} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <PanelEmpty icon={Building2} title="Aucune entreprise" text="Les espaces clients apparaîtront ici après validation." />
+          )}
+        </DashboardPanel>
       </div>
-      <section className="grid-lines rounded-2xl border border-dashed border-[hsl(var(--border))] p-5 sm:p-6">
-        <div className="flex items-start gap-4">
-          <div className="rounded-xl bg-[hsl(var(--accent)/.2)] p-3">
-            <Sparkles size={19} className="text-[hsl(var(--primary))]" />
-          </div>
-          <div>
-            <h2 className="font-bold">MAXIMUS en bref</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              Le centre de contrôle est prêt. Consultez les demandes, ajustez les modules autorisés et gardez une trace
-              de chaque décision.
-            </p>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
@@ -3139,161 +3151,78 @@ function RoleAwareCompanyDashboard({
     ) : null,
   ].filter(Boolean);
 
+  const signals = [
+    canStocks && lowStockProducts.length > 0 && (
+      <SignalItem key="stock" tone="warning" testId="button-dashboard-low-stock" icon={Package} onClick={() => onNavigate('/entreprise/stocks')}
+        title={`${lowStockProducts.length} produit(s) à réapprovisionner`} text="Le seuil de sécurité est atteint." />
+    ),
+    canPurchases && pendingPurchases.length > 0 && (
+      <SignalItem key="purchases" testId="button-dashboard-pending-purchases" icon={ClipboardCheck} onClick={() => onNavigate('/entreprise/achats')}
+        title={`${pendingPurchases.length} achat(s) à suivre`} text="Commandes ou réceptions non finalisées." />
+    ),
+    canControl && pendingTasks.length > 0 && (
+      <SignalItem key="tasks" testId="button-dashboard-pending-tasks" icon={ClipboardCheck} onClick={() => onNavigate('/entreprise/controle')}
+        title={`${pendingTasks.length} tâche(s) à traiter`} text="Coordination et décisions de votre périmètre." />
+    ),
+  ].filter(Boolean);
+
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-2xl border border-[hsl(var(--primary)/.22)] bg-[linear-gradient(135deg,hsl(var(--primary)/.09),hsl(var(--card)),hsl(var(--accent)/.1))] p-6 sm:p-7">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--primary))]">Pilotage de l’entreprise</p>
-            <h2 className="mt-3 text-2xl font-bold tracking-[-.04em] sm:text-3xl">Une vue claire pour décider plus vite.</h2>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              MAXIMUS rassemble ici les indicateurs et les alertes de vos modules autorisés. Les données affichées
-              respectent votre entreprise et votre rôle.
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
+      <DashboardHero
+        eyebrow="Pilotage de l’entreprise"
+        title="Une vue claire pour décider plus vite."
+        description="Les indicateurs et alertes de vos modules autorisés. Les données affichées respectent votre entreprise et votre rôle."
+        actions={(primaryLink || canReports) ? (
+          <>
             {primaryLink && (
-              <button
-                data-testid="button-dashboard-primary-action"
-                onClick={() => onNavigate(primaryLink.path)}
-                className="rounded-lg bg-[hsl(var(--primary))] px-4 py-3 text-xs font-bold text-white shadow-sm transition hover:opacity-90"
-              >
+              <Button type="button" data-testid="button-dashboard-primary-action" onClick={() => onNavigate(primaryLink.path)} className="gap-2">
+                <primaryLink.icon size={15} aria-hidden="true" />
                 Ouvrir {primaryLink.label}
-              </button>
+              </Button>
             )}
             {canReports && (
-              <button
-                data-testid="button-dashboard-reports"
-                onClick={() => onNavigate('/entreprise/rapports')}
-                className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card)/.8)] px-4 py-3 text-xs font-bold transition hover:bg-[hsl(var(--muted))]"
-              >
+              <Button type="button" variant="outline" data-testid="button-dashboard-reports" onClick={() => onNavigate('/entreprise/rapports')} className="gap-2">
+                <FileBarChart size={15} aria-hidden="true" />
                 Voir les rapports
-              </button>
+              </Button>
             )}
-          </div>
-        </div>
-      </section>
+          </>
+        ) : undefined}
+      />
 
-      <div className={`mobile-stat-grid grid gap-4 md:grid-cols-2 ${metrics.length > 2 ? 'xl:grid-cols-4' : 'xl:grid-cols-2'}`}>
-        {metrics.length ? metrics : (
-          <section className="card-surface rounded-2xl p-6 md:col-span-2">
-            <h2 className="font-bold">Aucun accès opérationnel</h2>
-            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-              Votre rôle n’a pas encore reçu de module ou de sous-autorisation.
-            </p>
-          </section>
-        )}
-      </div>
+      {metrics.length ? (
+        <div className={`mobile-stat-grid grid gap-4 md:grid-cols-2 ${metrics.length > 2 ? 'xl:grid-cols-4' : 'xl:grid-cols-2'}`}>{metrics}</div>
+      ) : (
+        <PanelEmpty icon={ShieldCheck} title="Aucun accès opérationnel" text="Votre rôle n’a pas encore reçu de module ou de sous-autorisation." />
+      )}
 
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_.9fr]">
-        <section className="card-surface rounded-2xl p-5 sm:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Décisions à prendre</p>
-              <h2 className="mt-2 text-xl font-bold">Les signaux du jour</h2>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <DashboardPanel eyebrow="Décisions à prendre" title="Les signaux du jour" icon={Bell}>
+          {signals.length ? <div className="space-y-2.5">{signals}</div> : (
+            <PanelEmpty icon={Check} title="Tout est en ordre" text="Aucune alerte opérationnelle dans votre périmètre." />
+          )}
+        </DashboardPanel>
+        <DashboardPanel eyebrow="Accès rapides" title="Vos espaces MAXIMUS" icon={Gauge}>
+          {quickLinks.length ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {quickLinks.slice(0, 4).map((link) => (
+                <QuickLinkTile key={link.id} testId={`button-dashboard-link-${link.id}`} icon={link.icon} label={link.label} description={link.description} onClick={() => onNavigate(link.path)} />
+              ))}
             </div>
-            <Bell size={18} className="text-[hsl(var(--muted-foreground))]" />
-          </div>
-          <div className="mt-6 space-y-3">
-            {canStocks && lowStockProducts.length > 0 && (
-              <button
-                data-testid="button-dashboard-low-stock"
-                onClick={() => onNavigate('/entreprise/stocks')}
-                className="flex w-full items-start gap-3 rounded-xl border border-[hsl(var(--accent)/.45)] bg-[hsl(var(--accent)/.1)] p-3 text-left transition hover:bg-[hsl(var(--accent)/.17)]"
-              >
-                <Package size={17} className="mt-0.5 shrink-0" />
-                <span className="min-w-0 flex-1">
-                  <strong className="block text-sm">{lowStockProducts.length} produit(s) à réapprovisionner</strong>
-                  <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Le seuil de sécurité est atteint.</span>
-                </span>
-                <ChevronRight size={16} className="mt-0.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
-              </button>
-            )}
-            {canPurchases && pendingPurchases.length > 0 && (
-              <button
-                data-testid="button-dashboard-pending-purchases"
-                onClick={() => onNavigate('/entreprise/achats')}
-                className="flex w-full items-start gap-3 rounded-xl border p-3 text-left transition hover:bg-[hsl(var(--muted)/.45)]"
-              >
-                <ClipboardCheck size={17} className="mt-0.5 shrink-0 text-[hsl(var(--primary))]" />
-                <span className="min-w-0 flex-1">
-                  <strong className="block text-sm">{pendingPurchases.length} achat(s) à suivre</strong>
-                  <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Commandes ou réceptions non finalisées.</span>
-                </span>
-                <ChevronRight size={16} className="mt-0.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
-              </button>
-            )}
-            {canControl && pendingTasks.length > 0 && (
-              <button
-                data-testid="button-dashboard-pending-tasks"
-                onClick={() => onNavigate('/entreprise/controle')}
-                className="flex w-full items-start gap-3 rounded-xl border p-3 text-left transition hover:bg-[hsl(var(--muted)/.45)]"
-              >
-                <ClipboardCheck size={17} className="mt-0.5 shrink-0 text-[hsl(var(--primary))]" />
-                <span className="min-w-0 flex-1">
-                  <strong className="block text-sm">{pendingTasks.length} tâche(s) à traiter</strong>
-                  <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">Coordination et décisions de votre périmètre.</span>
-                </span>
-                <ChevronRight size={16} className="mt-0.5 shrink-0 text-[hsl(var(--muted-foreground))]" />
-              </button>
-            )}
-            {(!canStocks || lowStockProducts.length === 0) && (!canPurchases || pendingPurchases.length === 0) && (!canControl || pendingTasks.length === 0) && (
-              <div className="rounded-xl border border-dashed p-4 text-sm text-[hsl(var(--muted-foreground))]">
-                Aucune alerte opérationnelle dans votre périmètre.
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="card-surface rounded-2xl p-5 sm:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Accès rapides</p>
-              <h2 className="mt-2 text-xl font-bold">Vos espaces MAXIMUS</h2>
-            </div>
-            <Gauge size={18} className="text-[hsl(var(--muted-foreground))]" />
-          </div>
-          <div className="mt-5 space-y-2">
-            {quickLinks.slice(0, 4).map((link) => {
-              const Icon = link.icon;
-              return (
-                <button
-                  data-testid={`button-dashboard-link-${link.id}`}
-                  key={link.id}
-                  onClick={() => onNavigate(link.path)}
-                  className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition hover:border-[hsl(var(--primary)/.35)] hover:bg-[hsl(var(--muted)/.4)]"
-                >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]">
-                    <Icon size={17} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <strong className="block text-sm">{link.label}</strong>
-                    <span className="mt-0.5 block truncate text-[11px] text-[hsl(var(--muted-foreground))]">{link.description}</span>
-                  </span>
-                  <ChevronRight size={16} className="shrink-0 text-[hsl(var(--muted-foreground))]" />
-                </button>
-              );
-            })}
-            {!quickLinks.length && <p className="text-sm text-[hsl(var(--muted-foreground))]">Aucun espace n’est encore configuré.</p>}
-          </div>
-        </section>
+          ) : (
+            <PanelEmpty icon={LayoutGrid} title="Aucun espace configuré" />
+          )}
+        </DashboardPanel>
       </div>
 
       {canCommerce && (
-        <section className="card-surface overflow-hidden rounded-2xl">
-          <div className="flex items-center justify-between border-b p-5">
-            <div>
-              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Activité commerciale</p>
-              <h2 className="mt-2 font-bold">Dernières ventes</h2>
-            </div>
-            <button
-              data-testid="button-dashboard-see-sales"
-              onClick={() => onNavigate('/entreprise/commerce')}
-              className="text-xs font-bold text-[hsl(var(--primary))]"
-            >
-              Tout voir <ChevronRight className="inline" size={14} />
-            </button>
-          </div>
+        <DashboardPanel
+          eyebrow="Activité commerciale"
+          title="Dernières ventes"
+          icon={ShoppingCart}
+          flush
+          action={{ label: 'Tout voir', onClick: () => onNavigate('/entreprise/commerce'), testId: 'button-dashboard-see-sales' }}
+        >
           {sales.length ? (
             <>
               <div className="hidden xl:block">
@@ -3308,13 +3237,9 @@ function RoleAwareCompanyDashboard({
                   ])}
                 />
               </div>
-              <div className="grid gap-3 p-4 xl:hidden">
+              <div className="grid gap-3 p-4 sm:grid-cols-2 xl:hidden">
                 {sales.slice(0, 5).map((sale) => (
-                  <article
-                    key={sale.id}
-                    data-testid={`card-dashboard-sale-${sale.id}`}
-                    className="rounded-xl border bg-[hsl(var(--muted))] p-4"
-                  >
+                  <article key={sale.id} data-testid={`card-dashboard-sale-${sale.id}`} className="rounded-xl border bg-[hsl(var(--muted)/.5)] p-4">
                     <div className="flex min-w-0 items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold">{sale.reference}</p>
@@ -3331,188 +3256,26 @@ function RoleAwareCompanyDashboard({
               </div>
             </>
           ) : (
-            <p className="p-5 text-sm text-[hsl(var(--muted-foreground))]">Aucune vente enregistrée pour le moment.</p>
+            <div className="p-5"><PanelEmpty icon={ShoppingCart} title="Aucune vente enregistrée" text="Les ventes validées apparaîtront ici." /></div>
           )}
-        </section>
+        </DashboardPanel>
       )}
 
-      <section className="card-surface overflow-hidden rounded-2xl">
-        <div className="flex items-center justify-between border-b p-5">
-          <div>
-            <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">Traçabilité</p>
-            <h2 className="mt-2 font-bold">Activité récente</h2>
-          </div>
-          {canControl && (
-            <button
-              data-testid="button-dashboard-see-control"
-              onClick={() => onNavigate('/entreprise/controle')}
-              className="text-xs font-bold text-[hsl(var(--primary))]"
-            >
-              Voir le contrôle <ChevronRight className="inline" size={14} />
-            </button>
-          )}
-        </div>
+      <DashboardPanel
+        eyebrow="Traçabilité"
+        title="Activité récente"
+        icon={History}
+        flush
+        action={canControl ? { label: 'Voir le contrôle', onClick: () => onNavigate('/entreprise/controle'), testId: 'button-dashboard-see-control' } : undefined}
+      >
         {activities.length ? (
           <div className="divide-y">
             {activities.slice(0, 5).map((activity, index) => <ActivityRow key={activity.id} activity={activity} delay={index} />)}
           </div>
         ) : (
-          <p className="p-5 text-sm text-[hsl(var(--muted-foreground))]">Aucune activité récente à afficher.</p>
+          <div className="p-5"><PanelEmpty icon={History} title="Aucune activité récente" /></div>
         )}
-      </section>
-    </div>
-  );
-}
-
-function CompanyDashboard({
-  data,
-  onNavigate,
-  allowed,
-}: {
-  data: StoreData;
-  onNavigate: (path: string) => void;
-  allowed: ModuleId[];
-}) {
-  const revenue = data.sales.filter((sale) => sale.status === 'VALIDÉ').reduce((sum, sale) => sum + sale.amount, 0);
-  const low = data.products.filter((p) => p.stock <= p.threshold).length;
-  const canCommerce = allowed.includes('commerce');
-  const canStocks = allowed.includes('stocks');
-  const canPresences = allowed.includes('presences');
-  return (
-    <div className="space-y-6">
-      <div className="mobile-stat-grid grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Metric
-          label="Encaissements du mois"
-          value={shortMoney(revenue)}
-          suffix=" FCFA"
-          detail="Ventes validées"
-          icon={TrendingUp}
-          accent
-        />
-        {canCommerce && (
-          <Metric
-            label="Ventes validées"
-            value={String(data.sales.filter((s) => s.status === 'VALIDÉ').length)}
-            detail="sur les 30 derniers jours"
-            icon={ShoppingCart}
-          />
-        )}
-        {canStocks && (
-          <Metric
-            label="Produits à surveiller"
-            value={String(low).padStart(2, '0')}
-            detail="seuil de sécurité atteint"
-            icon={Package}
-            warning
-          />
-        )}
-        {canPresences && (
-          <Metric label="Présences aujourd’hui" value="18 / 21" detail="85,7% de l’effectif" icon={Users} />
-        )}
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[1.35fr_.65fr]">
-        {canCommerce && (
-          <section className="card-surface rounded-2xl p-5 sm:p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">
-                  Performance commerciale
-                </p>
-                <h2 className="mt-2 text-xl font-bold">Les ventes avancent bien.</h2>
-              </div>
-              <button
-                data-testid="button-open-commerce"
-                onClick={() => onNavigate('/entreprise/commerce')}
-                className="rounded-lg border px-3 py-2 text-xs font-bold"
-              >
-                Ouvrir Commerce
-              </button>
-            </div>
-            <div className="mt-8 flex h-48 items-end gap-2 sm:gap-4">
-              {[38, 53, 45, 68, 57, 80, 72, 92, 76, 87, 81, 100].map((v, i) => (
-                <div key={i} className="flex flex-1 flex-col items-center gap-2">
-                  <div
-                    className={`w-full rounded-t-md ${i === 11 ? 'bg-[hsl(var(--accent))]' : 'bg-[hsl(var(--primary)/.18)]'}`}
-                    style={{ height: `${v}%` }}
-                  />
-                  <span className="mono text-[9px] text-[hsl(var(--muted-foreground))]">
-                    {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'][i]}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-        <section className="card-surface rounded-2xl p-5 sm:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--primary))]">À surveiller</p>
-              <h2 className="mt-2 text-xl font-bold">Signaux du jour</h2>
-            </div>
-            <Bell size={18} className="text-[hsl(var(--muted-foreground))]" />
-          </div>
-          <div className="mt-6 space-y-4">
-            {canStocks && (
-              <div className="flex gap-3 border-b pb-4">
-                <span className="h-2 w-2 mt-1.5 rounded-full bg-[hsl(var(--accent))]" />
-                <div>
-                  <p className="text-sm font-bold">Stock bas</p>
-                  <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                    {low} produits sous leur seuil recommandé.
-                  </p>
-                  <button
-                    onClick={() => onNavigate('/entreprise/stocks')}
-                    className="mt-2 text-xs font-bold text-[hsl(var(--primary))]"
-                  >
-                    Voir les stocks
-                  </button>
-                </div>
-              </div>
-            )}
-            <div className="flex gap-3">
-              <span className="h-2 w-2 mt-1.5 rounded-full bg-[hsl(var(--primary))]" />
-              <div>
-                <p className="text-sm font-bold">Rapport hebdomadaire</p>
-                <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                  Votre synthèse de la semaine est disponible.
-                </p>
-                <button
-                  onClick={() => onNavigate('/entreprise/rapports')}
-                  className="mt-2 text-xs font-bold text-[hsl(var(--primary))]"
-                >
-                  Consulter
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-      {canCommerce && (
-        <section className="card-surface overflow-hidden rounded-2xl">
-          <div className="flex items-center justify-between border-b p-5">
-            <div>
-              <h2 className="font-bold">Dernières ventes</h2>
-              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Aujourd’hui et hier</p>
-            </div>
-            <button
-              onClick={() => onNavigate('/entreprise/commerce')}
-              className="text-xs font-bold text-[hsl(var(--primary))]"
-            >
-              Tout voir
-            </button>
-          </div>
-          <DataTable
-            headers={['Référence', 'Client', 'Montant', 'Statut', 'Date']}
-            rows={data.sales.map((s) => [
-              s.reference,
-              s.client,
-              money(s.amount),
-              <StatusBadge status={s.status} />,
-              s.date,
-            ])}
-          />
-        </section>
-      )}
+      </DashboardPanel>
     </div>
   );
 }

@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Button } from '@workspace/maximus-design-system/components/ui/button';
+import { Alert, AlertDescription } from '@workspace/maximus-design-system/components/ui/alert';
+import { Textarea } from '@workspace/maximus-design-system/components/ui/textarea';
 import { onboardingApi, type OnboardingProposal, type OnboardingDraft } from '@/lib/onboarding-api';
 import { 
   Building2, 
@@ -139,23 +142,33 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
           </div>
           <span className="font-semibold text-lg tracking-tight">MAXIMUS</span>
         </div>
-        <div className="text-sm font-medium text-[hsl(var(--sidebar-foreground)/.7)]">
-          Configuration Intelligente
-        </div>
+        <ol aria-label="Étapes de configuration" className="flex items-center gap-1.5 text-xs font-semibold sm:gap-3">
+          {([['describe', 'Description'], ['review', 'Proposition'], ['identity', 'Identité']] as const).map(([key, label], index) => {
+            const order = { describe: 0, generating: 0, review: 1, refining: 1, identity: 2, submitting: 2 }[step];
+            const state = index < order ? 'done' : index === order ? 'current' : 'todo';
+            return (
+              <li key={key} aria-current={state === 'current' ? 'step' : undefined} className="flex items-center gap-1.5">
+                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${state === 'todo' ? 'border border-[hsl(var(--sidebar-foreground)/.3)] text-[hsl(var(--sidebar-foreground)/.6)]' : 'bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]'}`}>{index + 1}</span>
+                <span className={`hidden sm:inline ${state === 'current' ? 'text-[hsl(var(--sidebar-foreground))]' : 'text-[hsl(var(--sidebar-foreground)/.6)]'}`}>{label}</span>
+                {index < 2 && <span aria-hidden="true" className="ml-1 hidden h-px w-6 bg-[hsl(var(--sidebar-foreground)/.25)] sm:block" />}
+              </li>
+            );
+          })}
+        </ol>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-6 sm:p-12">
+      <main className="flex flex-1 flex-col items-center justify-center px-4 py-8 sm:p-12">
         <div className="w-full max-w-4xl">
           
           {errorMsg && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-800 animate-in fade-in slide-in-from-top-2">
-              <AlertCircle className="w-5 h-5 flex-none mt-0.5" />
-              <p className="text-sm font-medium">{errorMsg}</p>
-            </div>
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-sm font-medium">{errorMsg}</AlertDescription>
+            </Alert>
           )}
 
           {step === 'describe' && (
-            <div className="bg-[hsl(var(--card))] rounded-2xl shadow-[var(--shadow-soft)] border border-[hsl(var(--card-border))] p-8 sm:p-12 animate-in fade-in zoom-in-95 duration-300">
+            <div className="bg-[hsl(var(--card))] rounded-2xl shadow-[var(--shadow-soft)] border border-[hsl(var(--card-border))] p-6 sm:p-12 animate-in fade-in zoom-in-95 duration-300">
               <div className="max-w-2xl mx-auto">
                 <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
                   Parlez-nous de votre entreprise
@@ -181,21 +194,21 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-center gap-4 pt-4">
-                    <button
+                    <Button
                       type="submit"
                       disabled={!description.trim()}
-                      className="w-full sm:w-auto px-8 py-4 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-xl font-medium text-base hover:brightness-95 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
+                      size="lg" className="w-full gap-2 sm:w-auto"
                     >
                       <Sparkles className="w-5 h-5" />
                       Générer ma configuration
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={onManual}
-                      className="w-full sm:w-auto px-8 py-4 bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))] rounded-xl font-medium text-base hover:bg-[hsl(var(--muted))] border border-[hsl(var(--border))] active:scale-[0.98] transition-all"
+                      variant="outline" size="lg" className="w-full sm:w-auto"
                     >
                       Configuration manuelle
-                    </button>
+                    </Button>
                   </div>
                 </form>
               </div>
@@ -317,15 +330,15 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
 
                   {/* Unknowns / Clarifications */}
                   {draft.proposal.unknowns.length > 0 && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
-                      <h3 className="text-amber-800 font-bold flex items-center gap-2 mb-3">
+                    <div className="rounded-xl border border-[hsl(var(--accent)/.45)] bg-[hsl(var(--accent)/.1)] p-6">
+                      <h3 className="font-bold text-[hsl(var(--foreground))] flex items-center gap-2 mb-3">
                         <HelpCircle className="w-5 h-5" />
                         Points à clarifier
                       </h3>
                       <ul className="space-y-2">
                         {draft.proposal.unknowns.map((u, i) => (
-                          <li key={i} className="flex items-start gap-2 text-amber-700 text-sm">
-                            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-400 flex-none" />
+                          <li key={i} className="flex items-start gap-2 text-sm text-[hsl(var(--foreground)/.8)]">
+                            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent))] flex-none" />
                             {u}
                           </li>
                         ))}
@@ -348,25 +361,25 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                       placeholder="Ex: Ajoutez aussi la gestion des RH pour 5 personnes..."
                       className="flex-1 px-4 py-3 bg-[hsl(var(--muted)/.5)] border border-[hsl(var(--border))] rounded-xl text-sm focus:outline-none focus:border-[hsl(var(--primary))] focus:ring-0 transition-colors"
                     />
-                    <button
+                    <Button
                       type="submit"
                       disabled={!refinement.trim()}
-                      className="px-6 py-3 bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] rounded-xl font-medium text-sm hover:bg-[hsl(var(--secondary))] transition-colors disabled:opacity-50 whitespace-nowrap"
+                      variant="secondary" className="whitespace-nowrap"
                     >
                       Ajuster
-                    </button>
+                    </Button>
                   </form>
                 </div>
                 <div className="bg-[hsl(var(--sidebar))] rounded-2xl shadow-sm border border-[hsl(var(--sidebar-border))] p-6 sm:p-8 flex flex-col justify-center text-[hsl(var(--sidebar-foreground))]">
                   <h3 className="font-bold tracking-tight mb-2">Tout est correct ?</h3>
                   <p className="text-[hsl(var(--sidebar-foreground)/.68)] text-sm mb-6">Passez à la création de votre compte pour activer cet espace.</p>
-                  <button
+                  <Button
                     onClick={() => setStep('identity')}
-                    className="w-full px-6 py-3 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-xl font-medium text-sm hover:brightness-95 transition-colors flex items-center justify-center gap-2 group"
+                    className="group w-full gap-2"
                   >
                     Valider et continuer
                     <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -501,21 +514,21 @@ export function IntelligentOnboardingPage({ onComplete, onManual, onSubmitReques
                 </div>
 
                 <div className="pt-8 border-t border-[hsl(var(--border))] flex flex-col sm:flex-row items-center gap-4 justify-between">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setStep('review')}
-                    className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] font-medium text-sm px-4 py-2 transition-colors"
+                    variant="ghost" size="sm"
                   >
                     Retour à la proposition
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
                     disabled={passwordMismatch || identity.password.length < 8}
-                    className="w-full sm:w-auto px-8 py-4 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-xl font-medium text-base hover:brightness-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                    size="lg" className="w-full gap-2 sm:w-auto"
                   >
                     Créer mon espace MAXIMUS
                     <ArrowRight className="w-5 h-5" />
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>

@@ -131,9 +131,6 @@ body { min-width: 320px; }
 .page-pad > .mb-7 { margin-bottom: 1.75rem; padding-bottom: 1.35rem; border-bottom: 1px solid hsl(var(--border)); }
 .page-pad h1 { text-wrap: balance; }
 .page-pad table thead { letter-spacing: .08em; }
-.page-pad .card-surface table thead { background: hsl(var(--muted) / .72); }
-.page-pad .card-surface table tbody tr:nth-child(even) { background: hsl(var(--muted) / .14); }
-.page-pad .card-surface table tbody tr:hover { background: hsl(var(--primary) / .055); }
 .page-pad table tbody tr { transition: background-color .16s ease; }
 .page-pad input, .page-pad select, .page-pad textarea { border-color: hsl(var(--input)); }
 .page-pad input::placeholder, .page-pad textarea::placeholder { color: hsl(var(--muted-foreground) / .75); }
@@ -147,22 +144,8 @@ body { min-width: 320px; }
 .data-table tbody tr:hover { background: hsl(var(--primary) / .055); }
 .table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; border-top: 1px solid hsl(var(--border)); }
 .overflow-x-auto { max-width: 100%; overscroll-behavior-inline: contain; }
-.table-scroll table { min-width: 680px; background: hsl(var(--muted)); }
-.table-scroll thead { background: hsl(var(--muted)); }
-.table-scroll tbody tr:nth-child(odd) { background: hsl(var(--background)); }
-.table-scroll tbody tr:nth-child(even) { background: hsl(var(--secondary)); }
-.table-scroll tbody tr:hover { background: hsl(var(--primary) / .09); }
-.page-pad .card-surface table { background: hsl(var(--muted)); }
-.page-pad .card-surface table thead { background: hsl(var(--muted)); }
-.page-pad .card-surface table tbody tr:nth-child(odd) { background: hsl(var(--background)); }
-.page-pad .card-surface table tbody tr:nth-child(even) { background: hsl(var(--secondary)); }
-.page-pad .card-surface table tbody tr:hover { background: hsl(var(--primary) / .09); }
+.table-scroll table, .overflow-x-auto > table { min-width: 680px; }
 .transport-table-scroll table { min-width: 620px; }
-.overflow-x-auto > table { min-width: 680px; background: hsl(var(--muted)); }
-.overflow-x-auto > table thead { background: hsl(var(--muted)); }
-.overflow-x-auto > table tbody tr:nth-child(odd) { background: hsl(var(--background)); }
-.overflow-x-auto > table tbody tr:nth-child(even) { background: hsl(var(--secondary)); }
-.overflow-x-auto > table tbody tr:hover { background: hsl(var(--primary) / .09); }
 .table-scroll th { white-space: nowrap; }
 .table-scroll td, .table-scroll th { vertical-align: middle; }
 .table-scroll td:last-child, .table-scroll th:last-child { text-align: right; }
@@ -792,3 +775,45 @@ body {
 .overflow-x-auto > table tbody tr:hover {
   background-color: hsl(var(--primary) / .16) !important;
 }
+
+/* Sidebar group toggles (mobile accordion) share the quiet label style. */
+.sidebar-section-toggle { color: hsl(var(--sidebar-foreground) / .6); }
+.sidebar-section-toggle:hover { background: hsl(var(--sidebar-active) / .35); }
+.sidebar .nav-item:focus-visible,
+.topbar-icon:focus-visible { outline: 2px solid hsl(var(--sidebar-active)); outline-offset: 2px; }
+.page-header { gap: 1rem; }
+.page-header h1 { letter-spacing: -.035em; }
+
+/* Auth showcase: subtle grid texture over the sidebar surface. */
+.auth-showcase__grid {
+  background-image:
+    linear-gradient(hsl(var(--sidebar-foreground) / .05) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--sidebar-foreground) / .05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(circle at 30% 20%, black, transparent 75%);
+}
+
+/* Storefront hero scrim keeps banner text readable over any merchant image. */
+.shop-hero__scrim {
+  background:
+    linear-gradient(0deg, hsl(var(--sidebar) / .82) 0%, hsl(var(--sidebar) / .38) 48%, hsl(var(--sidebar) / .06) 100%),
+    linear-gradient(90deg, hsl(var(--sidebar) / .45) 0%, transparent 65%);
+}
+
+/* Storefront form field: token-driven input used by account/auth forms. */
+.shop-field {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  border-radius: .75rem;
+  border: 1px solid hsl(var(--input));
+  background: hsl(var(--card));
+  padding: .625rem .875rem;
+  font-size: .875rem;
+  color: hsl(var(--foreground));
+  transition: border-color .15s, box-shadow .15s;
+}
+.shop-field::placeholder { color: hsl(var(--muted-foreground)); }
+.shop-field:focus-visible { outline: none; border-color: var(--shop-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--shop-primary) 18%, transparent); }
+.shop-field:disabled { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); cursor: not-allowed; }

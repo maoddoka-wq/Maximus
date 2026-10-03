@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react';
-import { Building2, LogIn, ShieldAlert } from 'lucide-react';
+import { Building2, LogIn, RefreshCw, ShieldAlert } from 'lucide-react';
+import { Button } from '@workspace/maximus-design-system/components/ui/button';
+import { Input } from '@workspace/maximus-design-system/components/ui/input';
+import { Label } from '@workspace/maximus-design-system/components/ui/label';
+import { Skeleton } from '@workspace/maximus-design-system/components/ui/skeleton';
+import { Alert, AlertDescription } from '@workspace/maximus-design-system/components/ui/alert';
+import { AuthCard, AuthLayout } from '@/components/auth-layout';
 import { authApi, type AuthUser, type PublicCompanyLogin } from '@/lib/auth-api';
 import type { InstallationProfile } from '@/lib/installation-api';
 
@@ -122,95 +128,123 @@ export function CompanyLoginPage({ slug, installationCompany, onAuthenticated }:
   };
 
   if (loading) {
-    return <div className="flex min-h-[100dvh] items-center justify-center bg-slate-950 p-6 text-sm text-white">Chargement de votre espace…</div>;
+    return (
+      <main className="grid min-h-[100dvh] place-items-center bg-[hsl(var(--background))] p-6" aria-busy="true" aria-label="Chargement de votre espace">
+        <div className="w-full max-w-md space-y-4">
+          <Skeleton className="h-12 w-12 rounded-xl" />
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+        </div>
+      </main>
+    );
   }
 
-  return (
-    <main className="min-h-[100dvh] bg-slate-950" style={{ background: `linear-gradient(135deg, ${company?.sidebarColor ?? '#161D27'} 0%, #0f172a 62%, ${primary}33 100%)` }}>
-      <div className="mx-auto grid min-h-[100dvh] max-w-6xl items-center gap-10 p-6 lg:grid-cols-[1fr_440px] lg:p-12">
-        <section className="hidden text-white lg:block">
-          <div className="flex items-center gap-3">
-            {company?.profilePhoto ? (
-              <img src={company.profilePhoto} alt="" className="h-14 w-14 rounded-2xl object-cover ring-1 ring-white/20" />
-            ) : (
-              <span className="flex h-14 w-14 items-center justify-center rounded-2xl text-lg font-black" style={{ backgroundColor: primary, color: foreground }}>
-                {companyInitials(company?.name ?? 'EN')}
-              </span>
-            )}
-            <div>
-              <p className="text-lg font-bold">{company?.name ?? 'Espace entreprise'}</p>
-              <p className="text-sm text-white/60">Espace sécurisé de gestion</p>
-            </div>
-          </div>
-          <h1 className="mt-24 max-w-xl text-6xl font-black leading-[.98] tracking-[-.06em]">
-            Bienvenue dans votre espace.
-          </h1>
-          <p className="mt-7 max-w-lg text-lg leading-8 text-white/65">
-            Retrouvez vos équipes, vos opérations et les outils autorisés par votre entreprise.
-          </p>
-        </section>
+  const companyName = company?.name ?? installationCompany?.name ?? 'Espace entreprise';
+  const logo = (size: 'sm' | 'lg') => company?.profilePhoto ? (
+    <img src={company.profilePhoto} alt={`Logo de ${companyName}`} className={`${size === 'lg' ? 'h-14 w-14 rounded-2xl' : 'h-11 w-11 rounded-xl'} object-cover ring-1 ring-[hsl(var(--border))]`} />
+  ) : (
+    <span className={`flex items-center justify-center font-black ${size === 'lg' ? 'h-14 w-14 rounded-2xl text-lg' : 'h-11 w-11 rounded-xl text-sm'}`} style={{ backgroundColor: primary, color: foreground }}>
+      {companyInitials(companyName)}
+    </span>
+  );
 
-        <section className="rounded-3xl bg-white p-7 shadow-2xl sm:p-10">
-          <div className="flex items-center gap-3 lg:hidden">
-            {company?.profilePhoto ? (
-              <img src={company.profilePhoto} alt="" className="h-12 w-12 rounded-xl object-cover" />
-            ) : (
-              <span className="flex h-12 w-12 items-center justify-center rounded-xl text-sm font-black" style={{ backgroundColor: primary, color: foreground }}>
-                {companyInitials(company?.name ?? 'EN')}
-              </span>
-            )}
-            <p className="font-bold">{company?.name ?? 'Espace entreprise'}</p>
-          </div>
-          <div className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[.18em]" style={{ color: primary }}>Connexion entreprise</p>
-            <h2 className="mt-3 text-3xl font-black tracking-[-.04em]">Accédez à votre espace</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500">Utilisez les identifiants fournis par l’administrateur de votre entreprise.</p>
-          </div>
-          {error && (
-            <div role="alert" className="mt-6 flex gap-2 rounded-xl bg-red-50 p-3 text-xs font-semibold text-red-700">
-              <ShieldAlert size={16} className="shrink-0" />
-              <span>{error}</span>
+  return (
+    <AuthLayout
+      testId="page-company-login"
+      showcaseStyle={company?.sidebarColor ? { backgroundColor: company.sidebarColor } : undefined}
+      showcase={
+        <>
+          <div className="flex items-center gap-3">
+            {logo('lg')}
+            <div className="min-w-0">
+              <p className="truncate text-lg font-bold">{companyName}</p>
+              <p className="text-sm text-[hsl(var(--sidebar-foreground)/.6)]">Espace sécurisé de gestion</p>
             </div>
-          )}
-          {!company ? (
-            <div className="mt-6 rounded-xl bg-slate-100 p-4 text-sm text-slate-600">
-              <p>Cette connexion entreprise est indisponible.</p>
-              <button type="button" onClick={() => setRetry((value) => value + 1)} className="mt-3 rounded-lg border px-4 py-2 font-semibold">Réessayer</button>
-            </div>
-          ) : (
-            <form onSubmit={submit} className="mt-7 space-y-5">
-              <label className="block text-sm font-semibold">
-                Adresse email
-                <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required autoComplete="username" className="mt-2 w-full rounded-xl border px-3 py-3.5 text-sm outline-none focus:ring-2" style={{ '--tw-ring-color': `${primary}55` } as CSSProperties} />
-              </label>
-              <label className="block text-sm font-semibold">
-                Mot de passe
-                <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" required autoComplete="current-password" className="mt-2 w-full rounded-xl border px-3 py-3.5 text-sm outline-none focus:ring-2" style={{ '--tw-ring-color': `${primary}55` } as CSSProperties} />
-              </label>
-              <button type="submit" disabled={pending} className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-bold shadow-lg disabled:cursor-wait disabled:opacity-70" style={{ backgroundColor: primary, color: foreground }}>
-                <LogIn size={17} />
-                {pending ? 'Connexion en cours…' : 'Se connecter'}
-              </button>
-            </form>
-          )}
-          {installationCompany && (
-            <div className="mt-5 text-sm text-slate-600">
-              <button type="button" aria-expanded={showRecovery} onClick={() => setShowRecovery((value) => !value)} className="underline underline-offset-4">
-                Besoin d’aide pour vous connecter ?
-              </button>
-              {showRecovery && <p className="mt-3 rounded-xl bg-slate-50 p-4 leading-6">
-                Contactez l’administrateur de votre entreprise. Si son accès est également perdu,
-                le responsable du serveur dispose d’une procédure locale de récupération sécurisée.
-                Les identifiants MAXIMUS central ne permettent pas de se connecter ici.
-              </p>}
-            </div>
-          )}
-          <div className="mt-8 flex items-center justify-center gap-2 border-t pt-5 text-xs text-slate-400">
-            <Building2 size={14} />
-            <span>{installationCompany ? `Espace privé · ${company?.name ?? installationCompany.name}` : 'Connexion sécurisée par MAXIMUS'}</span>
           </div>
-        </section>
+          <div className="mt-auto max-w-xl pt-16">
+            <span aria-hidden="true" className="block h-1 w-16 rounded-full" style={{ backgroundColor: primary }} />
+            <h2 className="mt-8 text-5xl font-bold leading-[1.02] tracking-[-.055em] xl:text-6xl">Bienvenue dans votre espace.</h2>
+            <p className="mt-6 max-w-lg text-base leading-7 text-[hsl(var(--sidebar-foreground)/.68)]">
+              Retrouvez vos équipes, vos opérations et les outils autorisés par votre entreprise.
+            </p>
+          </div>
+          <p className="mono mt-12 flex items-center gap-2 text-[10px] uppercase tracking-[.18em] text-[hsl(var(--sidebar-foreground)/.5)]">
+            <Building2 size={13} aria-hidden="true" />
+            {installationCompany ? `Espace privé · ${companyName}` : 'Connexion sécurisée par MAXIMUS'}
+          </p>
+        </>
+      }
+    >
+      <div className="mb-6 flex items-center gap-3 lg:hidden">
+        {logo('sm')}
+        <p className="min-w-0 truncate font-bold">{companyName}</p>
       </div>
-    </main>
+      <AuthCard
+        eyebrow="Connexion entreprise"
+        eyebrowStyle={{ color: primary }}
+        title="Accédez à votre espace"
+        description="Utilisez les identifiants fournis par l’administrateur de votre entreprise."
+        footer={
+          <div className="space-y-3 text-sm text-[hsl(var(--muted-foreground))]">
+            {installationCompany && (
+              <>
+                <Button type="button" variant="link" size="sm" aria-expanded={showRecovery} onClick={() => setShowRecovery((value) => !value)} className="h-auto min-h-0 px-0 text-[hsl(var(--foreground))]">
+                  Besoin d’aide pour vous connecter ?
+                </Button>
+                {showRecovery && (
+                  <Alert>
+                    <AlertDescription className="text-xs leading-5">
+                      Contactez l’administrateur de votre entreprise. Si son accès est également perdu,
+                      le responsable du serveur dispose d’une procédure locale de récupération sécurisée.
+                      Les identifiants MAXIMUS central ne permettent pas de se connecter ici.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </>
+            )}
+            <p className="flex items-center justify-center gap-2 text-xs lg:hidden">
+              <Building2 size={14} aria-hidden="true" />
+              {installationCompany ? `Espace privé · ${companyName}` : 'Connexion sécurisée par MAXIMUS'}
+            </p>
+          </div>
+        }
+      >
+        {error && (
+          <Alert variant="destructive" className="mb-5">
+            <ShieldAlert size={16} />
+            <AlertDescription className="text-xs font-semibold">{error}</AlertDescription>
+          </Alert>
+        )}
+        {!company ? (
+          <Alert>
+            <AlertDescription>
+              <p className="text-sm">Cette connexion entreprise est indisponible.</p>
+              <Button type="button" variant="outline" size="sm" onClick={() => setRetry((value) => value + 1)} className="mt-3 gap-2">
+                <RefreshCw size={14} aria-hidden="true" />
+                Réessayer
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <form onSubmit={submit} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="company-login-email">Adresse email</Label>
+              <Input id="company-login-email" data-testid="input-company-login-email" value={email} onChange={(event) => setEmail(event.target.value)} type="email" required autoComplete="username" className="h-11" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="company-login-password">Mot de passe</Label>
+              <Input id="company-login-password" data-testid="input-company-login-password" value={password} onChange={(event) => setPassword(event.target.value)} type="password" required autoComplete="current-password" className="h-11" />
+            </div>
+            <Button type="submit" size="lg" data-testid="button-company-login" disabled={pending} className="w-full gap-2 font-bold disabled:cursor-wait" style={{ backgroundColor: primary, color: foreground, borderColor: primary } as CSSProperties}>
+              <LogIn size={17} aria-hidden="true" />
+              {pending ? 'Connexion en cours…' : 'Se connecter'}
+            </Button>
+          </form>
+        )}
+      </AuthCard>
+    </AuthLayout>
   );
 }
