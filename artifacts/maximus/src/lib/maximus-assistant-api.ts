@@ -3,7 +3,7 @@ import { requestJson } from './api-request';
 export type MaximusAssistantResponse = {
   answer: string;
   citations: string[];
-  provider: 'anthropic' | 'maxi';
+  provider: 'local' | 'maxi';
   model: string;
   action?: MaximusAssistantAction;
 };
@@ -41,6 +41,7 @@ export type MaximusAssistantAction = {
   parentId?: string | null;
   features?: string[];
   featureIds?: string[];
+  dependencies?: string[];
   featurePacks?: Array<{
     id: string;
     name: string;

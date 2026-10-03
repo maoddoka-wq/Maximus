@@ -202,6 +202,14 @@ Route::post(
 )->middleware('throttle:withdrawals');
 
 Route::middleware(['maximus.central', 'maximus.auth'])->post('/maximus-assistant/ask', [MaximusAssistantController::class, 'ask']);
+Route::middleware(['maximus.central', 'maximus.auth'])->prefix('maximus-assistant/plans')->group(function (): void {
+    Route::get('/', [MaximusAssistantController::class, 'listPlans']);
+    Route::post('/', [MaximusAssistantController::class, 'preparePlan'])->middleware('throttle:20,1');
+    Route::get('/{id}', [MaximusAssistantController::class, 'showPlan'])->whereUuid('id');
+    Route::post('/{id}/preview', [MaximusAssistantController::class, 'previewPlan'])->whereUuid('id');
+    Route::post('/{id}/execute', [MaximusAssistantController::class, 'executePlan'])->whereUuid('id');
+    Route::post('/{id}/cancel', [MaximusAssistantController::class, 'cancelPlan'])->whereUuid('id');
+});
 Route::middleware(['maximus.central', 'maximus.auth'])->prefix('maximus-assistant/actions')->group(function (): void {
     Route::post('/preview', [MaximusAssistantController::class, 'previewAction']);
     Route::post('/execute', [MaximusAssistantController::class, 'executeAction']);

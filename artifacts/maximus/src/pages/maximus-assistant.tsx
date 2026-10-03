@@ -30,6 +30,7 @@ import {
   type MaximusAssistantResponse,
 } from '@/lib/maximus-assistant-api';
 import { parseMaxiActionRequest } from '@/lib/maxi-actions';
+import { MaxiSupervisedPlans } from '@/components/maxi-supervised-plans';
 
 export type MaximusWorkspaceContext = {
   name: string;
@@ -81,6 +82,7 @@ type MaximusAssistantProps = {
   onExecuteAction: (action: MaximusAssistantAction) => Promise<MaximusAssistantResponse>;
   loading?: boolean;
   initialQuestion?: string;
+  onWorkspaceChanged?: () => Promise<unknown> | unknown;
 };
 
 const suggestedPrompts = [
@@ -320,6 +322,7 @@ export function MaximusAssistantPage({
   onExecuteAction,
   loading = false,
   initialQuestion = '',
+  onWorkspaceChanged,
 }: MaximusAssistantProps) {
   const [question, setQuestion] = useState(initialQuestion);
   const [conversationThreads, setConversationThreads] = useState<ConversationThread[]>(loadConversationThreads);
@@ -801,6 +804,8 @@ export function MaximusAssistantPage({
           )}
         </footer>
       </section>
+
+      <MaxiSupervisedPlans onWorkspaceChanged={onWorkspaceChanged} disabled={loading || submitting} threadKey={activeThread?.id} />
 
       <section aria-labelledby="assistant-insights-title">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">

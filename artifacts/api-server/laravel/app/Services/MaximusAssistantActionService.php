@@ -10,6 +10,33 @@ use RuntimeException;
 final class MaximusAssistantActionService
 {
     /**
+     * Validate a whole proposal in memory, including dependencies between steps.
+     * This never writes the workspace or publishes the catalogue.
+     *
+     * @param array<int, array<string, mixed>> $steps
+     * @return array<int, array<string, mixed>>
+     */
+    public function validatePlan(array $steps): array
+    {
+        $state = $this->workspaceState();
+        $result = [];
+        foreach ($steps as $index => $step) {
+            if (!is_array($step['action'] ?? null)) {
+                throw new RuntimeException('Chaque étape doit préciser une action autorisée.');
+            }
+            $action = $this->normalizeAndValidate($step['action'], $state);
+            $result[] = [
+                'index' => $index,
+                'title' => mb_substr(trim((string) ($step['title'] ?? $action['name'])), 0, 200),
+                'action' => $action,
+                'status' => 'PENDING_CONFIRMATION',
+            ];
+            $this->apply($state, $action);
+        }
+        return $result;
+    }
+
+    /**
      * @param array<string, mixed> $action
      * @return array{answer: string, citations: array<int, string>, provider: string, model: string, action: array<string, mixed>}
      */
@@ -182,6 +209,10 @@ final class MaximusAssistantActionService
      */
     private function normalizeOrganizationAction(array $action, array $state): array
     {
+        $id = Str::slug((string) ($action['id'] ?? ('org-'.Str::lower(Str::random(12)))));
+        if ($id === '' || $this->findOrganizationNode($state, $id) !== null) {
+            throw new RuntimeException('L’identifiant de cette unité est invalide ou existe déjà.');
+        }
         $companyReference = trim((string) ($action['companyId'] ?? ''));
         $company = collect(is_array($state['companies'] ?? null) ? $state['companies'] : [])
             ->first(static fn (mixed $item): bool => is_array($item)
@@ -253,7 +284,7 @@ final class MaximusAssistantActionService
 
         return [
             'type' => 'create_organization_unit',
-            'id' => 'org-'.Str::lower(Str::random(12)),
+            'id' => $id,
             'companyId' => $companyId,
             'companyName' => (string) ($company['name'] ?? $companyId),
             'name' => $name,
@@ -376,6 +407,12 @@ final class MaximusAssistantActionService
      */
     private function normalizeCompanyPlanAction(array $action, array $state): array
     {
+        $id = Str::slug((string) ($action['id'] ?? ('company-plan-'.Str::lower(Str::random(12)))));
+        if ($id === '' || collect($state['companySetupPlans'] ?? [])->contains(
+            fn (mixed $plan): bool => is_array($plan) && ($plan['id'] ?? null) === $id,
+        )) {
+            throw new RuntimeException('L’identifiant de ce plan d’entreprise est invalide ou existe déjà.');
+        }
         $name = trim((string) ($action['name'] ?? ''));
         $sector = trim((string) ($action['sector'] ?? ''));
         $moduleIds = [];
@@ -398,7 +435,7 @@ final class MaximusAssistantActionService
 
         return [
             'type' => 'create_company_plan',
-            'id' => 'company-plan-'.Str::lower(Str::random(12)),
+            'id' => $id,
             'name' => $name,
             'sector' => $sector,
             'managerName' => trim((string) ($action['managerName'] ?? '')),
@@ -449,6 +486,11 @@ final class MaximusAssistantActionService
         }
         if (array_diff($featureIds, $knownFeatureIds) !== []) {
             throw new RuntimeException('Le pack référence une fonctionnalité absente du module.');
+        }
+        if (collect($existingPacks)->contains(
+            fn (mixed $existing): bool => is_array($existing) && ($existing['id'] ?? null) === $id,
+        )) {
+            throw new RuntimeException('Ce module contient déjà un pack portant cet identifiant.');
         }
 
         return [
@@ -505,7 +547,6 @@ final class MaximusAssistantActionService
                 $base = $this->findModule($state, $moduleId) ?? [];
                 $override['featurePacks'] = [
                     ...(is_array($base['featurePacks'] ?? null) ? $base['featurePacks'] : []),
-                    ...(is_array($override['featurePacks'] ?? null) ? $override['featurePacks'] : []),
                     [
                         'id' => $action['id'],
                         'name' => $action['name'],
@@ -636,10 +677,10 @@ final class MaximusAssistantActionService
             ?? [];
         return [
             ...$definition,
-            'featurePacks' => [
+            'featurePacks' => collect([
                 ...($definition['feature_packs'] ?? []),
                 ...($override['featurePacks'] ?? []),
-            ],
+            ])->keyBy('id')->values()->all(),
             'features' => $override['features'] ?? ($definition['features'] ?? []),
         ];
     }

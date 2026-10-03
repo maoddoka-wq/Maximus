@@ -97,6 +97,7 @@ export function AdminRouter({
       onAsk: onAskAssistant,
       onPreviewAction: onPreviewAssistantAction,
       onExecuteAction: onExecuteAssistantAction,
+      onWorkspaceChanged: onRefresh,
     });
   }
   if (getAdminControlRoute(location) === 'coordination') {

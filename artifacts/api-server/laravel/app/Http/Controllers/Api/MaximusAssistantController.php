@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\AnthropicAssistantService;
 use App\Services\MaximusAssistantActionService;
+use App\Services\MaximusAssistantPlanService;
 use App\Support\ModuleCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,88 @@ use Illuminate\Support\Facades\DB;
 
 class MaximusAssistantController extends Controller
 {
+    public function listPlans(Request $request, MaximusAssistantPlanService $plans): JsonResponse
+    {
+        if (!$this->isMaximusAdmin($request)) return $this->adminOnlyResponse();
+        return response()->json(['plans' => $plans->list($this->planActor($request))])
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    public function preparePlan(Request $request, AnthropicAssistantService $assistant, MaximusAssistantPlanService $plans): JsonResponse
+    {
+        if (!$this->isMaximusAdmin($request)) return $this->adminOnlyResponse();
+        $data = $request->validate(['goal' => ['required', 'string', 'min:3', 'max:4000']]);
+        try {
+            $goal = trim($data['goal']);
+            if ($goal === '') {
+                throw new \RuntimeException('Décrivez un objectif avant de préparer le plan.');
+            }
+            return response()->json($plans->prepare(
+                $goal, $assistant->plan($goal, $this->workspaceContext()),
+                $this->planActor($request),
+            ));
+        } catch (\RuntimeException $exception) {
+            return response()->json(['error' => $exception->getMessage()], 422);
+        } catch (\Throwable $exception) {
+            if ($exception instanceof \Illuminate\Validation\ValidationException) throw $exception;
+            report($exception);
+            return response()->json(['error' => 'MAXI n’a pas pu préparer le plan. Réessayez dans quelques instants.'], 503);
+        }
+    }
+
+    public function showPlan(Request $request, string $id, MaximusAssistantPlanService $plans): JsonResponse
+    {
+        if (!$this->isMaximusAdmin($request)) return $this->adminOnlyResponse();
+        return response()->json($plans->get($id, $this->planActor($request)))
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    public function previewPlan(Request $request, string $id, MaximusAssistantPlanService $plans): JsonResponse
+    {
+        if (!$this->isMaximusAdmin($request)) return $this->adminOnlyResponse();
+        $data = $request->validate(['step' => ['required', 'integer', 'min:0', 'max:7']]);
+        try {
+            return response()->json($plans->preview($id, $data['step'], $this->planActor($request)));
+        } catch (\RuntimeException $exception) {
+            if ($exception instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) throw $exception;
+            return response()->json(['error' => $exception->getMessage()], 422);
+        }
+    }
+
+    public function executePlan(Request $request, string $id, MaximusAssistantPlanService $plans): JsonResponse
+    {
+        if (!$this->isMaximusAdmin($request)) return $this->adminOnlyResponse();
+        $data = $request->validate([
+            'step' => ['required', 'integer', 'min:0', 'max:7'],
+            'token' => ['required', 'string', 'size:64'],
+            'confirmed' => ['required', 'accepted'],
+            'action' => ['prohibited'],
+        ]);
+        try {
+            return response()->json($plans->execute(
+                $id, $data['step'], $data['token'], $this->planActor($request),
+            ));
+        } catch (\RuntimeException $exception) {
+            if ($exception instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) throw $exception;
+            return response()->json(['error' => $exception->getMessage()], 422);
+        }
+    }
+
+    public function cancelPlan(Request $request, string $id, MaximusAssistantPlanService $plans): JsonResponse
+    {
+        if (!$this->isMaximusAdmin($request)) return $this->adminOnlyResponse();
+        $request->validate(['confirmed' => ['required', 'accepted']]);
+        return response()->json($plans->cancel($id, $this->planActor($request)));
+    }
+
+    private function planActor(Request $request): array
+    {
+        return [
+            ...(array) $request->attributes->get('authActor'),
+            'id' => (string) $request->attributes->get('authUser')?->getKey(),
+        ];
+    }
+
     public function ask(Request $request, AnthropicAssistantService $assistant): JsonResponse
     {
         $actor = $request->attributes->get('authActor');
@@ -203,6 +286,33 @@ class MaximusAssistantController extends Controller
             'moduleCount' => is_array($draft['moduleOverrides'] ?? null) ? count($draft['moduleOverrides']) : 0,
             'sectorCount' => is_array($draft['sectorPresets'] ?? null) ? count($draft['sectorPresets']) : 0,
             'hasChanges' => (bool) ($draft['hasChanges'] ?? true),
+            'customModules' => collect($draft['customModules'] ?? [])->filter('is_array')
+                ->map(fn (array $module): array => [
+                    'id' => $module['id'] ?? '', 'name' => $module['name'] ?? '',
+                    'description' => $module['description'] ?? '',
+                    'features' => $module['features'] ?? [],
+                    'packs' => collect($module['featurePacks'] ?? [])->filter('is_array')->map(
+                        fn (array $pack): array => [
+                            'id' => $pack['id'] ?? '', 'name' => $pack['name'] ?? '',
+                            'featureIds' => $pack['featureIds'] ?? [],
+                        ],
+                    )->values()->all(),
+                ])->values()->all(),
+            'moduleOverrides' => collect($draft['moduleOverrides'] ?? [])->filter('is_array')
+                ->map(fn (array $module): array => [
+                    'features' => $module['features'] ?? [],
+                    'packs' => collect($module['featurePacks'] ?? [])->filter('is_array')->map(
+                        fn (array $pack): array => [
+                            'id' => $pack['id'] ?? '', 'name' => $pack['name'] ?? '',
+                            'featureIds' => $pack['featureIds'] ?? [],
+                        ],
+                    )->values()->all(),
+                ])->all(),
+            'sectors' => collect($draft['sectorPresets'] ?? [])->filter('is_array')
+                ->map(fn (array $sector): array => [
+                    'id' => $sector['id'] ?? '', 'name' => $sector['name'] ?? '',
+                    'moduleIds' => $sector['moduleIds'] ?? [],
+                ])->values()->all(),
         ];
     }
 }

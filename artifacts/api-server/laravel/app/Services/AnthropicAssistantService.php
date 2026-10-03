@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\Response;
 use RuntimeException;
 
 final class AnthropicAssistantService
@@ -14,13 +15,7 @@ final class AnthropicAssistantService
      */
     public function ask(string $question, array $context, array $history = []): array
     {
-        $apiKey = (string) config('services.anthropic.key');
-        $model = (string) config('services.anthropic.model', 'claude-sonnet-4-5');
-        $url = (string) config('services.anthropic.url', 'https://api.anthropic.com/v1/messages');
-
-        if (trim($apiKey) === '') {
-            throw new RuntimeException('MAXI n’est pas configuré sur le serveur.');
-        }
+        $model = (string) config('services.maxi_local.model', 'maxi-local');
 
         $messages = [];
         foreach (array_slice($history, -8) as $message) {
@@ -38,43 +33,12 @@ final class AnthropicAssistantService
         }
         $messages[] = ['role' => 'user', 'content' => $question];
 
-        $response = Http::withHeaders([
-            'x-api-key' => $apiKey,
-            'anthropic-version' => '2023-06-01',
-            'accept' => 'application/json',
-        ])->timeout(35)->post($url, [
+        $response = $this->localModelRequest([
             'model' => $model,
             'max_tokens' => 2048,
             'system' => $this->systemPrompt($context),
             'messages' => $messages,
         ]);
-
-        if ($response->failed()) {
-            $errorMessage = strtolower((string) $response->json('error.message', ''));
-            $errorType = (string) $response->json('error.type', 'unknown_error');
-            report(new RuntimeException(
-                'Anthropic request failed with HTTP '.$response->status().' ('.$errorType.').'
-            ));
-
-            if (
-                str_contains($errorMessage, 'credit balance')
-                || str_contains($errorMessage, 'purchase credits')
-            ) {
-                throw new RuntimeException(
-                    'Le compte Anthropic n’a plus de crédit disponible. Ajoutez des crédits dans Plans & Billing, puis réessayez.'
-                );
-            }
-
-            if ($response->status() === 401) {
-                throw new RuntimeException('La clé Anthropic configurée sur le serveur est invalide.');
-            }
-
-            if ($response->status() === 429) {
-                throw new RuntimeException('MAXI a atteint une limite temporaire. Réessayez dans quelques instants.');
-            }
-
-            throw new RuntimeException('MAXI n’a pas pu répondre pour le moment.');
-        }
 
         $text = collect($response->json('content', []))
             ->filter(fn (mixed $block): bool => is_array($block) && ($block['type'] ?? null) === 'text')
@@ -93,9 +57,115 @@ final class AnthropicAssistantService
                 'Catalogue des modules et packs',
                 'Organisation et accès',
             ],
-            'provider' => 'anthropic',
+            'provider' => 'local',
             'model' => $model,
         ];
+    }
+
+    /** A model may propose tools; it never gets an execution channel. */
+    public function plan(string $goal, array $context): array
+    {
+        $stringList = ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 40];
+        $properties = [
+            'type' => ['type' => 'string', 'enum' => [
+                'create_module', 'create_pack', 'create_feature', 'create_sector',
+                'create_company_plan', 'create_organization_unit',
+            ]],
+        ];
+        foreach (['id', 'name', 'description', 'sector', 'companyEmail', 'managerName', 'moduleId', 'companyId', 'companyName', 'code', 'parentId'] as $key) {
+            $properties[$key] = ['type' => 'string'];
+        }
+        foreach (['features', 'featureIds', 'moduleIds', 'requirements', 'nextSteps', 'dependencies'] as $key) {
+            $properties[$key] = $stringList;
+        }
+        foreach (['modulePackIds', 'moduleFeatures'] as $key) {
+            $properties[$key] = ['type' => 'object', 'additionalProperties' => $stringList];
+        }
+        $properties['featurePacks'] = [
+            'type' => 'array', 'maxItems' => 20, 'items' => [
+                'type' => 'object', 'properties' => [
+                    'id' => ['type' => 'string'], 'name' => ['type' => 'string'],
+                    'description' => ['type' => 'string'], 'featureIds' => $stringList,
+                ], 'required' => ['name', 'description', 'featureIds'], 'additionalProperties' => false,
+            ],
+        ];
+        $response = $this->localModelRequest([
+            'model' => (string) config('services.maxi_local.model', 'maxi-local'),
+            'max_tokens' => 4096,
+            'system' => $this->systemPrompt($context)."\n".implode("\n", [
+                'Mode plan supervisé : propose au maximum huit étapes concrètes, ordonnées selon leurs dépendances.',
+                'Une confirmation humaine DISTINCTE sera nécessaire avant CHAQUE modification. Ne prétends pas avoir exécuté les étapes.',
+                'N’utilise que les six actions du schéma. Aucune publication, suppression, activation de compte, opération financière, requête SQL ou code exécutable.',
+                'create_module exige name, description et features ; create_pack exige moduleId, name, description et featureIds (slugs des fonctionnalités).',
+                'create_feature exige moduleId et name ; create_sector exige name et moduleIds.',
+                'create_company_plan exige name, sector et moduleIds : prépare seulement un plan, jamais une entreprise activée.',
+                'create_organization_unit exige une entreprise EXISTANTE identifiée par companyId, name, code et moduleIds.',
+                'Réutilise les identifiants du contexte. Un module créé dans une étape peut être utilisé dans les suivantes avec le même id.',
+                'Ne crée pas un module si le contexte en contient déjà un équivalent. Les modifications de catalogue restent en brouillon.',
+                'Si des données nécessaires manquent ou si la demande est hors de ces capacités, retourne questions et steps vide. Ne remplis jamais les inconnues avec des exemples ou des coordonnées fictives.',
+            ]),
+            'messages' => [['role' => 'user', 'content' => $goal]],
+            'tool_choice' => ['type' => 'tool', 'name' => 'propose_supervised_plan'],
+            'tools' => [[
+                'name' => 'propose_supervised_plan',
+                'description' => 'Préparer un plan administratif validé par un humain étape par étape, sans exécuter.',
+                'input_schema' => [
+                    'type' => 'object', 'required' => ['title', 'summary', 'steps', 'questions'],
+                    'properties' => [
+                        'title' => ['type' => 'string', 'maxLength' => 200],
+                        'summary' => ['type' => 'string', 'maxLength' => 4000],
+                        'questions' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 8],
+                        'steps' => ['type' => 'array', 'maxItems' => 8, 'items' => [
+                            'type' => 'object', 'required' => ['title', 'action'], 'properties' => [
+                                'title' => ['type' => 'string', 'maxLength' => 200],
+                                'action' => ['type' => 'object', 'required' => ['type', 'name'],
+                                    'properties' => $properties, 'additionalProperties' => false],
+                            ], 'additionalProperties' => false,
+                        ]],
+                    ], 'additionalProperties' => false,
+                ],
+            ]],
+        ]);
+        $blocks = collect($response->json('content', []))->filter(
+            fn (mixed $block): bool => is_array($block) && ($block['type'] ?? null) === 'tool_use'
+                && ($block['name'] ?? null) === 'propose_supervised_plan',
+        );
+        if ($response->json('stop_reason') === 'max_tokens' || $blocks->count() !== 1
+            || !is_array($blocks->first()['input'] ?? null)) {
+            throw new RuntimeException('MAXI n’a pas retourné un plan complet et exploitable. Précisez votre objectif puis réessayez.');
+        }
+        return $blocks->first()['input'];
+    }
+
+    private function localModelRequest(array $body): Response
+    {
+        $url = (string) config('services.maxi_local.url', '');
+        $parts = parse_url($url);
+        if (!is_array($parts) || ($parts['scheme'] ?? '') !== 'http'
+            || !in_array($parts['host'] ?? '', ['127.0.0.1', '[::1]'], true)
+            || isset($parts['user']) || isset($parts['pass'])) {
+            throw new RuntimeException('Les API d’IA externes sont désactivées pour MAXI. Son modèle local n’est pas encore configuré.');
+        }
+        $response = Http::withHeaders([
+            'accept' => 'application/json',
+        ])->withOptions(['allow_redirects' => false])->timeout(60)->post(
+            $url,
+            $body,
+        );
+        if ($response->failed()) {
+            $errorType = (string) $response->json('error.type', 'unknown_error');
+            report(new RuntimeException(
+                'MAXI local model failed with HTTP '.$response->status().' ('.$errorType.').'
+            ));
+
+            if ($response->status() === 429) {
+                throw new RuntimeException('MAXI a atteint une limite temporaire. Réessayez dans quelques instants.');
+            }
+
+            throw new RuntimeException('Le modèle local de MAXI n’a pas pu répondre pour le moment.');
+        }
+
+        return $response;
     }
 
     /**

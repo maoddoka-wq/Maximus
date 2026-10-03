@@ -14,6 +14,12 @@ class MaximusAssistantTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config()->set('services.maxi_local.url', 'http://127.0.0.1:11434/v1/messages');
+    }
+
     public function test_only_the_main_maximus_admin_can_use_the_claude_assistant(): void
     {
         $companyAdmin = AuthUser::query()->create([
@@ -37,12 +43,12 @@ class MaximusAssistantTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_main_maximus_admin_receives_a_claude_answer_from_server_context(): void
+    public function test_main_maximus_admin_receives_a_local_model_answer_from_server_context(): void
     {
         config()->set('services.anthropic.key', 'test-anthropic-key');
         config()->set('services.anthropic.model', 'claude-sonnet-4-5');
         Http::fake([
-            'https://api.anthropic.com/v1/messages' => Http::response([
+            'http://127.0.0.1:11434/v1/messages' => Http::response([
                 'content' => [
                     ['type' => 'text', 'text' => 'Le catalogue contient plusieurs modules configurables.'],
                 ],
@@ -70,29 +76,21 @@ class MaximusAssistantTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('answer', 'Le catalogue contient plusieurs modules configurables.')
-            ->assertJsonPath('provider', 'anthropic')
-            ->assertJsonPath('model', 'claude-sonnet-4-5');
+            ->assertJsonPath('provider', 'local')
+            ->assertJsonPath('model', 'maxi-local');
 
         Http::assertSent(function ($request): bool {
-            return $request->url() === 'https://api.anthropic.com/v1/messages'
-                && $request->header('x-api-key')[0] === 'test-anthropic-key'
+            return $request->url() === 'http://127.0.0.1:11434/v1/messages'
+                && $request->header('x-api-key') === []
                 && $request['messages'][0]['content'] === 'Quels modules sont disponibles ?'
                 && str_contains($request['system'], 'administration principale');
         });
     }
 
-    public function test_it_explains_when_anthropic_has_no_available_credit(): void
+    public function test_it_refuses_external_ai_without_sending_any_request(): void
     {
-        config()->set('services.anthropic.key', 'test-anthropic-key');
-        Http::fake([
-            'https://api.anthropic.com/v1/messages' => Http::response([
-                'type' => 'error',
-                'error' => [
-                    'type' => 'invalid_request_error',
-                    'message' => 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.',
-                ],
-            ], 400),
-        ]);
+        config()->set('services.maxi_local.url', 'https://api.anthropic.com/v1/messages');
+        Http::fake();
 
         $admin = AuthUser::query()->create([
             'id' => 'assistant-credit-admin',
@@ -108,13 +106,14 @@ class MaximusAssistantTest extends TestCase
         $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $token)
             ->postJson('/api/maximus-assistant/ask', [
-                'question' => 'Vérifier la disponibilité de Claude',
+                'question' => 'Vérifier la disponibilité de MAXI',
             ])
             ->assertStatus(503)
             ->assertJsonPath(
                 'error',
-                'Le compte Anthropic n’a plus de crédit disponible. Ajoutez des crédits dans Plans & Billing, puis réessayez.'
+                'Les API d’IA externes sont désactivées pour MAXI. Son modèle local n’est pas encore configuré.'
             );
+        Http::assertNothingSent();
     }
 
     public function test_maxi_previews_and_confirms_catalog_and_organization_actions(): void
