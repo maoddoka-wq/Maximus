@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuthUser;
 use App\Models\Company;
 use App\Services\PublicRegistrationPolicy;
+use App\Support\CompanyStateBoundary;
 use App\Support\ModuleAuthorization;
 use App\Support\ModuleCatalog;
 use App\Support\RolePermissionAuthorization;
@@ -170,6 +171,7 @@ class AppStateController extends Controller
                 (string) ($actor['companyId'] ?? ''),
             );
             $state = $this->restrictToCompany($state, (string) ($actor['companyId'] ?? ''));
+            $state = $this->restrictBusinessReads($state, $actor);
         } else {
             $state = $this->mergeRegistryCompanies($state);
         }
@@ -391,6 +393,13 @@ class AppStateController extends Controller
                 $companyId = (string) ($actor['companyId'] ?? '');
                 if ($companyId === '') {
                     return response()->json(['error' => 'Aucune entreprise associée à cet acteur.'], 403);
+                }
+                $violation = CompanyStateBoundary::violation(
+                    $currentPayload, $incomingState, $companyId,
+                    (string) ($actor['role'] ?? ''), self::COMPANY_SCOPED_COLLECTIONS,
+                );
+                if ($violation !== null) {
+                    return response()->json(['error' => $violation['error']], $violation['status']);
                 }
                 if (($actor['role'] ?? null) === 'sector_manager'
                     && ! $this->managerStateWriteWithinScope(
@@ -1080,6 +1089,7 @@ class AppStateController extends Controller
         if ($companyId === '') {
             return [];
         }
+        unset($state['companySetupPlans'], $state['catalogDraft']);
 
         foreach (self::COMPANY_SCOPED_COLLECTIONS as $key) {
             if (!isset($state[$key]) || !is_array($state[$key])) {
@@ -1095,6 +1105,27 @@ class AppStateController extends Controller
             $state['commerceStates'] = array_key_exists($companyId, $state['commerceStates'])
                 ? [$companyId => $state['commerceStates'][$companyId]]
                 : [];
+        }
+
+        return $state;
+    }
+
+    /** UI visibility is not authorization: project business records on the server. */
+    private function restrictBusinessReads(array $state, array $actor): array
+    {
+        if (($actor['role'] ?? null) === 'company_admin') {
+            return $state;
+        }
+
+        foreach (self::EMPLOYEE_WRITABLE_COLLECTIONS as $collection) {
+            if (! isset($state[$collection]) || ! is_array($state[$collection])) {
+                continue;
+            }
+            $state[$collection] = array_values(array_filter(
+                $state[$collection],
+                fn (mixed $record): bool => is_array($record)
+                    && $this->allowsCollectionAction($actor, $collection, 'view', $record),
+            ));
         }
 
         return $state;
@@ -1128,16 +1159,15 @@ class AppStateController extends Controller
             }
 
             $isCompanyScopedCollection = in_array($key, self::COMPANY_SCOPED_COLLECTIONS, true);
+            if (! $isCompanyScopedCollection || ! array_is_list($value)) {
+                // Never recursively merge browser-controlled maps into shared state.
+                continue;
+            }
             if (!isset($current[$key]) || !is_array($current[$key])) {
                 if (!$isCompanyScopedCollection) {
                     continue;
                 }
                 $current[$key] = [];
-            }
-
-            if (!array_is_list($value)) {
-                $current[$key] = array_replace_recursive($current[$key], $value);
-                continue;
             }
 
             $existing = collect($current[$key]);

@@ -12,10 +12,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Concerns\CreatesPublicStoreAccess;
 
 class EcommerceDigitalProductTest extends TestCase
 {
     use RefreshDatabase;
+    use CreatesPublicStoreAccess;
 
     public function test_digital_sales_need_an_explicit_grant_and_a_private_file_before_publication(): void
     {
@@ -173,6 +175,7 @@ class EcommerceDigitalProductTest extends TestCase
 
     private function createStore(string $companyId, string $slug): void
     {
+        $this->authorizePublicStore($companyId);
         DB::table('ecommerce_stores')->insert([
             'id' => 'store-'.$companyId,
             'company_id' => $companyId,

@@ -3,6 +3,12 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
+    "audit:inventory": "node scripts/maintenance/inventory.mjs",
+    "audit:licenses": "node scripts/maintenance/licenses.mjs",
+    "test:php": "node scripts/maintenance/test-laravel.mjs",
+    "test:legacy": "pnpm --filter @workspace/api-server test",
+    "test": "pnpm run test:php && pnpm --filter @workspace/maximus test && pnpm --filter @workspace/maximus-chauffeur test",
+    "verify:local": "pnpm run typecheck && pnpm test && git diff --check",
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",

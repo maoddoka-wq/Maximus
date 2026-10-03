@@ -393,7 +393,7 @@ class TransportTest extends TestCase
             ->assertJsonPath('trackingIntervalSeconds', 10)
             ->assertJsonPath('baseFare', 750)
             ->assertJsonPath('pricePerKm', 425)
-            ->assertJsonPath('heroImageUrl', '/api/transport/settings/hero-image');
+            ->assertJsonPath('heroImageUrl', '/api/transport/settings/hero-image/0');
         $request->get('/api/transport/settings/hero-image?companyId=kora')
             ->assertOk()
             ->assertHeader('Content-Type', 'image/png');
@@ -404,7 +404,7 @@ class TransportTest extends TestCase
             ->assertJsonPath('settings.trackingIntervalSeconds', 10)
             ->assertJsonPath('settings.baseFare', 750)
             ->assertJsonPath('settings.pricePerKm', 425)
-            ->assertJsonPath('settings.heroImageUrl', '/api/transport/settings/hero-image');
+            ->assertJsonPath('settings.heroImageUrl', '/api/transport/settings/hero-image/0');
 
         $request->patchJson('/api/transport/settings?companyId=kora', [
             'gpsValidityMinutes' => 8,

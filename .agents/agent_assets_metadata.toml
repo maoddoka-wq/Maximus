@@ -406,3 +406,17 @@ mtime_ms = 1790381615261
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/cc0208a2-7470-4400-aefc-d0cd9b6ca7da/901e9aa3-a04b-4e8c-905c-7237a671418a"
 storage_version_token = "1790381615839400"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "G63l48u-ahrW_kV-IgnfW"
+uri = "file://reports/maximus-code-audit-2026-10-03.html"
+type = "html"
+title = "MAXIMUS — Rapport d’audit du code"
+description = "Corrections réalisées, résultats des tests, licences et propriété, limites de l’audit et travaux de maintenance restants."
+logical_id = "269f38f0-763f-494c-a040-ff751c5cbf22"
+content_hash = "sha256:2269b80ed9114c4d4efcd6f29cb24ccf987975cfef8740431270103a5e76292c"
+size = 10645
+mtime_ms = 1791024964808
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/269f38f0-763f-494c-a040-ff751c5cbf22/6e637a61-64dc-4a0c-9c47-0b5c48ff3527"
+storage_version_token = "1791024965355043"
+content_type = "text/html"

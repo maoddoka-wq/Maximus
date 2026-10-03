@@ -1,4 +1,7 @@
 .git
+artifacts/maximus-windows-sync-fix
+**/*.zip
+**/*.apk
 .local
 .agents
 node_modules

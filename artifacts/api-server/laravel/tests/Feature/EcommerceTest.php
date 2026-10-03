@@ -1234,8 +1234,8 @@ class EcommerceTest extends TestCase
         ]);
 
         $this->getJson('http://unknown-domain.test/api/shop-domain')
-            ->assertOk()
-            ->assertJson(['available' => false]);
+            ->assertNotFound()
+            ->assertJsonPath('code', 'PUBLIC_SITE_UNAVAILABLE');
     }
 
     public function test_active_custom_domain_is_disabled_when_dns_proof_disappears_and_can_be_reverified(): void
@@ -1272,8 +1272,8 @@ class EcommerceTest extends TestCase
         );
 
         $this->getJson('http://'.$domain.'/api/shop-domain')
-            ->assertOk()
-            ->assertJson(['available' => false]);
+            ->assertNotFound()
+            ->assertJsonPath('code', 'PUBLIC_SITE_UNAVAILABLE');
         $this->assertDatabaseHas('ecommerce_domains', [
             'id' => 'domain-dns-revalidation',
             'status' => 'PENDING',

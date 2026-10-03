@@ -53,6 +53,9 @@ trap cleanup EXIT
 package_dir="$temp_dir/maximus-$local_version"
 mkdir -p "$package_dir"
 tar \
+    --exclude='./artifacts/maximus-windows-sync-fix' \
+    --exclude='*.zip' \
+    --exclude='*.apk' \
     --exclude='./.git' \
     --exclude='./.local' \
     --exclude='./.cache' \

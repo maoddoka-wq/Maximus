@@ -1,5 +1,8 @@
 # MAXIMUS ERP
 
+Guide de reprise et commandes de vérification :
+[Maintenance par un humain](docs/guides/human-maintenance.md).
+
 MAXIMUS est un ERP SaaS multi-entreprises en français. L’application permet à
 une équipe MAXIMUS d’administrer les entreprises, puis à chaque entreprise de
 configurer ses unités, ses rôles, ses employés, ses modules et ses permissions.

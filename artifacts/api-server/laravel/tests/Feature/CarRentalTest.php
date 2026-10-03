@@ -8,10 +8,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
+use Tests\Concerns\CreatesPublicStoreAccess;
 
 class CarRentalTest extends TestCase
 {
     use RefreshDatabase;
+    use CreatesPublicStoreAccess;
 
     public function test_location_owner_permissions_are_checked_for_read_and_write(): void
     {
@@ -197,6 +199,7 @@ class CarRentalTest extends TestCase
 
     private function createStore(string $company, string $slug): void
     {
+        $this->authorizePublicStore($company);
         DB::table('ecommerce_stores')->insert([
             'id' => 'store-'.$slug, 'company_id' => $company, 'slug' => $slug,
             'name' => 'Boutique voitures', 'description' => '', 'status' => 'PUBLISHED',

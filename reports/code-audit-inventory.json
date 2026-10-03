@@ -1,0 +1,122 @@
+{
+  "trackedFiles": 7413,
+  "nestedArchiveFiles": 5440,
+  "nestedArchiveDepth": 10,
+  "composerLocks": [
+    "artifacts/api-server/laravel/composer.lock",
+    "artifacts/maximus-windows-sync-fix/artifacts/api-server/laravel/composer.lock",
+    "artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/api-server/laravel/composer.lock",
+    "artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/api-server/laravel/composer.lock",
+    "artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/api-server/laravel/composer.lock",
+    "artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/api-server/laravel/composer.lock",
+    "artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/api-server/laravel/composer.lock",
+    "artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/api-server/laravel/composer.lock",
+    "artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/api-server/laravel/composer.lock",
+    "artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/api-server/laravel/composer.lock",
+    "artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/maximus-windows-sync-fix/artifacts/api-server/laravel/composer.lock"
+  ],
+  "sourceFiles": 1240,
+  "largestSourceFiles": [
+    {
+      "path": "artifacts/maximus/src/App.tsx",
+      "lines": 9573
+    },
+    {
+      "path": "artifacts/maximus/src/pages/public-shop.tsx",
+      "lines": 2810
+    },
+    {
+      "path": "artifacts/api-server/laravel/app/Http/Controllers/Api/EcommerceController.php",
+      "lines": 2693
+    },
+    {
+      "path": "artifacts/api-server/laravel/app/Http/Controllers/Api/TransportController.php",
+      "lines": 2617
+    },
+    {
+      "path": "artifacts/api-server/laravel/tests/Feature/EcommerceTest.php",
+      "lines": 1756
+    },
+    {
+      "path": "artifacts/maximus-vtc-transport-location/src/.sdm/SdmInteractionLayer.tsx",
+      "lines": 1570
+    },
+    {
+      "path": "artifacts/maximus-nsg-presentation/src/.sdm/SdmInteractionLayer.tsx",
+      "lines": 1559
+    },
+    {
+      "path": "lib/api-client-react/src/generated/api.ts",
+      "lines": 1407
+    },
+    {
+      "path": "artifacts/maximus-preparation-deck/src/.sdm/SdmInteractionLayer.tsx",
+      "lines": 1390
+    },
+    {
+      "path": "artifacts/maximus/src/pages/ecommerce-module.tsx",
+      "lines": 1317
+    },
+    {
+      "path": "artifacts/maximus/src/pages/transport-module.tsx",
+      "lines": 1292
+    },
+    {
+      "path": "artifacts/api-server/laravel/app/Http/Controllers/Api/AppStateController.php",
+      "lines": 1226
+    },
+    {
+      "path": "artifacts/api-server/laravel/tests/Feature/AppStateRecoveryTest.php",
+      "lines": 1165
+    },
+    {
+      "path": "artifacts/api-server/laravel/tests/Feature/TransportTest.php",
+      "lines": 1048
+    },
+    {
+      "path": "artifacts/maximus-vtc-transport-location/src/.sdm/render.tsx",
+      "lines": 1038
+    },
+    {
+      "path": "artifacts/api-server/laravel/app/Support/ModuleCatalog.php",
+      "lines": 1020
+    },
+    {
+      "path": "artifacts/maximus-nsg-presentation/src/.sdm/render.tsx",
+      "lines": 1006
+    },
+    {
+      "path": "artifacts/maximus-preparation-deck/src/.sdm/render.tsx",
+      "lines": 993
+    },
+    {
+      "path": "artifacts/api-server/laravel/tests/Feature/SellerWalletTest.php",
+      "lines": 987
+    },
+    {
+      "path": "artifacts/maximus-nsg-presentation/src/.sdm/core/motion.ts",
+      "lines": 976
+    },
+    {
+      "path": "artifacts/maximus-preparation-deck/src/.sdm/core/motion.ts",
+      "lines": 976
+    },
+    {
+      "path": "artifacts/maximus-vtc-transport-location/src/.sdm/core/motion.ts",
+      "lines": 976
+    },
+    {
+      "path": "artifacts/maximus-nsg-presentation/src/.sdm/core/layoutValidation.ts",
+      "lines": 964
+    },
+    {
+      "path": "artifacts/maximus-vtc-transport-location/src/.sdm/core/layoutValidation.ts",
+      "lines": 964
+    },
+    {
+      "path": "artifacts/maximus-preparation-deck/src/.sdm/core/layoutValidation.ts",
+      "lines": 957
+    }
+  ],
+  "trackedDependenciesOrBuilds": []
+}

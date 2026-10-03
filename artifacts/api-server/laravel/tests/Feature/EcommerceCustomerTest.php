@@ -11,10 +11,12 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Concerns\CreatesPublicStoreAccess;
 
 class EcommerceCustomerTest extends TestCase
 {
     use RefreshDatabase;
+    use CreatesPublicStoreAccess;
 
     public function test_customer_registration_session_and_order_are_persisted(): void
     {
@@ -309,6 +311,7 @@ class EcommerceCustomerTest extends TestCase
 
     private function createStore(string $companyId, string $slug): void
     {
+        $this->authorizePublicStore($companyId);
         DB::table('ecommerce_stores')->insert([
             'id' => 'store-'.$companyId,
             'company_id' => $companyId,

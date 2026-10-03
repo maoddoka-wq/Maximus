@@ -1,0 +1,102 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MAXIMUS — Audit du code et maintenance humaine</title><style>body{font:16px/1.65 system-ui,sans-serif;color:#202020;background:#eee;margin:0;padding:24px}main{max-width:980px;margin:auto;background:white;padding:44px;border:1px solid #ddd}h1{font-size:30px;line-height:1.25}h2{font-size:23px;margin-top:38px;border-bottom:1px solid #ddd;padding-bottom:10px}h3{font-size:18px}p,li{max-width:90ch}table{width:100%;border-collapse:collapse;font-size:14px}td{border:1px solid #ccc;padding:10px;vertical-align:top}tr:first-child{font-weight:700;background:#f3f3f3}code{font-size:.88em;background:#f3f3f3;padding:2px 4px;overflow-wrap:anywhere}pre{background:#f3f3f3;padding:18px;overflow:auto;white-space:pre-wrap}pre code{padding:0}small{color:#555}@media(max-width:650px){body{padding:8px}main{padding:20px}table{font-size:12px}}@media print{body{background:white;padding:0}main{border:0;padding:0}h2{break-after:avoid}tr{break-inside:avoid}}</style></head><body><main><small>MAXIMUS · Rapport technique · 3 octobre 2026</small><h1>Audit du code MAXIMUS — 3 octobre 2026</h1>
+<h2>Conclusion</h2>
+<p>L’audit global et un premier nettoyage sécurisé sont réalisés. Ils ne constituent</p>
+<p>ni une certification de sécurité, ni une preuve juridique de propriété, ni une</p>
+<p>refonte complète de l’application.</p>
+<p>Le typage de tous les packages déclarés passe. Le build ERP passe. La suite</p>
+<p>Laravel passe avec <strong>359 tests et 2 581 assertions</strong> ; les suites ERP et Chauffeur</p>
+<p>passent avec <strong>263 et 49 tests</strong>. Express a **6 tests réussis et 6 intégrations</p>
+<p>ignorées**, faute de base PostgreSQL de test explicitement configurée dans ce</p>
+<p>passage local. La CI fournit une base isolée pour ces intégrations.</p>
+<h2>Périmètre et méthode</h2>
+<ul>
+<li>Inventaire du dépôt : 7 413 fichiers suivis au début de l’audit.</li>
+<li>5 440 fichiers appartiennent à une archive Windows extraite, imbriquée jusqu’à dix niveaux. Onze lockfiles Composer sont présents, dont un seul pour Laravel actif.</li>
+<li>Revue ciblée de l’architecture, de l’état partagé, des permissions et de MAXI.</li>
+<li>Exécution des suites existantes, ajout de huit régressions HTTP, typage et build.</li>
+<li>Trois scans : dépendances, analyse statique et flux de données.</li>
+<li>Inventaires des licences pnpm et du lockfile Composer actif.</li>
+</ul>
+<p>La revue humaine est ciblée, pas une lecture de chaque ligne des 7 413 fichiers.</p>
+<p>Les routes publiques ont une couverture partielle. Les tests Laravel locaux</p>
+<p>utilisent SQLite en mémoire ; ils ne prouvent pas la parité PostgreSQL complète,</p>
+<p>ni les parcours navigateur, ni le fonctionnement de l’APK sur un téléphone réel.</p>
+<h2>Corrections livrées</h2>
+<table><tbody>
+<tr><td>Problème constaté</td><td>Correction et preuve</td></tr>
+<tr><td>Collection associative fusionnée récursivement avant filtrage entreprise</td><td>Validation de la forme et suppression de cette fusion ; requête rejetée en 422</td></tr>
+<tr><td>Modification du catalogue partagé par un administrateur entreprise</td><td>Catalogue identique accepté ; modification globale refusée en 403</td></tr>
+<tr><td>Réattribution d’un identifiant détenu par une autre entreprise</td><td>Vérification du propriétaire avant fusion ; refus en 403</td></tr>
+<tr><td>Plans internes MAXI et catalogue brouillon présents dans les réponses entreprise</td><td>Retrait de ces clés pour les comptes non-MAXIMUS</td></tr>
+<tr><td>Paie/documents et autres collections métier lus sans droit de fonctionnalité</td><td>Projection du bootstrap réutilisant l’autorisation de lecture existante</td></tr>
+<tr><td>Identifiants composés pouvant provoquer une erreur serveur</td><td>Validation explicite des identifiants de record et d’entreprise</td></tr>
+<tr><td>Tests ne représentant plus l’autorisation publique et les contrats actuels</td><td>Trait commun de fixture publique, attentes de domaine et galerie corrigées</td></tr>
+<tr><td>Header Bearer d’installation conservé pendant une action administrateur</td><td>Nettoyage du header dans le test, sans modifier l’authentification de production</td></tr>
+<tr><td>Absence de tests Laravel dans la CI</td><td>Étape Laravel ajoutée</td></tr>
+<tr><td>Archives de source réintroduites dans les paquets d’installation</td><td>Exclusion des copies Windows, ZIP et APK du paquet source et du contexte Docker</td></tr>
+</tbody></table>
+<p>La validation est isolée dans <code>CompanyStateBoundary</code>, indépendante de la base et</p>
+<p>testable via les routes. Les index de records sont construits une fois, plutôt</p>
+<p>que relus pour chaque record. Les tests confirment aussi qu’une sauvegarde légitime</p>
+<p>préserve les données de l’autre entreprise et les plans privés MAXI.</p>
+<h2>Maintenabilité : réalisé et restant</h2>
+<p>Réalisé :</p>
+<ul>
+<li>conventions d’édition partagées via <code>.editorconfig</code> ;</li>
+<li>commandes racine pour inventaire, licences, tests et vérification locale ;</li>
+<li>lanceur Laravel imposant une base SQLite en mémoire dans le processus de test ;</li>
+<li>validation de frontière multi-entreprise dans une responsabilité séparée ;</li>
+<li>fixture d’autorisation publique réutilisable ;</li>
+<li>guide de reprise humain lié depuis <code>README.md</code>.</li>
+</ul>
+<p>À terminer :</p>
+<p>1. <strong>Découper <code>App.tsx</code></strong>, encore environ 9 572 lignes, écran par écran avec props</p>
+<p>explicites, sans changer les routes ou les tokens du design system.</p>
+<p>2. Découper progressivement les contrôleurs E-commerce et Transport, chacun</p>
+<p>au-delà de 2 600 lignes. Éviter une extraction en même temps qu’un changement métier.</p>
+<p>3. Compléter la projection par rôle, secteur et dossier : les collections RH,</p>
+<p>les données administratives et le périmètre des records déjà autorisés doivent</p>
+<p>encore être vérifiés. Le filtrage par module n’est pas une preuve de confinement par unité.</p>
+<p>4. Harmoniser les anciens endpoints d’action directe MAXI avec les confirmations</p>
+<p>des plans : aperçu lié, expiration, version et idempotence.</p>
+<p>5. Archiver séparément puis retirer les copies Windows suivies, après accord</p>
+<p>explicite. Elles sont <strong>préservées</strong>, pas effacées par <code>.gitignore</code>.</p>
+<h2>Sécurité des dépendances</h2>
+<p>Le scan global initial signale <strong>12 alertes hautes et 10 modérées</strong>. Vingt</p>
+<p>occurrences concernent CommonMark dans dix copies historiques. Le Laravel actif</p>
+<p>utilise déjà CommonMark <strong>2.10.3</strong> et son audit Composer ne signale pas d’avis.</p>
+<p>La tentative de mise à jour compatible n’a rien changé : il était déjà corrigé.</p>
+<p>L’audit pnpm actif confirme <strong>deux alertes hautes</strong>, sans version corrigée publiée</p>
+<p>sur le registre consulté : <code>braces</code> 3.0.3 et <code>node-forge</code> 1.4.0. Ils sont notamment</p>
+<p>amenés par les outils Expo/Metro et d’autres outils de construction. Leur présence</p>
+<p>ne prouve pas un accès exploitable depuis une route publique ; elle reste un risque</p>
+<p>à surveiller, en particulier pour la chaîne de construction et de signature.</p>
+<p>Aucune rétrogradation, exception d’audit ou modification du code fournisseur</p>
+<p>n’a été appliquée pour masquer ces alertes.</p>
+<p>Le scan statique est <strong>incomplet</strong> malgré zéro résultat retourné. Le scan de flux</p>
+<p>de données ne retourne aucun résultat. Ni l’un ni l’autre ne garantit l’absence</p>
+<p>de vulnérabilité, de secret historique ou de fuite de données.</p>
+<h2>Propriété et licences</h2>
+<p><strong>La propriété juridique exclusive n’est pas démontrable à partir du dépôt seul.</strong></p>
+<ul>
+<li>Les manifests racine et Laravel déclarent MIT ; aucun fichier de licence racine n’identifie clairement le titulaire et les conditions complètes.</li>
+<li>L’inventaire pnpm contient 869 entrées de package/licence, dont cinq « Unknown » : <code>@replit/connectors-sdk</code>, <code>@replit/vite-plugin-cartographer</code>, <code>@replit/vite-plugin-dev-banner</code>, <code>@replit/vite-plugin-runtime-error-modal</code>, <code>create-launch</code>. « Unknown » signifie métadonnées absentes dans cet outil, pas absence certaine de droit d’utilisation.</li>
+<li>Les 115 entrées du lockfile Composer actif déclarent une licence : 81 MIT, 31 BSD-3-Clause, deux alternatives BSD/GPL et une Apache-2.0.</li>
+<li>Des licences MPL, OFL, CC-BY et des licences doubles demandent des obligations adaptées aux fichiers redistribués. Une licence double GPL/BSD n’impose pas automatiquement de placer toute l’application sous GPL.</li>
+<li>Les droits des images, polices, ressources importées et contributions doivent être rapprochés des licences et des contrats de cession.</li>
+<li>L’historique des commits ne remplace pas les contrats de propriété. Les conditions des outils de génération doivent aussi être vérifiées.</li>
+</ul>
+<p>Aucun titulaire n’a été inventé et aucune licence existante n’a été remplacée.</p>
+<p>Une validation juridique et une décision du propriétaire restent nécessaires</p>
+<p>avant de déclarer le projet exclusif ou de changer sa licence.</p>
+<h2>Reprendre le travail</h2>
+<p>Voir <code>docs/guides/human-maintenance.md</code>.</p>
+<pre><code>pnpm run audit:inventory
+pnpm run audit:licenses
+pnpm run verify:local
+pnpm run test:legacy
+PORT=5173 BASE_PATH=/ pnpm --filter @workspace/maximus build</code></pre>
+<p>Les preuves structurées sont dans <code>reports/code-audit-scanners.json</code>,</p>
+<p><code>reports/code-audit-licenses.json</code> et <code>reports/code-audit-inventory.json</code>.</p>
+<p>**Aucun push GitHub, déploiement Render, changement de licence, purge de données</p>
+<p>ou migration de production n’a été réalisé.**</p><h2>Vérification de l’application</h2><p>Après redémarrage, la sonde de santé de l’API de développement répond HTTP 200. La page de connexion ERP s’affiche sans erreur navigateur.</p><p>Metro reste actif, mais le débogueur natif Expo ne démarre pas, faute de libglib-2.0.so.0 dans l’environnement. Ce problème d’outillage reste à corriger. Aucun test sur appareil Android réel n’a été réalisé dans cet audit.</p></main></body></html>

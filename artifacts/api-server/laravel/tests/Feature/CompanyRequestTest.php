@@ -148,6 +148,7 @@ class CompanyRequestTest extends TestCase
             ->assertJsonPath('catalog.0.id', 'commerce');
 
         $this->withCredentials()
+            ->withHeader('Authorization', '')
             ->withUnencryptedCookie(MaximusAuth::COOKIE, $maximusToken)
             ->deleteJson('/api/companies/'.$companyId.'/installation')
             ->assertOk();

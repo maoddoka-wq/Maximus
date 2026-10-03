@@ -50,3 +50,7 @@ Thumbs.db
 
 # Dedicated MAXIMUS instances
 artifacts/api-server/laravel/MAXIMUS_BUILD_VERSION
+
+# Historical extracted installation bundle: do not recursively include new copies.
+# Existing tracked history is preserved until explicitly approved for removal.
+/artifacts/maximus-windows-sync-fix/

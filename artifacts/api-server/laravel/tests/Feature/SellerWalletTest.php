@@ -11,10 +11,12 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
+use Tests\Concerns\CreatesPublicStoreAccess;
 
 class SellerWalletTest extends TestCase
 {
     use RefreshDatabase;
+    use CreatesPublicStoreAccess;
 
     public function test_wallet_is_strictly_scoped_to_the_authenticated_company(): void
     {
@@ -907,6 +909,7 @@ class SellerWalletTest extends TestCase
 
     private function createStore(string $companyId, string $slug): void
     {
+        $this->authorizePublicStore($companyId);
         DB::table('ecommerce_stores')->insert([
             'id' => 'store-'.$slug,
             'company_id' => $companyId,

@@ -1,0 +1,546 @@
+[
+  {
+    "scanner": "dependencies",
+    "status": "fulfilled",
+    "metadata": {
+      "vulnerabilities": {
+        "critical": 0,
+        "high": 12,
+        "info": 0,
+        "low": 0,
+        "moderate": 10
+      }
+    },
+    "findings": [
+      {
+        "id": "GHSA-3q6v-r5mr-hxv8@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "high",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: Quadratic-time denial of service in the GitHub Flavored Markdown Table extension block-start scan",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.471Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-97jj-33gv-5xf9@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "moderate",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: DisallowedRawHtml bypassed when a disallowed tag name ends the raw-HTML literal",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.471Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-3q6v-r5mr-hxv8@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "high",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: Quadratic-time denial of service in the GitHub Flavored Markdown Table extension block-start scan",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.471Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-97jj-33gv-5xf9@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "moderate",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: DisallowedRawHtml bypassed when a disallowed tag name ends the raw-HTML literal",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.472Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-3q6v-r5mr-hxv8@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "high",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: Quadratic-time denial of service in the GitHub Flavored Markdown Table extension block-start scan",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.472Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-97jj-33gv-5xf9@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "moderate",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: DisallowedRawHtml bypassed when a disallowed tag name ends the raw-HTML literal",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.472Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-3q6v-r5mr-hxv8@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "high",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: Quadratic-time denial of service in the GitHub Flavored Markdown Table extension block-start scan",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.472Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-97jj-33gv-5xf9@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "moderate",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: DisallowedRawHtml bypassed when a disallowed tag name ends the raw-HTML literal",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.472Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-3q6v-r5mr-hxv8@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "high",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: Quadratic-time denial of service in the GitHub Flavored Markdown Table extension block-start scan",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.472Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-97jj-33gv-5xf9@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "moderate",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: DisallowedRawHtml bypassed when a disallowed tag name ends the raw-HTML literal",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.472Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-3q6v-r5mr-hxv8@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "high",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: Quadratic-time denial of service in the GitHub Flavored Markdown Table extension block-start scan",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.472Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-97jj-33gv-5xf9@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "moderate",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: DisallowedRawHtml bypassed when a disallowed tag name ends the raw-HTML literal",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.473Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-3q6v-r5mr-hxv8@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "high",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: Quadratic-time denial of service in the GitHub Flavored Markdown Table extension block-start scan",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.473Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-97jj-33gv-5xf9@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "moderate",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: DisallowedRawHtml bypassed when a disallowed tag name ends the raw-HTML literal",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.473Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-3q6v-r5mr-hxv8@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "high",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: Quadratic-time denial of service in the GitHub Flavored Markdown Table extension block-start scan",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.473Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-97jj-33gv-5xf9@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "moderate",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: DisallowedRawHtml bypassed when a disallowed tag name ends the raw-HTML literal",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.473Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-3q6v-r5mr-hxv8@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "high",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: Quadratic-time denial of service in the GitHub Flavored Markdown Table extension block-start scan",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.473Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-97jj-33gv-5xf9@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "moderate",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: DisallowedRawHtml bypassed when a disallowed tag name ends the raw-HTML literal",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.473Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-3q6v-r5mr-hxv8@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "high",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: Quadratic-time denial of service in the GitHub Flavored Markdown Table extension block-start scan",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.473Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-97jj-33gv-5xf9@league/commonmark-2.10.0",
+        "package": {
+          "ecosystem": "Packagist",
+          "name": "league/commonmark",
+          "purl": "pkg:composer/league/commonmark",
+          "version": "2.10.0"
+        },
+        "severity": {
+          "level": "moderate",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+        },
+        "fix": {
+          "available": true,
+          "requiresMajorUpdate": false,
+          "version": "2.10.2"
+        },
+        "message": "league/commonmark: DisallowedRawHtml bypassed when a disallowed tag name ends the raw-HTML literal",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.473Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-vfj7-8cjw-p6xm@braces-3.0.3",
+        "package": {
+          "ecosystem": "npm",
+          "name": "braces",
+          "purl": "pkg:npm/braces",
+          "version": "3.0.3"
+        },
+        "severity": {
+          "level": "high",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        "message": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.474Z",
+          "scanner": "osv-scanner"
+        }
+      },
+      {
+        "id": "GHSA-86w9-cpqp-85rv@node-forge-1.4.0",
+        "package": {
+          "ecosystem": "npm",
+          "name": "node-forge",
+          "purl": "pkg:npm/node-forge",
+          "version": "1.4.0"
+        },
+        "severity": {
+          "level": "high",
+          "type": "CVSS_V3",
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"
+        },
+        "message": "node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements",
+        "source": {
+          "scannedAt": "2026-10-03T10:22:13.474Z",
+          "scanner": "osv-scanner"
+        }
+      }
+    ]
+  },
+  {
+    "scanner": "sast",
+    "status": "fulfilled",
+    "incomplete": true,
+    "findings": []
+  },
+  {
+    "scanner": "privacy",
+    "status": "fulfilled",
+    "findings": []
+  }
+]

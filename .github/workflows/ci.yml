@@ -65,6 +65,9 @@ jobs:
         run: php artisan migrate --force
       - name: Typecheck
         run: pnpm run typecheck
+      - name: Laravel regression tests
+        working-directory: artifacts/api-server/laravel
+        run: php artisan test --compact
       - name: Chauffeur GPS lifecycle regression tests
         run: pnpm --filter @workspace/maximus-chauffeur test
       - name: MAXIMUS tests
