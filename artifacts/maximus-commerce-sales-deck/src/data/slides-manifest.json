@@ -1,0 +1,66 @@
+[
+  {
+    "id": "6c1687dd-7911-4d6c-9fbf-2c1a6c21e101",
+    "position": 1,
+    "filepath": "src/pages/slides/Slide1.tsx",
+    "title": "MAXIMUS — Le centre de pilotage de vos ventes",
+    "description": "Boutique publique, vente au comptoir, suivi et rapports réunis pour le commerce.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "6c1687dd-7911-4d6c-9fbf-2c1a6c21e102",
+    "position": 2,
+    "filepath": "src/pages/slides/Slide2.tsx",
+    "title": "La vente au-delà de la vitrine",
+    "description": "Catalogue, boutique en ligne, caisse comptoir et suivi des ventes.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "6c1687dd-7911-4d6c-9fbf-2c1a6c21e103",
+    "position": 3,
+    "filepath": "src/pages/slides/Slide3.tsx",
+    "title": "Un catalogue, deux canaux de vente",
+    "description": "Les produits alimentent la boutique publique et la caisse au magasin.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "6c1687dd-7911-4d6c-9fbf-2c1a6c21e104",
+    "position": 4,
+    "filepath": "src/pages/slides/Slide4.tsx",
+    "title": "Une boutique publique, même sans site",
+    "description": "Présenter ses produits à ses clients grâce à une vitrine MAXIMUS publique.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "6c1687dd-7911-4d6c-9fbf-2c1a6c21e105",
+    "position": 5,
+    "filepath": "src/pages/slides/Slide5.tsx",
+    "title": "La caisse au rythme du magasin",
+    "description": "Enregistrer une vente comptoir et choisir son moyen d’encaissement.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "6c1687dd-7911-4d6c-9fbf-2c1a6c21e106",
+    "position": 6,
+    "filepath": "src/pages/slides/Slide6.tsx",
+    "title": "Le suivi des commandes et des ventes",
+    "description": "Retrouver les commandes en ligne, la synthèse du jour et les ventes récentes.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "6c1687dd-7911-4d6c-9fbf-2c1a6c21e107",
+    "position": 7,
+    "filepath": "src/pages/slides/Slide7.tsx",
+    "title": "Des rapports pour lire l’activité",
+    "description": "Filtrer les rapports par période et source, consulter les totaux et les statuts.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "6c1687dd-7911-4d6c-9fbf-2c1a6c21e108",
+    "position": 8,
+    "filepath": "src/pages/slides/Slide8.tsx",
+    "title": "Une démonstration adaptée à votre commerce",
+    "description": "Conclusion et proposition de découvrir MAXIMUS selon les besoins du commerçant.",
+    "speakerNotes": ""
+  }
+]

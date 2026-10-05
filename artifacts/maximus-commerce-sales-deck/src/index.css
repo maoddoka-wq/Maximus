@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+
+@theme inline {
+  --color-primary: var(--slide-primary);
+  --color-accent: var(--slide-accent);
+  --color-bg: var(--slide-bg);
+  --color-text: var(--slide-text);
+  --color-muted: var(--slide-muted);
+  --color-surface: var(--slide-surface);
+  --color-secondary: var(--slide-secondary);
+  --color-border: var(--slide-border);
+  --font-display: var(--font-display-family);
+  --font-body: var(--font-body-family);
+  --font-mono: var(--font-mono-family);
+}
+
+:root {
+  --slide-primary: #f4b20b;
+  --slide-accent: #f4b20b;
+  --slide-bg: #121821;
+  --slide-text: #f3f0e7;
+  --slide-muted: #bbb5a5;
+  --slide-surface: #1b212d;
+  --slide-secondary: #28303e;
+  --slide-border: #333b4d;
+  --font-display-family: 'DM Sans', sans-serif;
+  --font-body-family: 'DM Sans', sans-serif;
+  --font-mono-family: 'Space Mono', monospace;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--slide-bg);
+  color: var(--slide-text);
+}
+
+.slide {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.slide-viewer {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}

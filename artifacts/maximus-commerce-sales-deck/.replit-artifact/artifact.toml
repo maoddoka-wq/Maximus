@@ -1,0 +1,28 @@
+kind = "slides"
+previewPath = "/maximus-commerce-sales-deck/"
+title = "MAXIMUS — Centre de pilotage des ventes"
+description = "Présentation commerciale destinée aux commerçants sans site. Le deck présente la boutique publique MAXIMUS, les ventes au comptoir, le suivi des commandes et les rapports de vente."
+version = "1.0.0"
+id = "artifacts/maximus-commerce-sales-deck"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/maximus-commerce-sales-deck/" ]
+localPort = 25693
+
+[services.development]
+run = "pnpm --filter @workspace/maximus-commerce-sales-deck run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/maximus-commerce-sales-deck", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/maximus-commerce-sales-deck/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25693"
+BASE_PATH = "/maximus-commerce-sales-deck/"
