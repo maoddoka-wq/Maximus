@@ -49,9 +49,6 @@ final class DemoWorkspaceSeeder
             }
 
             $linkScope = DemoWorkspace::employeeScope($companyId, $employeeId);
-            if (DB::table('maximus_app_states')->where('scope', $linkScope)->exists()) {
-                continue;
-            }
 
             $fingerprint = substr(hash('sha256', $employeeId), 0, 12);
             $accountIds = fn (string $name): string => $ids('account-'.$fingerprint.'-'.$name);
@@ -80,6 +77,9 @@ final class DemoWorkspaceSeeder
             $this->seedEmployeeTransport($datasetCompanyId, $employeeId, $displayName, $accountIds, $now);
             $this->seedEmployeePayroll($datasetCompanyId, $employeeId, $displayName, $accountIds, $now);
 
+            // The employee scope is an initialization marker, not a reason to
+            // skip seeding: insertOrIgnore and appendStateRecord backfill
+            // missing fixtures without overwriting employee edits.
             DB::table('maximus_app_states')->insertOrIgnore([
                 'scope' => $linkScope,
                 'company_id' => $companyId,

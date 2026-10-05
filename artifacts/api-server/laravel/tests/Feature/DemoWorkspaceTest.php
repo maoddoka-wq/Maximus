@@ -200,6 +200,10 @@ class DemoWorkspaceTest extends TestCase
             [$employee->employee_id],
             array_column($employeeState->json('data.employees'), 'id'),
         );
+        $this->assertSame(
+            [$employee->employee_id],
+            array_column($employeeState->json('data.payrollSlips'), 'employeeId'),
+        );
 
         $employeePayroll = $this->withSessionFor($employee)
             ->withHeader('X-Maximus-Dataset', 'demo')
@@ -269,6 +273,28 @@ class DemoWorkspaceTest extends TestCase
             ->where('assignee_employee_id', $employee->employee_id)
             ->value('id');
         DB::table('control_tasks')->where('id', $existingTaskId)->update(['title' => 'Tâche modifiée en démo']);
+
+        // Simulate an older or partial employee demo scope. Re-enabling must
+        // fill missing personal fixtures even when its marker already exists.
+        DB::table('presence_items')
+            ->where('company_id', $demoCompanyId)
+            ->where('employee_id', $employee->employee_id)
+            ->where('type', 'attendance')
+            ->delete();
+        $demoStateScope = DemoWorkspace::stateScope('kora');
+        $companyDemoState = json_decode(
+            (string) DB::table('maximus_app_states')->where('scope', $demoStateScope)->value('payload'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+        $companyDemoState['payrollSlips'] = array_values(array_filter(
+            $companyDemoState['payrollSlips'],
+            static fn (array $slip): bool => ($slip['employeeId'] ?? null) !== $employee->employee_id,
+        ));
+        DB::table('maximus_app_states')->where('scope', $demoStateScope)->update([
+            'payload' => json_encode($companyDemoState, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+        ]);
+
         $originalPasswordHash = $employee->password_hash;
         $originalPermissions = $employee->permissions;
 
@@ -291,6 +317,11 @@ class DemoWorkspaceTest extends TestCase
             'employee_id' => $laterEmployee->employee_id,
             'type' => 'attendance',
         ]);
+        $this->assertDatabaseHas('presence_items', [
+            'company_id' => $demoCompanyId,
+            'employee_id' => $employee->employee_id,
+            'type' => 'attendance',
+        ]);
         $this->assertSame($originalPasswordHash, AuthUser::query()->whereKey($employee->id)->value('password_hash'));
         $preservedAccount = AuthUser::query()->whereKey($employee->id)->firstOrFail();
         $this->assertSame($employee->id, $preservedAccount->id);
@@ -305,6 +336,14 @@ class DemoWorkspaceTest extends TestCase
         $this->assertSame(
             [$laterEmployee->employee_id],
             collect($laterEmployeeBootstrap->json('items'))->pluck('employeeId')->filter()->unique()->values()->all(),
+        );
+        $restoredEmployeeState = $this->withSessionFor($employee)
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('dataset', 'demo');
+        $this->assertSame(
+            [$employee->employee_id],
+            array_column($restoredEmployeeState->json('data.payrollSlips'), 'employeeId'),
         );
     }
 
