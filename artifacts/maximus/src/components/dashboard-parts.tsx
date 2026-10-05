@@ -118,13 +118,11 @@ export function SignalItem({
 export function QuickLinkTile({
   icon: Icon,
   label,
-  description,
   onClick,
   testId,
 }: {
   icon: LucideIcon;
   label: string;
-  description: string;
   onClick: () => void;
   testId?: string;
 }) {
@@ -143,7 +141,6 @@ export function QuickLinkTile({
       </span>
       <span className="min-w-0">
         <strong className="block text-sm">{label}</strong>
-        <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">{description}</span>
       </span>
     </button>
   );

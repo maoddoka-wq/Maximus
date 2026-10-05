@@ -3062,49 +3062,42 @@ function RoleAwareCompanyDashboard({
       id: 'commerce',
       path: commercePath,
       label: 'Ventes & clients',
-      description: 'Suivez les ventes, les clients et la performance commerciale.',
       icon: ShoppingCart,
     },
     canStocks && {
       id: 'stocks',
       path: '/entreprise/stocks',
       label: 'Stock & achats',
-      description: 'Surveillez les niveaux, mouvements et réapprovisionnements.',
       icon: Package,
     },
     canFinance && {
       id: 'finance',
       path: financePath,
       label: 'Finance',
-      description: 'Consultez les écritures et les mouvements financiers.',
       icon: WalletCards,
     },
     canTeam && {
       id: 'team',
       path: teamPath,
       label: allowed.includes('presences') ? 'Équipe & présences' : allowed.includes('paie') ? 'Paie' : 'Ressources humaines',
-      description: 'Organisez les équipes, les accès et le suivi quotidien.',
       icon: Users,
     },
     allowed.includes('ecommerce') && {
       id: 'ecommerce',
       path: '/entreprise/ecommerce?tab=dashboard',
       label: 'Boutique en ligne',
-      description: 'Pilotez le catalogue, les commandes et les clients publics.',
       icon: Store,
     },
     allowed.includes('transport') && {
       id: 'transport',
       path: '/entreprise/transport',
       label: 'Transport',
-      description: 'Suivez les courses, chauffeurs et véhicules.',
       icon: CarFront,
     },
   ].filter(Boolean) as Array<{
     id: string;
     path: string;
     label: string;
-    description: string;
     icon: typeof ShoppingCart;
   }>;
 
@@ -3206,7 +3199,7 @@ function RoleAwareCompanyDashboard({
           {quickLinks.length ? (
             <div className="grid gap-3 sm:grid-cols-2">
               {quickLinks.slice(0, 4).map((link) => (
-                <QuickLinkTile key={link.id} testId={`button-dashboard-link-${link.id}`} icon={link.icon} label={link.label} description={link.description} onClick={() => onNavigate(link.path)} />
+                <QuickLinkTile key={link.id} testId={`button-dashboard-link-${link.id}`} icon={link.icon} label={link.label} onClick={() => onNavigate(link.path)} />
               ))}
             </div>
           ) : (

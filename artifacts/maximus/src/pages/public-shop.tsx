@@ -382,6 +382,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     ? clientPwaPath(slug, suffix, domain)
     : slug ? `/shop/${encodeURIComponent(slug)}${suffix}` : suffix || '/';
   const go = (suffix: string) => {
+    if (suffix === '/panier' || suffix.endsWith('/panier')) setCartNotice('');
     setLocation(shopPath(suffix));
   };
 
@@ -537,6 +538,10 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   useEffect(() => {
     if (isAccountRoute && !customer && !loading) go('/connexion');
   }, [customer, isAccountRoute, loading]);
+
+  useEffect(() => {
+    if (isCartRoute && cartNotice) setCartNotice('');
+  }, [cartNotice, isCartRoute]);
 
   const syncCart = async (next: CartLine[]) => {
     setCart(next);
@@ -895,7 +900,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
          {primaryMobileNav.map(item => { const Icon = item.path === '/accueil' ? Store : item.path === '/boutique' ? Package : ShoppingBag; const active = isPublicNavActive(item.path); return <Button variant="ghost" size="sm" type="button" key={item.path} onClick={() => go(item.path)} aria-current={active ? 'page' : undefined} className={`relative h-auto min-w-0 flex-col gap-1 rounded-xl px-1 py-1.5 text-xs font-semibold transition-colors ${active ? 'bg-[var(--shop-accent)]/10 text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Icon size={18} /><span className="max-w-full truncate">{item.label}{item.path === '/panier' && cartCount > 0 ? ` (${cartCount})` : ''}</span>{item.path === '/panier' && cartCount > 0 && <span className="absolute right-1/4 top-0 flex h-4 min-w-4 translate-x-1/2 items-center justify-center rounded-full bg-[var(--shop-accent)] px-1 text-[9px] font-bold text-[var(--shop-accent-foreground)]">{cartCount}</span>}</Button>; })}
          <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" type="button" aria-label={additionalMobileNavActive ? 'Plus, une section est active' : 'Plus, autres fonctionnalités'} className={`relative h-auto min-w-0 flex-col gap-1 rounded-xl px-1 py-1.5 text-xs font-semibold transition-colors ${additionalMobileNavActive ? 'bg-[var(--shop-accent)]/10 text-[var(--shop-accent)]' : 'text-[hsl(var(--muted-foreground))]'}`}><Plus size={18} /><span>Plus</span>{additionalMobileNavActive && <span className="absolute right-1/4 top-0 h-2 w-2 translate-x-1/2 rounded-full bg-[var(--shop-accent)]" />}</Button></DropdownMenuTrigger><DropdownMenuContent align="end" side="top" sideOffset={8}>{additionalMobileNav.map(item => <DropdownMenuItem key={item.path} onSelect={() => go(item.path)} className={isPublicNavActive(item.path) ? 'font-bold text-[var(--shop-accent)]' : ''}>{item.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>
        </div></nav>}
-        {cartNotice && <div role="status" aria-live="polite" className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex items-center gap-3 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-3 shadow-xl lg:inset-x-auto lg:bottom-4 lg:right-6 lg:w-[min(24rem,calc(100vw-3rem))]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--shop-primary)]/10 text-[var(--shop-primary)]"><Check size={16} /></span><p className="min-w-0 flex-1 text-sm font-semibold text-[hsl(var(--foreground))]">{cartNotice}</p><button type="button" onClick={() => go('/panier')} className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-bold text-[var(--shop-accent-foreground)]" style={{ backgroundColor: 'var(--shop-accent)' }}>Voir le panier</button><button type="button" onClick={() => setCartNotice('')} className="shrink-0 rounded-lg p-1.5 text-[hsl(var(--muted-foreground))]" aria-label="Fermer la confirmation"><X size={15} /></button></div>}
+        {cartNotice && !isCartRoute && <div role="status" aria-live="polite" className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex items-center gap-3 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-3 shadow-xl lg:inset-x-auto lg:bottom-4 lg:right-6 lg:w-[min(24rem,calc(100vw-3rem))]"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--shop-primary)]/10 text-[var(--shop-primary)]"><Check size={16} /></span><p className="min-w-0 flex-1 text-sm font-semibold text-[hsl(var(--foreground))]">{cartNotice}</p><button type="button" onClick={() => go('/panier')} className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-bold text-[var(--shop-accent-foreground)]" style={{ backgroundColor: 'var(--shop-accent)' }}>Voir le panier</button><button type="button" onClick={() => setCartNotice('')} className="shrink-0 rounded-lg p-1.5 text-[hsl(var(--muted-foreground))]" aria-label="Fermer la confirmation"><X size={15} /></button></div>}
   </div>;
 }
 
@@ -2647,7 +2652,66 @@ function CartPanelV2({ cart, total, requiresShipping, zones, deliveryZoneId, set
     <div className="mt-5">
       <ShopPageHeader eyebrow="Panier" title="Votre commande" description={cart.length ? `${cart.reduce((sum, line) => sum + line.quantity, 0)} article(s) · ${money(total, store.currency)}` : undefined} />
       {cart.length === 0 ? <div className="mt-6"><ShopEmpty icon={ShoppingBag} title="Votre panier est vide" text="Ajoutez des produits depuis la boutique pour préparer votre commande." /><div className="mt-4 flex justify-center"><button type="button" data-testid="button-cart-empty-shop" onClick={onBack} className="rounded-xl bg-[var(--shop-accent)] px-5 py-3 text-sm font-bold text-[var(--shop-accent-foreground)] hover:opacity-90">Voir la boutique</button></div></div> : <><div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)] lg:items-start"><div className="min-w-0 rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 sm:p-6"><h2 className="text-base font-bold tracking-[-.02em]">Articles</h2>
-         <div className="mt-6 divide-y divide-[hsl(var(--border))] border-y border-[hsl(var(--border))]">{cart.map(line => <div key={line.product.slug} className="flex flex-wrap items-center gap-3 py-4 sm:flex-nowrap"><span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.5)]">{line.product.imageUrl ? <img src={line.product.imageUrl} alt="" className="h-full w-full object-cover" /> : <Package size={18} aria-hidden="true" className="text-[hsl(var(--muted-foreground))]" />}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{line.product.name}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{line.product.fulfillmentType === 'DIGITAL' ? 'Produit numérique' : line.product.productType === 'RENTAL' ? 'Location' : 'Produit physique'} · {money(line.product.price, store.currency)}</p></div>{line.product.fulfillmentType === 'DIGITAL' ? <div className="flex items-center gap-2"><span className="text-sm font-bold">× 1</span><button type="button" onClick={() => onChange(line.product.slug, -1)} aria-label="Retirer le produit numérique du panier" className="rounded-lg border p-1.5"><X size={13} /></button></div> : <div className="flex items-center rounded-xl border border-[hsl(var(--border))]"><button type="button" onClick={() => onChange(line.product.slug, -1)} aria-label="Retirer une unité" className="flex h-9 w-9 items-center justify-center rounded-l-xl hover:bg-[hsl(var(--muted))]"><Minus size={14} /></button><span className="w-8 text-center text-sm font-bold" aria-live="polite">{line.quantity}</span><button type="button" onClick={() => onChange(line.product.slug, 1)} aria-label="Ajouter une unité" className="flex h-9 w-9 items-center justify-center rounded-r-xl hover:bg-[hsl(var(--muted))]"><Plus size={14} /></button></div>}<p className="w-24 text-right text-sm font-bold">{money(line.product.price * line.quantity, store.currency)}</p></div>)}</div>
+         <div className="mt-6 divide-y divide-[hsl(var(--border))] border-y border-[hsl(var(--border))]">
+           {cart.map(line => (
+             <div
+               key={line.product.slug}
+               className="grid w-full min-w-0 grid-cols-[3.5rem_minmax(0,1fr)_max-content] items-center gap-x-3 gap-y-2 py-4 sm:flex sm:flex-nowrap sm:gap-3"
+             >
+               <span className="row-span-2 flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted)/.5)] sm:row-span-1">
+                 {line.product.imageUrl
+                   ? <img src={line.product.imageUrl} alt="" className="h-full w-full object-cover" />
+                   : <Package size={18} aria-hidden="true" className="text-[hsl(var(--muted-foreground))]" />}
+               </span>
+               <div className="col-start-2 row-start-1 min-w-0 sm:flex-1">
+                 <p className="line-clamp-2 break-words text-sm font-bold">{line.product.name}</p>
+                 <p className="mt-1 break-words text-xs text-[hsl(var(--muted-foreground))]">
+                   {line.product.fulfillmentType === 'DIGITAL'
+                     ? 'Produit numérique'
+                     : line.product.productType === 'RENTAL'
+                       ? 'Location'
+                       : 'Produit physique'} · {money(line.product.price, store.currency)}
+                 </p>
+               </div>
+               {line.product.fulfillmentType === 'DIGITAL' ? (
+                 <div className="col-start-2 row-start-2 flex items-center gap-2 sm:ml-auto">
+                   <span className="text-sm font-bold">× 1</span>
+                   <button
+                     type="button"
+                     onClick={() => onChange(line.product.slug, -1)}
+                     aria-label="Retirer le produit numérique du panier"
+                     className="rounded-lg border p-1.5"
+                   >
+                     <X size={13} />
+                   </button>
+                 </div>
+               ) : (
+                 <div className="col-start-2 row-start-2 flex items-center rounded-xl border border-[hsl(var(--border))] sm:col-auto sm:row-auto">
+                   <button
+                     type="button"
+                     onClick={() => onChange(line.product.slug, -1)}
+                     aria-label="Retirer une unité"
+                     className="flex h-9 w-9 items-center justify-center rounded-l-xl hover:bg-[hsl(var(--muted))]"
+                   >
+                     <Minus size={14} />
+                   </button>
+                   <span className="w-8 text-center text-sm font-bold" aria-live="polite">{line.quantity}</span>
+                   <button
+                     type="button"
+                     onClick={() => onChange(line.product.slug, 1)}
+                     aria-label="Ajouter une unité"
+                     className="flex h-9 w-9 items-center justify-center rounded-r-xl hover:bg-[hsl(var(--muted))]"
+                   >
+                     <Plus size={14} />
+                   </button>
+                 </div>
+               )}
+               <p className="col-start-3 row-start-1 row-span-2 whitespace-nowrap text-right text-sm font-bold sm:w-24 sm:shrink-0 sm:row-span-1">
+                 {money(line.product.price * line.quantity, store.currency)}
+               </p>
+             </div>
+           ))}
+         </div>
          {requiresZone && <div className="mt-5 rounded-2xl border border-[var(--shop-primary)]/20 bg-[var(--shop-primary)]/5 p-4"><div className="flex items-start gap-3"><Truck size={18} className="mt-0.5 shrink-0" style={{ color: 'var(--shop-accent)' }} /><div><p className="text-sm font-bold">Choisissez votre zone de livraison</p><p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Les frais sont ajoutés au total selon la zone sélectionnée.</p></div></div><select required aria-label="Zone de livraison" data-testid="select-delivery-zone" className="mt-3 h-11 w-full rounded-xl border border-[hsl(var(--input))] bg-[hsl(var(--card))] px-3 text-sm focus-visible:outline-2 focus-visible:outline-[var(--shop-primary)]" value={deliveryZoneId} onChange={event => setDeliveryZoneId(event.target.value)}><option value="">Sélectionner une zone</option>{zones.map(zone => <option key={zone.id} value={zone.id}>{zone.name} · {zone.fee > 0 ? money(zone.fee, store.currency) : 'Gratuit'}</option>)}</select></div>}
           {store.allowOrderAttachments && <div className="mt-5 rounded-2xl border border-dashed p-4">
             <label className="block text-sm font-bold">Pièces jointes (facultatif)
