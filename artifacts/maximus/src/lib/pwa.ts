@@ -56,6 +56,18 @@ export const isIosDevice = () => /iphone|ipad|ipod/i.test(window.navigator.userA
 
 export const canInstallPwa = () => Boolean(deferredInstallPrompt) && !isStandalonePwa();
 
+export function registerMaximusPushServiceWorker() {
+  if (!('serviceWorker' in navigator)) {
+    return Promise.reject(new Error('Les notifications navigateur ne sont pas prises en charge.'));
+  }
+
+  const scope = new URL(import.meta.env.BASE_URL, window.location.origin).href;
+  return navigator.serviceWorker.register(
+    `${import.meta.env.BASE_URL}maximus-notifications-sw.js`,
+    { scope, updateViaCache: 'none' },
+  );
+}
+
 export async function mountClientManifest(manifestUrl: string): Promise<() => void> {
   const response = await fetch(manifestUrl, { cache: 'no-store' });
   if (!response.ok) {
@@ -102,7 +114,10 @@ export function initializePwa() {
           .filter((registration) => registration.scope === rootScope && registration.active?.scriptURL.endsWith('/sw.js'))
           .map((registration) => registration.unregister()),
       ))
-      .then(() => navigator.serviceWorker.register(clientServiceWorker, { scope: clientScope, updateViaCache: 'none' }))
+      .then(() => navigator.serviceWorker.register(clientServiceWorker, {
+        scope: clientScope,
+        updateViaCache: 'none',
+      }))
       .catch((error: unknown) => {
         console.warn('Le service worker client MAXIMUS n’a pas pu être enregistré.', error);
       });

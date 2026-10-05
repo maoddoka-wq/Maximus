@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuthUser;
 use App\Models\Company;
+use App\Services\MaximusPushNotificationService;
 use App\Services\PublicRegistrationPolicy;
 use App\Support\CompanyStateBoundary;
 use App\Support\ModuleAuthorization;
@@ -373,7 +374,13 @@ class AppStateController extends Controller
             'deleted.*.ids.*' => ['string'],
         ]);
 
-        return DB::transaction(function () use ($actor, $data): JsonResponse {
+        $authUser = $request->attributes->get('authUser');
+        $actorUserId = is_object($authUser) && is_string($authUser->id ?? null)
+            ? (string) $authUser->id
+            : '';
+        $requestHost = $request->getHost();
+
+        return DB::transaction(function () use ($actor, $data, $actorUserId, $requestHost): JsonResponse {
             $current = DB::table('maximus_app_states')
                 ->where('scope', 'workspace')
                 ->lockForUpdate()
@@ -382,6 +389,9 @@ class AppStateController extends Controller
                 ? json_decode($current->payload, true)
                 : ($current?->payload ?? []);
             $currentPayload = is_array($currentPayload) ? $currentPayload : [];
+            $previousNotifications = is_array($currentPayload['notifications'] ?? null)
+                ? $currentPayload['notifications']
+                : [];
 
             $incomingState = $this->stripCredentials($data['data']);
             $deleted = is_array($data['deleted'] ?? null) ? $data['deleted'] : [];
@@ -460,8 +470,58 @@ class AppStateController extends Controller
                 ],
             );
 
+            if ($current) {
+                $newNotifications = $this->newlyAddedNotifications(
+                    $previousNotifications,
+                    is_array($currentPayload['notifications'] ?? null)
+                        ? $currentPayload['notifications']
+                        : [],
+                );
+                if ($newNotifications !== []) {
+                    DB::afterCommit(function () use ($newNotifications, $actorUserId, $requestHost): void {
+                        app(MaximusPushNotificationService::class)->dispatchNewNotifications(
+                            $newNotifications,
+                            $actorUserId,
+                            $requestHost,
+                        );
+                    });
+                }
+            }
+
             return response()->json(['ok' => true, 'version' => $nextVersion]);
         });
+    }
+
+    /**
+     * @param array<int, mixed> $previous
+     * @param array<int, mixed> $current
+     * @return array<int, array<string, mixed>>
+     */
+    private function newlyAddedNotifications(array $previous, array $current): array
+    {
+        $knownIds = [];
+        foreach ($previous as $notification) {
+            if (is_array($notification) && is_string($notification['id'] ?? null)) {
+                $knownIds[$notification['id']] = true;
+            }
+        }
+
+        $newNotifications = [];
+        foreach ($current as $notification) {
+            if (! is_array($notification)) {
+                continue;
+            }
+
+            $id = $notification['id'] ?? null;
+            if (! is_string($id) || $id === '' || isset($knownIds[$id]) || ! empty($notification['read'])) {
+                continue;
+            }
+
+            $knownIds[$id] = true;
+            $newNotifications[] = $notification;
+        }
+
+        return $newNotifications;
     }
 
     /**

@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\SubscriptionBillingController;
 use App\Http\Controllers\Api\SystemHealthController;
 use App\Http\Controllers\Api\InstallationController;
 use App\Http\Controllers\Api\InstallationAccessController;
+use App\Http\Controllers\Api\NotificationPushController;
 use App\Services\SystemHealthService;
 use App\Support\InstallationContext;
 use Illuminate\Support\Facades\Route;
@@ -166,6 +167,14 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription'])->
 Route::middleware(['maximus.auth', 'maximus.subscription'])->prefix('app-state')->group(function (): void {
     Route::get('/bootstrap', [AppStateController::class, 'bootstrap']);
     Route::put('/', [AppStateController::class, 'save']);
+});
+
+Route::middleware('maximus.auth')->prefix('notifications/push')->group(function (): void {
+    Route::get('/public-key', [NotificationPushController::class, 'publicKey'])
+        ->middleware('maximus.subscription');
+    Route::post('/subscriptions', [NotificationPushController::class, 'subscribe'])
+        ->middleware('maximus.subscription');
+    Route::delete('/subscriptions', [NotificationPushController::class, 'unsubscribe']);
 });
 
 Route::middleware(['maximus.central', 'maximus.auth'])->prefix('platform-settings')->group(function (): void {

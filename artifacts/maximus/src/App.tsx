@@ -63,6 +63,9 @@ import { companyNavigationMode } from '@/lib/company-navigation';
 import { WorkspaceTabs } from '@workspace/maximus-design-system/components/ui/workspace-tabs';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { parseClientPwaPath } from '@/lib/pwa';
+import { NotificationSettings } from '@/components/notification-settings';
+import { disableCurrentBrowserPushSubscription } from '@/lib/notification-push-api';
+import { playNotificationSound } from '@/lib/notification-sound';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
 import { ModulePackDraftForm } from '@/components/module-pack-draft-form';
 import { SubscriptionPricingManagement } from '@/components/subscription-pricing-management';
@@ -471,6 +474,8 @@ function AppContent() {
   const moduleAccessCacheRef = useRef(
     new Map<string, { access: ServerModuleAccess[]; updatedAt: number }>(),
   );
+  const observedNotificationsRef = useRef<{ contextKey: string; ids: Set<string> } | null>(null);
+  const deliveredNotificationIdsRef = useRef(new Set<string>());
   dataRef.current = data;
   appStateVersionRef.current = appStateVersion;
   sessionRef.current = session;
@@ -832,6 +837,78 @@ function AppContent() {
   const sectorTestCompanyId = activeCompanyId?.startsWith('sector-test-') ? activeCompanyId : null;
   const activeCompany = data.companies.find((company) => company.id === activeCompanyId);
   const activeCompanyAllowedModulesKey = activeCompany?.allowedModules.join(',') ?? '';
+  const notificationIsAdmin = session === 'admin' && !installationProfile?.companyOnly;
+  const notificationCompanyId = activeCompanyId ?? '';
+  useEffect(() => {
+    if (!session || !appStateReady) {
+      observedNotificationsRef.current = null;
+      deliveredNotificationIdsRef.current.clear();
+      return;
+    }
+
+    const contextKey = `${session}:${notificationIsAdmin ? 'admin' : notificationCompanyId}`;
+    const visibleNotifications = getVisibleNotifications(data.notifications, {
+      isAdmin: notificationIsAdmin,
+      companyId: notificationCompanyId,
+    });
+
+    if (observedNotificationsRef.current?.contextKey !== contextKey) {
+      observedNotificationsRef.current = {
+        contextKey,
+        ids: new Set(visibleNotifications.map((notification) => notification.id)),
+      };
+      deliveredNotificationIdsRef.current.clear();
+      return;
+    }
+
+    const observed = observedNotificationsRef.current;
+    const newlyAdded = visibleNotifications.filter(
+      (notification) => !observed.ids.has(notification.id) && !notification.read,
+    );
+    visibleNotifications.forEach((notification) => observed.ids.add(notification.id));
+    const notAlreadyDelivered = newlyAdded.filter(
+      (notification) => !deliveredNotificationIdsRef.current.has(notification.id),
+    );
+    notAlreadyDelivered.forEach((notification) => deliveredNotificationIdsRef.current.add(notification.id));
+
+    if (notAlreadyDelivered.length === 0 || document.visibilityState !== 'visible') return;
+
+    const latest = notAlreadyDelivered[0];
+    showAppToast(`${latest.title} : ${latest.text}`, 'info');
+    void playNotificationSound();
+  }, [
+    appStateReady,
+    data.notifications,
+    notificationCompanyId,
+    notificationIsAdmin,
+    session,
+  ]);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return undefined;
+
+    const handlePushMessage = (event: MessageEvent<unknown>) => {
+      if (!sessionRef.current || !event.data || typeof event.data !== 'object') return;
+      const message = event.data as {
+        type?: unknown;
+        notification?: { id?: unknown; title?: unknown; body?: unknown };
+      };
+      if (message.type !== 'MAXIMUS_PUSH_NOTIFICATION' || !message.notification) return;
+
+      const { id, title, body } = message.notification;
+      if (typeof id === 'string' && id !== '') {
+        if (deliveredNotificationIdsRef.current.has(id)) return;
+        deliveredNotificationIdsRef.current.add(id);
+      }
+      if (typeof title === 'string' && typeof body === 'string') {
+        showAppToast(`${title} : ${body}`, 'info');
+      }
+      void playNotificationSound();
+    };
+
+    navigator.serviceWorker.addEventListener('message', handlePushMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handlePushMessage);
+  }, []);
   useEffect(() => {
     if (!activeCompanyId || session === 'admin' || !session || sectorTestCompanyId) {
       setServerModuleStatuses(null);
@@ -1086,7 +1163,10 @@ function AppContent() {
     localStorage.removeItem(companyLoginContextStorageKey);
     setCompanyLoginReturnPath(null);
     setLocation(destination);
-    void authApi.logout().catch(() => undefined);
+    void disableCurrentBrowserPushSubscription()
+      .catch(() => undefined)
+      .then(() => authApi.logout())
+      .catch(() => undefined);
   };
   // A button passes its click event; never interpret that event as a return URL.
   const logout = () => logoutTo();
@@ -5324,6 +5404,7 @@ function NotificationsPage({
   const notifications = getVisibleNotifications(data.notifications, context);
   return (
     <div className="space-y-3">
+      <NotificationSettings />
       {notifications.length === 0 && (
         <div className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
           Aucune notification pour le moment.
