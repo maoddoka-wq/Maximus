@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
-import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Boxes, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Edit3, FileBarChart, History, MapPin, Package, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, Upload, UserRound, Users, Warehouse, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Boxes, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Edit3, FileBarChart, History, MapPin, Package, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Truck, UserRound, Users, Warehouse, X } from 'lucide-react';
 import { createStockApi, type StockApi, type StockBootstrap, type StockBootstrapScope, type StockInventory, type StockLocation, type StockMovement, type StockMovementType, type StockProduct, type StockRequest, type StockSupplier, type StockWarehouse } from '@/lib/stock-api';
 import { useQueryTab } from '@/lib/query-tab';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
@@ -27,7 +27,7 @@ const tabs = [
 ] as const;
 
 type Tab = typeof tabs[number][0];
-type ProductForm = Omit<StockProduct, 'id' | 'companyId' | 'archived'> & { imageFile?: File | null };
+type ProductForm = Omit<StockProduct, 'id' | 'companyId' | 'archived'>;
 type WarehouseForm = Pick<StockWarehouse, 'name' | 'manager' | 'address'>;
 type SupplierForm = Pick<StockSupplier, 'name' | 'contactName' | 'email' | 'phone' | 'address' | 'notes'>;
 type MovementForm = { productId: string; warehouseId: string; destinationWarehouseId: string; quantity: number; purchasePrice: number; reason: string; movementDate: string; userName: string; reference: string; comment: string };
@@ -545,65 +545,20 @@ function RequestModal({ value, data, onClose, onChange, onSave }: { value: Stock
 
 function ProductModal({ value, suppliers, onClose, onSave }: { value: ProductForm | StockProduct; suppliers: StockSupplier[]; onClose: () => void; onSave: (body: ProductForm) => void }) {
   const { canCreate, canModify } = useStockAccess();
-  const isEditing = 'id' in value;
   const [form, setForm] = useState<ProductForm>({ ...blankProduct, ...value });
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageError, setImageError] = useState('');
   const update = (key: keyof ProductForm, nextValue: string | number | null) => setForm(current => ({ ...current, [key]: nextValue }));
 
   const save = () => {
     if ('id' in value ? !canModify : !canCreate) return;
-    onSave({ ...form, imageFile });
+    onSave(form);
   };
 
   return <Modal large title={'id' in value ? 'Modifier le produit' : 'Ajouter un produit'} onClose={onClose}>
     <div className="grid gap-4 sm:grid-cols-2">
       <Input label="Nom du produit" value={form.name} onChange={value => update('name', value)} />
       <Input label="SKU / référence" value={form.sku} onChange={value => update('sku', value)} />
-      {isEditing && <Input label="Code-barres" value={form.barcode} onChange={value => update('barcode', value)} />}
-      {isEditing && <Input label="Marque" value={form.brand} onChange={value => update('brand', value)} />}
       <Input label="Catégorie" value={form.category} onChange={value => update('category', value)} />
-      {isEditing && <Input label="Sous-catégorie" value={form.subcategory} onChange={value => update('subcategory', value)} />}
       <Input label="Unité" value={form.unit} onChange={value => update('unit', value)} />
-      {isEditing && <div className="flex min-w-0 items-center gap-3">
-        <span className="shrink-0 text-xs font-bold">Photo</span>
-        <label htmlFor="stock-product-image" aria-label={imageFile || form.imageUrl ? 'Remplacer la photo de l’article' : 'Ajouter une photo à l’article'} className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border bg-[hsl(var(--muted)/.35)] px-3 py-2 text-xs font-bold transition hover:bg-[hsl(var(--muted)/.6)]">
-          <Upload size={14} aria-hidden="true" />
-          {imageFile || form.imageUrl ? 'Remplacer' : 'Choisir'}
-        </label>
-        <span
-          id={imageError ? 'stock-product-image-error' : undefined}
-          role={imageError ? 'alert' : undefined}
-          title={imageError || imageFile?.name || undefined}
-          className={`min-w-0 flex-1 truncate text-xs ${imageError ? 'text-[hsl(var(--destructive))]' : 'text-[hsl(var(--muted-foreground))]'}`}
-        >
-          {imageError || imageFile?.name || (form.imageUrl ? 'Photo actuelle' : 'Aucune photo sélectionnée')}
-        </span>
-        <span id="stock-product-image-help" className="sr-only">Formats JPG, PNG ou WebP · 1,8 Mo maximum.</span>
-          <input
-            id="stock-product-image"
-            type="file"
-            accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-            aria-describedby={imageError ? 'stock-product-image-error' : 'stock-product-image-help'}
-            aria-invalid={Boolean(imageError)}
-            className="sr-only"
-            onChange={event => {
-              const file = event.currentTarget.files?.[0];
-              event.currentTarget.value = '';
-              if (!file) return;
-              if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-                setImageError('Choisissez une image JPG, PNG ou WebP.');
-                return;
-              }
-              if (file.size > 1_800_000) {
-                setImageError('La photo ne doit pas dépasser 1,8 Mo.');
-                return;
-              }
-              setImageError('');
-              setImageFile(file);
-            }}
-          />
-      </div>}
       <Input label="Prix d’achat (FCFA)" type="number" value={String(form.purchasePrice)} onChange={value => update('purchasePrice', Number(value))} />
       <Input label="Prix de vente (FCFA)" type="number" value={String(form.salePrice)} onChange={value => update('salePrice', Number(value))} />
       <Input label="Stock minimum" type="number" value={String(form.minStock)} onChange={value => update('minStock', Number(value))} />
