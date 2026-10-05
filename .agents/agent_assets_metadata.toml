@@ -420,3 +420,17 @@ mtime_ms = 1791024964808
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/269f38f0-763f-494c-a040-ff751c5cbf22/6e637a61-64dc-4a0c-9c47-0b5c48ff3527"
 storage_version_token = "1791024965355043"
 content_type = "text/html"
+
+[[outputs]]
+id = "eZnGelTALzmwJQTOUIfPD"
+uri = "file://.local/outputs/MAXIMUS-Centre-de-pilotage-des-ventes.pdf"
+type = "pdf"
+title = "MAXIMUS — Centre de pilotage des ventes (PDF)"
+description = "Présentation commerciale MAXIMUS en huit diapositives, destinée aux commerçants sans site."
+logical_id = "e3d18a40-88ce-4fd6-90fa-7d11d3456e82"
+content_hash = "sha256:c6655f41b32888fa168dc6f667e34c791ff5ca6d513999696082b9271dded628"
+size = 372711
+mtime_ms = 1791227476448
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/e3d18a40-88ce-4fd6-90fa-7d11d3456e82/77cb36e2-1727-4617-a2aa-31986d617dd9"
+storage_version_token = "1791227476989105"
+content_type = "application/pdf"
