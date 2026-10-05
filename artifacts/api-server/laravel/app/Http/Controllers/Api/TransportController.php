@@ -252,10 +252,11 @@ class TransportController extends Controller
             'status' => ['sometimes', Rule::in(self::DRIVER_STATUSES)],
         ]);
         $company = $this->company($request);
+        $realCompany = (string) ($request->attributes->get('realCompanyId') ?: $company);
         $employeeId = trim($input['employeeId']);
         $employee = AuthUser::query()
             ->where('employee_id', $employeeId)
-            ->where('company_id', $company)
+            ->where('company_id', $realCompany)
             ->where('status', 'ACTIF')
             ->first();
         if (! $employee) {

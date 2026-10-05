@@ -9,6 +9,7 @@ use App\Services\MaximusPushNotificationService;
 use App\Services\PublicRegistrationPolicy;
 use App\Support\CompanyStateBoundary;
 use App\Support\DemoWorkspace;
+use App\Support\EmployeeRecordScope;
 use App\Support\ModuleAuthorization;
 use App\Support\ModuleCatalog;
 use App\Support\RolePermissionAuthorization;
@@ -185,7 +186,7 @@ class AppStateController extends Controller
                 (string) ($actor['companyId'] ?? ''),
             );
             $state = $this->restrictToCompany($state, (string) ($actor['companyId'] ?? ''));
-            $state = $this->restrictBusinessReads($state, $actor);
+            $state = $this->restrictBusinessReads($state, $actor, $demoEnabled);
         } else {
             $state = $this->mergeRegistryCompanies($state);
         }
@@ -1200,7 +1201,7 @@ class AppStateController extends Controller
     }
 
     /** UI visibility is not authorization: project business records on the server. */
-    private function restrictBusinessReads(array $state, array $actor): array
+    private function restrictBusinessReads(array $state, array $actor, bool $demoEnabled = false): array
     {
         if (($actor['role'] ?? null) === 'company_admin') {
             return $state;
@@ -1214,6 +1215,87 @@ class AppStateController extends Controller
                 $state[$collection],
                 fn (mixed $record): bool => is_array($record)
                     && $this->allowsCollectionAction($actor, $collection, 'view', $record),
+            ));
+        }
+
+        if ($demoEnabled) {
+            $employeeIds = EmployeeRecordScope::allowedEmployeeIds(
+                $actor,
+                (string) ($actor['companyId'] ?? ''),
+                $state,
+            );
+            if ($employeeIds !== null) {
+                $state = $this->restrictDemoEmployeeRecords($state, $employeeIds, $actor);
+            }
+        }
+
+        return $state;
+    }
+
+    private function restrictDemoEmployeeRecords(array $state, array $employeeIds, array $actor): array
+    {
+        $allowedEmployees = array_fill_keys(array_map('strval', $employeeIds), true);
+        $state['employees'] = array_values(array_filter(
+            is_array($state['employees'] ?? null) ? $state['employees'] : [],
+            fn (mixed $record): bool => is_array($record)
+                && isset($allowedEmployees[(string) ($record['id'] ?? '')]),
+        ));
+        $roleIds = [];
+        $sectorIds = array_fill_keys(
+            array_values(array_filter($actor['sectorIds'] ?? [], 'is_string')),
+            true,
+        );
+        $employeeNames = [];
+        foreach ($state['employees'] as $employee) {
+            if (is_string($employee['roleId'] ?? null)) {
+                $roleIds[$employee['roleId']] = true;
+            }
+            if (is_string($employee['sectorId'] ?? null)) {
+                $sectorIds[$employee['sectorId']] = true;
+            }
+            $name = trim((string) ($employee['firstName'] ?? '').' '.(string) ($employee['lastName'] ?? ''));
+            if ($name !== '') {
+                $employeeNames[$name] = true;
+            }
+        }
+
+        $state['roles'] = array_values(array_filter(
+            is_array($state['roles'] ?? null) ? $state['roles'] : [],
+            fn (mixed $record): bool => is_array($record)
+                && isset($roleIds[(string) ($record['id'] ?? '')]),
+        ));
+        $state['orgNodes'] = array_values(array_filter(
+            is_array($state['orgNodes'] ?? null) ? $state['orgNodes'] : [],
+            fn (mixed $record): bool => is_array($record)
+                && isset($sectorIds[(string) ($record['id'] ?? '')]),
+        ));
+        $state['controlTasks'] = array_values(array_filter(
+            is_array($state['controlTasks'] ?? null) ? $state['controlTasks'] : [],
+            fn (mixed $record): bool => is_array($record)
+                && (empty($record['assigneeEmployeeId'])
+                    || isset($allowedEmployees[(string) $record['assigneeEmployeeId']])),
+        ));
+
+        foreach (['payrollSlips', 'activities'] as $collection) {
+            if (! is_array($state[$collection] ?? null)) {
+                continue;
+            }
+            $state[$collection] = array_values(array_filter(
+                $state[$collection],
+                function (mixed $record) use ($allowedEmployees, $employeeNames, $collection): bool {
+                    if (! is_array($record)) {
+                        return false;
+                    }
+                    $employeeId = $record['employeeId'] ?? $record['employee_id'] ?? null;
+                    if ($employeeId !== null && $employeeId !== '') {
+                        return isset($allowedEmployees[(string) $employeeId]);
+                    }
+                    $name = (string) ($collection === 'payrollSlips'
+                        ? ($record['employee'] ?? '')
+                        : ($record['user'] ?? ''));
+
+                    return $name !== '' && isset($employeeNames[$name]);
+                },
             ));
         }
 

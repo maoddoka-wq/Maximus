@@ -314,6 +314,11 @@ final class PayrollService
 
     private function wallet(string $companyId): object
     {
+        $wallet = DB::table('payroll_wallets')->where('company_id', $companyId)->first();
+        if ($wallet) {
+            return $wallet;
+        }
+
         $id = 'payroll-wallet-'.$companyId;
         DB::table('payroll_wallets')->insertOrIgnore([
             'id' => $id,
@@ -326,7 +331,7 @@ final class PayrollService
             'updated_at' => now(),
         ]);
 
-        return DB::table('payroll_wallets')->where('id', $id)->first();
+        return DB::table('payroll_wallets')->where('company_id', $companyId)->first();
     }
 
     private function ledger(object $wallet, string $companyId, string $type, string $direction, int $amount, string $referenceType, string $referenceId, string $key): void

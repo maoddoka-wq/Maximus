@@ -111,6 +111,203 @@ class DemoWorkspaceTest extends TestCase
         )['products'][0]['name']);
     }
 
+    public function test_demo_fixtures_use_existing_employee_accounts_and_add_accounts_created_later(): void
+    {
+        $this->prepareCompany();
+        ModuleCatalog::ensureCompanyAccess('kora', ['presences', 'transport']);
+        $manager = $this->createLinkedEmployeeAccount(
+            'demo-linked-manager',
+            'employee-manager-kora',
+            'sector_manager',
+            ['kora-sector-1'],
+        );
+        $employee = $this->createLinkedEmployeeAccount(
+            'demo-linked-employee',
+            'employee-kora-1',
+            'employee',
+            ['kora-sector-1'],
+        );
+        $otherEmployee = $this->createLinkedEmployeeAccount(
+            'demo-linked-employee-other',
+            'employee-kora-2',
+            'employee',
+            ['kora-sector-2'],
+        );
+
+        DemoWorkspace::setEnabled('kora', true);
+        $demoCompanyId = DemoWorkspace::datasetCompanyId('kora');
+        $this->assertDatabaseHas('presence_items', [
+            'company_id' => $demoCompanyId,
+            'employee_id' => $employee->employee_id,
+            'type' => 'attendance',
+        ]);
+        $this->assertDatabaseHas('control_tasks', [
+            'company_id' => $demoCompanyId,
+            'assignee_employee_id' => $employee->employee_id,
+        ]);
+        $this->assertDatabaseHas('transport_drivers', [
+            'company_id' => $demoCompanyId,
+            'employee_id' => $employee->employee_id,
+        ]);
+        $this->assertDatabaseHas('payroll_beneficiaries', [
+            'company_id' => $demoCompanyId,
+            'employee_id' => $employee->employee_id,
+        ]);
+
+        $demoState = json_decode(
+            (string) DB::table('maximus_app_states')
+                ->where('scope', DemoWorkspace::stateScope('kora'))
+                ->value('payload'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+        $this->assertContains(
+            $employee->employee_id,
+            array_column($demoState['employees'], 'id'),
+        );
+        $this->assertDatabaseHas('presence_items', [
+            'company_id' => $demoCompanyId,
+            'employee_id' => $otherEmployee->employee_id,
+            'type' => 'attendance',
+        ]);
+
+        $employeeBootstrap = $this->withSessionFor($employee)
+            ->withHeader('X-Maximus-Dataset', 'demo')
+            ->getJson('/api/presence/bootstrap?companyId=kora')
+            ->assertOk();
+        $visibleEmployeeIds = collect($employeeBootstrap->json('items'))
+            ->pluck('employeeId')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $this->assertSame([$employee->employee_id], $visibleEmployeeIds);
+
+        $employeeControl = $this->withSessionFor($employee)
+            ->withHeader('X-Maximus-Dataset', 'demo')
+            ->getJson('/api/control/bootstrap?companyId=kora')
+            ->assertOk();
+        $this->assertSame(
+            [$employee->employee_id],
+            array_column($employeeControl->json('tasks'), 'assigneeEmployeeId'),
+        );
+
+        $employeeState = $this->withSessionFor($employee)
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('dataset', 'demo');
+        $this->assertSame(
+            [$employee->employee_id],
+            array_column($employeeState->json('data.employees'), 'id'),
+        );
+
+        $employeePayroll = $this->withSessionFor($employee)
+            ->withHeader('X-Maximus-Dataset', 'demo')
+            ->getJson('/api/payroll/bootstrap?companyId=kora')
+            ->assertOk();
+        $this->assertSame(
+            [$employee->employee_id],
+            array_column($employeePayroll->json('beneficiaries'), 'employeeId'),
+        );
+
+        $otherEmployeePayroll = $this->withSessionFor($otherEmployee)
+            ->withHeader('X-Maximus-Dataset', 'demo')
+            ->getJson('/api/payroll/bootstrap?companyId=kora')
+            ->assertOk();
+        $this->assertSame(
+            [$otherEmployee->employee_id],
+            array_column($otherEmployeePayroll->json('beneficiaries'), 'employeeId'),
+        );
+
+        $managerPayroll = $this->withSessionFor($manager)
+            ->withHeader('X-Maximus-Dataset', 'demo')
+            ->getJson('/api/payroll/bootstrap?companyId=kora')
+            ->assertOk();
+        $this->assertEqualsCanonicalizing(
+            [$manager->employee_id, $employee->employee_id],
+            array_column($managerPayroll->json('beneficiaries'), 'employeeId'),
+        );
+
+        $managerRequest = $this->withSessionFor($manager)->withHeader('X-Maximus-Dataset', 'demo');
+        $managerRequest->postJson('/api/presence/items?companyId=kora', [
+            'type' => 'leave',
+            'employeeId' => $employee->employee_id,
+            'startDate' => now()->addDays(30)->toDateString(),
+            'endDate' => now()->addDays(34)->toDateString(),
+            'status' => 'EN ATTENTE',
+            'payload' => ['reason' => 'Demande fictive de démonstration'],
+        ])->assertCreated();
+        $managerRequest->postJson('/api/presence/items?companyId=kora', [
+            'type' => 'leave',
+            'employeeId' => $otherEmployee->employee_id,
+            'startDate' => now()->addDays(30)->toDateString(),
+            'endDate' => now()->addDays(34)->toDateString(),
+            'status' => 'EN ATTENTE',
+            'payload' => ['reason' => 'Demande hors secteur'],
+        ])->assertForbidden();
+
+        $this->asCompanyAdmin();
+        $administrator = AuthUser::query()->whereKey('demo-workspace-admin')->firstOrFail();
+        $adminRequest = $this->withSessionFor($administrator)->withHeader('X-Maximus-Dataset', 'demo');
+        $adminRequest->postJson('/api/payroll/beneficiaries?companyId=kora', [
+            'employeeId' => $employee->employee_id,
+            'fullName' => 'Bénéficiaire de démonstration',
+            'mobile' => '+221 70 555 1212',
+            'accountNumber' => 'DEMO-NEW-ACCOUNT',
+            'provider' => 'WAVE',
+            'monthlySalary' => 325000,
+            'paymentDay' => 25,
+        ])->assertCreated();
+        $adminRequest->postJson('/api/transport/drivers?companyId=kora', [
+            'employeeId' => $employee->employee_id,
+            'licenseNumber' => 'DEMO-DUPLICATE-CHECK',
+        ])->assertUnprocessable()
+            ->assertJsonPath('error', 'Ce compte est déjà lié à un chauffeur.');
+
+        $existingTaskId = DB::table('control_tasks')
+            ->where('company_id', $demoCompanyId)
+            ->where('assignee_employee_id', $employee->employee_id)
+            ->value('id');
+        DB::table('control_tasks')->where('id', $existingTaskId)->update(['title' => 'Tâche modifiée en démo']);
+        $originalPasswordHash = $employee->password_hash;
+        $originalPermissions = $employee->permissions;
+
+        DemoWorkspace::setEnabled('kora', false);
+        $laterEmployee = $this->createLinkedEmployeeAccount(
+            'demo-linked-employee-later',
+            'employee-kora-2',
+            'employee',
+            ['kora-sector-1'],
+        );
+        DemoWorkspace::setEnabled('kora', true);
+
+        $this->assertDatabaseHas('control_tasks', [
+            'id' => $existingTaskId,
+            'company_id' => $demoCompanyId,
+            'title' => 'Tâche modifiée en démo',
+        ]);
+        $this->assertDatabaseHas('presence_items', [
+            'company_id' => $demoCompanyId,
+            'employee_id' => $laterEmployee->employee_id,
+            'type' => 'attendance',
+        ]);
+        $this->assertSame($originalPasswordHash, AuthUser::query()->whereKey($employee->id)->value('password_hash'));
+        $preservedAccount = AuthUser::query()->whereKey($employee->id)->firstOrFail();
+        $this->assertSame($employee->id, $preservedAccount->id);
+        $this->assertSame($employee->employee_id, $preservedAccount->employee_id);
+        $this->assertSame($employee->role, $preservedAccount->role);
+        $this->assertSame($originalPermissions, $preservedAccount->permissions);
+
+        $laterEmployeeBootstrap = $this->withSessionFor($laterEmployee)
+            ->withHeader('X-Maximus-Dataset', 'demo')
+            ->getJson('/api/presence/bootstrap?companyId=kora')
+            ->assertOk();
+        $this->assertSame(
+            [$laterEmployee->employee_id],
+            collect($laterEmployeeBootstrap->json('items'))->pluck('employeeId')->filter()->unique()->values()->all(),
+        );
+    }
+
     public function test_stock_routes_use_the_synthetic_company_and_reject_a_stale_dataset_header(): void
     {
         $this->prepareCompany();
@@ -277,6 +474,36 @@ class DemoWorkspaceTest extends TestCase
             'status' => 'ACTIF',
         ]);
 
+        return $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
+    }
+
+    private function createLinkedEmployeeAccount(
+        string $id,
+        string $employeeId,
+        string $role = 'employee',
+        array $sectorIds = [],
+    ): AuthUser {
+        return AuthUser::query()->create([
+            'id' => $id,
+            'email' => $id.'@kora.example.test',
+            'password_hash' => 'unchanged-'.$id,
+            'display_name' => 'Compte '.str_replace('-', ' ', $id),
+            'role' => $role,
+            'company_id' => 'kora',
+            'employee_id' => $employeeId,
+            'sector_ids' => $sectorIds,
+            'permissions' => [
+                'presence.view' => ['allowed'],
+                'presence.create' => ['allowed'],
+                'paie' => ['voir'],
+            ],
+            'status' => 'ACTIF',
+        ]);
+    }
+
+    private function withSessionFor(AuthUser $user): self
+    {
         return $this->withCredentials()
             ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
     }

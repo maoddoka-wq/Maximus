@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\PayrollService;
+use App\Support\EmployeeRecordScope;
 use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,36 @@ final class PayrollController extends Controller
             return $this->forbidden();
         }
 
-        return response()->json($this->payroll->bootstrap($this->company($request)));
+        $data = $this->payroll->bootstrap($this->company($request));
+        $actor = $request->attributes->get('authActor');
+        if (is_array($actor)) {
+            $employeeIds = EmployeeRecordScope::forDemoRequest($request, $actor);
+            if ($employeeIds !== null) {
+                $allowedEmployeeIds = array_fill_keys($employeeIds, true);
+                $data['beneficiaries'] = array_values(array_filter(
+                    $data['beneficiaries'],
+                    fn (array $beneficiary): bool => isset($allowedEmployeeIds[(string) ($beneficiary['employeeId'] ?? '')]),
+                ));
+                $beneficiaryIds = array_fill_keys(
+                    array_map('strval', array_column($data['beneficiaries'], 'id')),
+                    true,
+                );
+                $data['items'] = array_values(array_filter(
+                    $data['items'],
+                    fn (array $item): bool => isset($beneficiaryIds[(string) ($item['beneficiaryId'] ?? '')]),
+                ));
+                $batchIds = array_fill_keys(
+                    array_map('strval', array_column($data['items'], 'batchId')),
+                    true,
+                );
+                $data['batches'] = array_values(array_filter(
+                    $data['batches'],
+                    fn (array $batch): bool => isset($batchIds[(string) ($batch['id'] ?? '')]),
+                ));
+            }
+        }
+
+        return response()->json($data);
     }
 
     public function createBeneficiary(Request $request): JsonResponse
@@ -35,7 +65,8 @@ final class PayrollController extends Controller
         }
         $input = $this->validateBeneficiary($request);
         $company = $this->company($request);
-        $this->assertEmployeeBelongsToCompany($input['employeeId'] ?? null, $company);
+        $realCompany = (string) ($request->attributes->get('realCompanyId') ?: $company);
+        $this->assertEmployeeBelongsToCompany($input['employeeId'] ?? null, $realCompany);
         $row = [
             'id' => 'payroll-beneficiary-'.Str::uuid(),
             'company_id' => $company,
@@ -61,7 +92,8 @@ final class PayrollController extends Controller
             return $this->forbidden();
         }
         $input = $this->validateBeneficiary($request, true);
-        $this->assertEmployeeBelongsToCompany($input['employeeId'] ?? null, $this->company($request));
+        $realCompany = (string) ($request->attributes->get('realCompanyId') ?: $this->company($request));
+        $this->assertEmployeeBelongsToCompany($input['employeeId'] ?? null, $realCompany);
         $query = DB::table('payroll_beneficiaries')->where('id', $id)->where('company_id', $this->company($request));
         if (! $query->exists()) {
             return response()->json(['error' => 'Bénéficiaire introuvable.'], 404);

@@ -61,13 +61,14 @@ class PresenceController extends Controller
         if (! $companyId) {
             return response()->json(['error' => 'Contexte entreprise requis.'], 400);
         }
+        $authorizationCompanyId = (string) ($request->attributes->get('realCompanyId') ?: $companyId);
         $actorData = $request->attributes->get('authActor');
         $feature = $this->featureForType($input['type']);
         if (! is_array($actorData)
             || $feature === null
             || (($actorData['role'] ?? null) === 'employee' && $input['type'] === 'schedule')
             || ! ModuleAuthorization::allows($actorData, 'presences', 'create', $feature)
-            || ! $this->actorCanAccessEmployee($actorData, $companyId, $input['employeeId'] ?? null)) {
+            || ! $this->actorCanAccessEmployee($actorData, $authorizationCompanyId, $input['employeeId'] ?? null)) {
             return $this->forbidden();
         }
         $actor = $this->actorName($request);
@@ -102,6 +103,7 @@ class PresenceController extends Controller
     {
         $input = $this->validateItem($request, true);
         $companyId = $this->company($request);
+        $authorizationCompanyId = (string) ($request->attributes->get('realCompanyId') ?: $companyId);
         $item = PresenceItem::query()->where('id', $id)->where('company_id', $companyId)->first();
 
         if (! $item) {
@@ -139,7 +141,7 @@ class PresenceController extends Controller
             && ModuleAuthorization::allows($actorData, 'presences', 'edit', $feature);
         $allowed = is_array($actorData)
             && $feature !== null
-            && $this->actorCanAccessEmployee($actorData, $companyId, $item->employee_id)
+            && $this->actorCanAccessEmployee($actorData, $authorizationCompanyId, $item->employee_id)
             && ! (($actorData['role'] ?? null) === 'employee' && $item->type === 'schedule')
             && ! ($requiresValidation && ($actorData['role'] ?? null) === 'employee')
             && $hasCrudRights
@@ -186,6 +188,7 @@ class PresenceController extends Controller
     public function delete(Request $request, string $id): JsonResponse
     {
         $companyId = $this->company($request);
+        $authorizationCompanyId = (string) ($request->attributes->get('realCompanyId') ?: $companyId);
         $item = PresenceItem::query()->where('id', $id)->where('company_id', $companyId)->first();
         if (! $item) {
             return response()->json(['error' => 'Enregistrement introuvable'], 404);
@@ -198,7 +201,7 @@ class PresenceController extends Controller
         $feature = $this->featureForType($item->type);
         if (! is_array($actorData)
             || (($actorData['role'] ?? null) === 'employee' && $item->type === 'schedule')
-            || ! $this->actorCanAccessEmployee($actorData, $companyId, $item->employee_id)
+            || ! $this->actorCanAccessEmployee($actorData, $authorizationCompanyId, $item->employee_id)
             || $feature === null
             || ! ModuleAuthorization::allows($actorData, 'presences', 'view', $feature)
             || ! ModuleAuthorization::allows($actorData, 'presences', 'create', $feature)
@@ -266,7 +269,8 @@ class PresenceController extends Controller
         ])->validate();
         $companyId = $this->company($request);
         $actorData = $request->attributes->get('authActor');
-        $employeeSectorIds = $companyId ? $this->employeeSectorIds($companyId, $input['employeeId']) : [];
+        $realCompanyId = (string) ($request->attributes->get('realCompanyId') ?: $companyId);
+        $employeeSectorIds = $realCompanyId ? $this->employeeSectorIds($realCompanyId, $input['employeeId']) : [];
         if (! $companyId || ! is_array($actorData)
             || ! ModuleAuthorization::allowsPresenceClock($actorData, $input['employeeId'], $employeeSectorIds)) {
             return $this->forbidden();

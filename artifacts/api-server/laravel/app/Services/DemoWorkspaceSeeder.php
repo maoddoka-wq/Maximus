@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AuthUser;
 use App\Support\DemoWorkspace;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,406 @@ final class DemoWorkspaceSeeder
         $this->seedPayroll($datasetCompanyId, $ids, $now);
         $this->seedTransport($datasetCompanyId, $ids, $now);
         $this->seedImmobilier($datasetCompanyId, $ids, $now);
+    }
+
+    /**
+     * Add demo-only records for existing employee accounts without changing
+     * authentication data or resetting fixtures the company has already edited.
+     */
+    public function seedExistingEmployeeAccounts(string $companyId): void
+    {
+        $datasetCompanyId = DemoWorkspace::datasetCompanyId($companyId);
+        $ids = fn (string $name): string => 'demo-'.substr(hash('sha256', $companyId), 0, 16).'-'.$name;
+        $users = AuthUser::query()
+            ->where('company_id', $companyId)
+            ->whereIn('role', ['employee', 'sector_manager'])
+            ->where('status', 'ACTIF')
+            ->whereNotNull('employee_id')
+            ->orderBy('created_at')
+            ->get();
+
+        foreach ($users as $user) {
+            $employeeId = trim((string) $user->employee_id);
+            if ($employeeId === '') {
+                continue;
+            }
+
+            $linkScope = DemoWorkspace::employeeScope($companyId, $employeeId);
+            if (DB::table('maximus_app_states')->where('scope', $linkScope)->exists()) {
+                continue;
+            }
+
+            $fingerprint = substr(hash('sha256', $employeeId), 0, 12);
+            $accountIds = fn (string $name): string => $ids('account-'.$fingerprint.'-'.$name);
+            $now = now();
+            $displayName = trim((string) $user->display_name);
+            if ($displayName === '') {
+                $displayName = 'Employé de démonstration';
+            }
+            $sectorIds = array_values(array_unique(array_filter(
+                is_array($user->sector_ids) ? $user->sector_ids : [],
+                static fn (mixed $sectorId): bool => is_string($sectorId) && trim($sectorId) !== '',
+            )));
+            $sectorId = $sectorIds[0] ?? null;
+
+            $this->addEmployeeToDemoAppState(
+                $companyId,
+                $user,
+                $employeeId,
+                $displayName,
+                $sectorIds,
+                $accountIds,
+                $now,
+            );
+            $this->seedEmployeePresence($datasetCompanyId, $employeeId, $displayName, $accountIds, $now);
+            $this->seedEmployeeControlTask($datasetCompanyId, $employeeId, $displayName, $sectorId, $accountIds, $now);
+            $this->seedEmployeeTransport($datasetCompanyId, $employeeId, $displayName, $accountIds, $now);
+            $this->seedEmployeePayroll($datasetCompanyId, $employeeId, $displayName, $accountIds, $now);
+
+            DB::table('maximus_app_states')->insertOrIgnore([
+                'scope' => $linkScope,
+                'company_id' => $companyId,
+                'payload' => json_encode(['initialized' => true], JSON_THROW_ON_ERROR),
+                'version' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+    }
+
+    private function addEmployeeToDemoAppState(
+        string $companyId,
+        AuthUser $user,
+        string $employeeId,
+        string $displayName,
+        array $sectorIds,
+        callable $ids,
+        mixed $now,
+    ): void {
+        $scope = DemoWorkspace::stateScope($companyId);
+        $row = DB::table('maximus_app_states')->where('scope', $scope)->lockForUpdate()->first();
+        if (! $row) {
+            throw new \RuntimeException('DEMO_APP_STATE_NOT_INITIALIZED');
+        }
+
+        $payload = is_string($row->payload) ? json_decode($row->payload, true) : ($row->payload ?? []);
+        $state = is_array($payload) ? $payload : [];
+        $sectorId = $sectorIds[0] ?? null;
+        $roleId = $ids('role');
+        $parts = preg_split('/\s+/', $displayName, 2) ?: [];
+        $this->appendStateRecord($state, 'employees', [
+            'id' => $employeeId,
+            'firstName' => $parts[0] ?? 'Employé',
+            'lastName' => $parts[1] ?? 'MAXIMUS',
+            'email' => (string) $user->email,
+            'phone' => (string) ($user->phone ?? ''),
+            'position' => ($user->role ?? '') === 'sector_manager' ? 'Responsable de secteur' : 'Employé',
+            'department' => 'Opérations',
+            'subDepartment' => 'Démonstration',
+            'role' => (string) $user->role,
+            'status' => 'ACTIF',
+            'companyId' => $companyId,
+            'sectorId' => $sectorId,
+            'roleId' => $roleId,
+            'isSectorAdmin' => $user->role === 'sector_manager',
+        ]);
+        $this->appendStateRecord($state, 'roles', [
+            'id' => $roleId,
+            'name' => 'Rôle de démonstration — '.$displayName,
+            'description' => 'Profil fictif lié au compte existant; les autorisations réelles restent inchangées.',
+            'companyId' => $companyId,
+            'sectorId' => $sectorId,
+            'modulePermissions' => is_array($user->permissions) ? $user->permissions : [],
+        ]);
+
+        foreach ($sectorIds as $index => $linkedSectorId) {
+            $this->appendStateRecord($state, 'orgNodes', [
+                'id' => $linkedSectorId,
+                'companyId' => $companyId,
+                'code' => 'DEMO-UNIT-'.strtoupper(substr(hash('sha256', $linkedSectorId), 0, 8)),
+                'name' => 'Unité de démonstration '.($index + 1),
+                'type' => 'service',
+                'parentId' => null,
+                'moduleIds' => [],
+                'managerEmployeeId' => $user->role === 'sector_manager' ? $employeeId : null,
+            ]);
+        }
+
+        $taskId = $ids('control-task');
+        $this->appendStateRecord($state, 'controlTasks', [
+            'id' => $taskId,
+            'title' => 'Traiter une demande de démonstration',
+            'description' => 'Tâche fictive attribuée au compte existant.',
+            'companyId' => $companyId,
+            'sectorId' => $sectorId,
+            'moduleId' => 'stocks',
+            'assigneeEmployeeId' => $employeeId,
+            'assigneeName' => $displayName,
+            'createdBy' => 'Administration de démonstration',
+            'status' => 'EN COURS',
+            'priority' => 'NORMALE',
+            'requiresApproval' => false,
+            'dueDate' => $now->copy()->addDays(3)->toDateString(),
+            'relatedObject' => 'Dépôt principal',
+            'createdAt' => $now->toISOString(),
+            'updatedAt' => $now->toISOString(),
+        ]);
+        $this->appendStateRecord($state, 'activities', [
+            'id' => $ids('activity'),
+            'employeeId' => $employeeId,
+            'user' => $displayName,
+            'action' => 'Ouverture de la démonstration',
+            'module' => 'presences',
+            'object' => 'Espace de démonstration',
+            'date' => $now->toDateString(),
+            'status' => 'ACTIF',
+            'companyId' => $companyId,
+        ]);
+        $fingerprint = substr(hash('sha256', $employeeId), 0, 8);
+        $this->appendStateRecord($state, 'payrollSlips', [
+            'id' => $ids('payroll-slip'),
+            'reference' => 'DEMO-BUL-'.$fingerprint,
+            'employeeId' => $employeeId,
+            'employee' => $displayName,
+            'period' => $now->format('Y-m'),
+            'gross' => 320000,
+            'net' => 291200,
+            'status' => 'BROUILLON',
+            'companyId' => $companyId,
+        ]);
+
+        DB::table('maximus_app_states')->where('scope', $scope)->update([
+            'payload' => json_encode($state, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'version' => ((int) $row->version) + 1,
+            'updated_at' => $now,
+        ]);
+    }
+
+    private function appendStateRecord(array &$state, string $collection, array $record): void
+    {
+        $records = is_array($state[$collection] ?? null) ? $state[$collection] : [];
+        foreach ($records as $existing) {
+            if (is_array($existing) && (string) ($existing['id'] ?? '') === (string) $record['id']) {
+                return;
+            }
+        }
+        $records[] = $record;
+        $state[$collection] = array_values($records);
+    }
+
+    private function seedEmployeePresence(
+        string $companyId,
+        string $employeeId,
+        string $displayName,
+        callable $ids,
+        mixed $now,
+    ): void {
+        $this->insertDemoRows('presence_items', [
+            [
+                'id' => $ids('presence-attendance'),
+                'company_id' => $companyId,
+                'type' => 'attendance',
+                'employee_id' => $employeeId,
+                'work_date' => $now->toDateString(),
+                'start_date' => null,
+                'end_date' => null,
+                'status' => 'VALIDÉE',
+                'payload' => json_encode(['arrivalTime' => '08:04', 'departureTime' => null, 'note' => 'Pointage fictif'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                'created_by' => $displayName,
+                'updated_by' => $displayName,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            [
+                'id' => $ids('presence-leave'),
+                'company_id' => $companyId,
+                'type' => 'leave',
+                'employee_id' => $employeeId,
+                'work_date' => null,
+                'start_date' => $now->copy()->addDays(14)->toDateString(),
+                'end_date' => $now->copy()->addDays(18)->toDateString(),
+                'status' => 'EN ATTENTE',
+                'payload' => json_encode(['reason' => 'Congé annuel fictif', 'days' => 5], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                'created_by' => $displayName,
+                'updated_by' => $displayName,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+        ]);
+    }
+
+    private function seedEmployeeControlTask(
+        string $companyId,
+        string $employeeId,
+        string $displayName,
+        ?string $sectorId,
+        callable $ids,
+        mixed $now,
+    ): void {
+        $this->insertDemoRows('control_tasks', [[
+            'id' => $ids('control-task'),
+            'company_id' => $companyId,
+            'sector_id' => $sectorId,
+            'title' => 'Traiter une demande de démonstration',
+            'description' => 'Tâche fictive attribuée au compte existant.',
+            'module_id' => 'stocks',
+            'assignee_employee_id' => $employeeId,
+            'assignee_name' => $displayName,
+            'created_by' => 'Administration de démonstration',
+            'status' => 'EN COURS',
+            'priority' => 'NORMALE',
+            'requires_approval' => false,
+            'due_date' => $now->copy()->addDays(3)->toDateString(),
+            'related_object' => 'Dépôt principal',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]]);
+    }
+
+    private function seedEmployeeTransport(
+        string $companyId,
+        string $employeeId,
+        string $displayName,
+        callable $ids,
+        mixed $now,
+    ): void {
+        $driverId = $ids('transport-driver');
+        $vehicleId = $ids('transport-vehicle');
+        $fingerprint = substr(hash('sha256', $employeeId), 0, 8);
+        $this->insertDemoRows('transport_drivers', [[
+            'id' => $driverId,
+            'company_id' => $companyId,
+            'name' => $displayName,
+            'phone' => '+221 70 555 '.substr($fingerprint, -4),
+            'license_number' => 'DEMO-PERMIS-'.$fingerprint,
+            'employee_id' => $employeeId,
+            'status' => 'ACTIVE',
+            'latitude' => 14.6937,
+            'longitude' => -17.4441,
+            'availability' => 'AVAILABLE',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]]);
+        $this->insertDemoRows('transport_vehicles', [[
+            'id' => $vehicleId,
+            'company_id' => $companyId,
+            'registration' => 'DEMO-'.strtoupper($fingerprint),
+            'model' => 'Berline de démonstration',
+            'vehicle_type' => 'TAXI',
+            'status' => 'AVAILABLE',
+            'driver_id' => $driverId,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]]);
+        $this->insertDemoRows('transport_trips', [
+            [
+                'id' => $ids('transport-trip-active'),
+                'company_id' => $companyId,
+                'reference' => 'DEMO-TAXI-'.$fingerprint.'-01',
+                'pickup' => 'Dakar-Plateau',
+                'destination' => 'Almadies',
+                'passenger_name' => 'Passager de démonstration',
+                'passenger_phone' => '+221 70 555 0000',
+                'fare' => 4500,
+                'driver_id' => $driverId,
+                'vehicle_id' => $vehicleId,
+                'status' => 'ASSIGNED',
+                'requested_at' => $now->copy()->subMinutes(20),
+                'created_at' => $now->copy()->subMinutes(20),
+                'updated_at' => $now,
+            ],
+            [
+                'id' => $ids('transport-trip-done'),
+                'company_id' => $companyId,
+                'reference' => 'DEMO-TAXI-'.$fingerprint.'-02',
+                'pickup' => 'Médina',
+                'destination' => 'Dakar-Plateau',
+                'passenger_name' => 'Passager de démonstration',
+                'passenger_phone' => '+221 70 555 0000',
+                'fare' => 2800,
+                'driver_id' => $driverId,
+                'vehicle_id' => $vehicleId,
+                'status' => 'COMPLETED',
+                'requested_at' => $now->copy()->subDay(),
+                'created_at' => $now->copy()->subDay(),
+                'updated_at' => $now->copy()->subDay(),
+            ],
+        ]);
+    }
+
+    private function seedEmployeePayroll(
+        string $companyId,
+        string $employeeId,
+        string $displayName,
+        callable $ids,
+        mixed $now,
+    ): void {
+        $beneficiaryId = $ids('payroll-beneficiary');
+        $batchId = $ids('payroll-batch');
+        $accountNumber = 'DEMO-ACCOUNT-'.substr(hash('sha256', $employeeId), 0, 8);
+        $mobile = '+221 70 555 '.substr(hash('sha256', $employeeId), -4);
+        $this->insertDemoRows('payroll_beneficiaries', [[
+            'id' => $beneficiaryId,
+            'company_id' => $companyId,
+            'employee_id' => $employeeId,
+            'full_name' => $displayName,
+            'mobile' => $mobile,
+            'account_number' => Crypt::encryptString($accountNumber),
+            'provider' => 'WAVE',
+            'monthly_salary' => 320000,
+            'payment_day' => 28,
+            'active' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]]);
+        $this->insertDemoRows('payroll_batches', [[
+            'id' => $batchId,
+            'company_id' => $companyId,
+            'period' => $now->format('Y-m'),
+            'payment_date' => $now->copy()->addDays(7)->toDateString(),
+            'total_amount' => 320000,
+            'status' => 'DRAFT',
+            'created_by' => $displayName,
+            'approved_by' => null,
+            'approved_at' => null,
+            'processed_at' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]]);
+        $this->insertDemoRows('payroll_batch_items', [[
+            'id' => $ids('payroll-batch-item'),
+            'batch_id' => $batchId,
+            'company_id' => $companyId,
+            'beneficiary_id' => $beneficiaryId,
+            'beneficiary_name' => $displayName,
+            'mobile' => $mobile,
+            'account_number' => Crypt::encryptString($accountNumber),
+            'provider' => 'WAVE',
+            'amount' => 320000,
+            'status' => 'PENDING',
+            'provider_payout_id' => null,
+            'idempotency_key' => $ids('payroll-payout-key'),
+            'failure_reason' => '',
+            'processed_at' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]]);
+    }
+
+    private function insertDemoRows(string $table, array $rows): void
+    {
+        if (! Schema::hasTable($table) || $rows === []) {
+            return;
+        }
+
+        $availableColumns = array_flip(Schema::getColumnListing($table));
+        $rows = array_values(array_map(
+            static fn (array $row): array => array_intersect_key($row, $availableColumns),
+            $rows,
+        ));
+        if ($rows !== []) {
+            DB::table($table)->insertOrIgnore($rows);
+        }
     }
 
     private function seedAppState(string $companyId, callable $ids, mixed $now): void

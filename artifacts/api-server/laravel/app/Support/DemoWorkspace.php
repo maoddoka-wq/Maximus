@@ -9,6 +9,7 @@ final class DemoWorkspace
 {
     private const MODE_SCOPE_PREFIX = 'demo-mode:';
     private const STATE_SCOPE_PREFIX = 'demo-workspace:';
+    private const EMPLOYEE_SCOPE_PREFIX = 'demo-employee:';
 
     public static function isEnabled(string $companyId): bool
     {
@@ -53,6 +54,9 @@ final class DemoWorkspace
                 app(DemoWorkspaceSeeder::class)->seed($companyId);
                 $payload['initialized'] = true;
             }
+            if ($enabled) {
+                app(DemoWorkspaceSeeder::class)->seedExistingEmployeeAccounts($companyId);
+            }
 
             $payload['enabled'] = $enabled;
             $payload['companyId'] = $companyId;
@@ -86,6 +90,11 @@ final class DemoWorkspace
     public static function modeScope(string $companyId): string
     {
         return self::MODE_SCOPE_PREFIX.hash('sha256', $companyId);
+    }
+
+    public static function employeeScope(string $companyId, string $employeeId): string
+    {
+        return self::EMPLOYEE_SCOPE_PREFIX.hash('sha256', $companyId."\0".$employeeId);
     }
 
     public static function datasetCompanyId(string $companyId): string
