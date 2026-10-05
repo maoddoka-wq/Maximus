@@ -289,7 +289,7 @@ class DemoWorkspaceTest extends TestCase
         );
         $companyDemoState['payrollSlips'] = array_values(array_filter(
             $companyDemoState['payrollSlips'],
-            static fn (array $slip): bool => ($slip['employeeId'] ?? null) !== $employee->employee_id,
+            fn (array $slip): bool => ($slip['employeeId'] ?? null) !== $employee->employee_id,
         ));
         DB::table('maximus_app_states')->where('scope', $demoStateScope)->update([
             'payload' => json_encode($companyDemoState, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
