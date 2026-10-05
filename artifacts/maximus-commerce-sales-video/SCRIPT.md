@@ -1,94 +1,148 @@
-# MAXIMUS — Le commerce en mouvement
+# MAXIMUS E-commerce — La boutique et les ventes réunies
 
 ## Traitement
 
-- **Promesse :** même sans site web, un commerçant peut présenter ses produits, enregistrer ses ventes au comptoir et lire son activité depuis MAXIMUS.
-- **Identité :** bleu nuit `#121821`, or `#F4B20B`, ivoire `#F3F0E7`; DM Sans pour les titres, une mono sobre pour les repères. Emblème officiel du deck, sans redessin.
-- **Héros :** le commerçant de la photo de couverture, puis un téléphone graphique qui relie boutique, comptoir et rapports.
-- **Mouvement :** recadrages photographiques avec parallaxe légère; téléphone qui se déplie en boutique; traits dorés et cadres qui se transforment entre les scènes.
-- **Arc :** accroche humaine immédiate, découverte du canal public, passage au comptoir, regroupement de l’activité, synthèse de marque.
-- **Finale :** inversion vers un champ bleu nuit épuré; l’emblème MAXIMUS et la phrase de marque se résolvent, puis le cercle de l’emblème devient le cercle du téléphone de l’ouverture.
-- **Format :** vertical 9:16, compositions pensées pour 1080 × 1920; tous les textes clés restent dans la zone centrale sûre.
-- **Durée :** 35 secondes, cinq scènes de 6, 7, 7, 7 et 8 secondes.
-- **Son :** un seul fond instrumental moderne, discret et sans paroles. Pas de voix off ni d’effet sonore; les messages sont portés par le texte à l’écran.
+- **Objectif :** montrer les fonctions e-commerce actuellement disponibles, sans transformer un écran d’attente en promesse.
+- **Promesse :** relier boutique publique, commandes, location, comptoir et suivi des ventes dans MAXIMUS.
+- **Identité :** bleu nuit `#121821`, or `#F4B20B`, ivoire `#F3F0E7`; DM Sans pour les titres, une mono sobre pour les repères. Emblème officiel existant.
+- **Format :** vertical 9:16, composition 1080 × 1920; textes dans la zone centrale sûre.
+- **Héros :** photographie de couverture déjà utilisée, puis interfaces graphiques stylisées et non transactionnelles.
+- **Durée cible :** 117 secondes, voix off française, une musique instrumentale continue. La durée finale sera ajustée à la mesure réelle de la narration.
+- **Son :** narration claire au premier plan, musique abaissée sous la voix et relevée dans les respirations. Pas d’effet sonore ni de montant, chiffre de performance ou commission inventés.
+- **Éléments exclus des revendications :** campagnes Promotions, dont la rubrique indique « à venir »; validation en production du paiement DiamanoPay, non établie par les tests locaux.
+- **Appel final :** « Demandez une démonstration adaptée à votre commerce. »
 
 ## Repère de rythme
 
-| Scène | Temps | Point d’attention | Action principale | Passage |
+| Scène | Temps cible | Fonction montrée | Point visuel | Passage |
 | --- | --- | --- | --- | --- |
-| 1 | 00–06 s | Le commerçant et le besoin | Accroche en deux temps, recadrage vers son téléphone | Le cercle doré s’agrandit en cadre de téléphone |
-| 2 | 06–13 s | La boutique publique | Le cadre se déplie en vitrine et catalogue | Un trait de fiche produit devient un ticket |
-| 3 | 13–20 s | La vente au comptoir | Ticket déroulé, puis trois moyens d’encaissement révélés | Les trois repères deviennent une ligne d’activité |
-| 4 | 20–27 s | Commandes et ventes | Deux canaux alimentent une chronologie sans montants inventés | Les lignes se redressent en panneaux de rapport |
-| 5 | 27–35 s | Rapports et marque | Filtres visibles, synthèse, conclusion de marque | L’emblème se contracte en cercle d’ouverture |
+| 1 — Accroche | 00–07 s | Boutique en ligne et comptoir | Le cercle d’or entoure le téléphone du commerçant | Le cercle devient le cadre du téléphone |
+| 2 — Boutique | 07–17 s | Identité, accueil, adresse et domaine | Le téléphone s’ouvre en vitrine | Un cadre de vitrine devient une fiche |
+| 3 — Catalogue | 17–29 s | Catégories, produits physiques et numériques | Des fiches différentes se rangent en catalogue | Une carte de fiche se replie en panier |
+| 4 — Clients | 29–41 s | Vitrine publique, panier, comptes, favoris, adresses | Les commandes du client se rangent dans son espace | Le panier se transforme en checkout |
+| 5 — Commandes | 41–55 s | Options de paiement, pièces jointes, étapes de commande | Les étapes forment une ligne de traitement | La ligne aboutit à un fichier protégé |
+| 6 — Numérique | 55–62 s | Livraison numérique après paiement confirmé | Un verrou s’ouvre sur l’accès au fichier | Le trait de téléchargement devient un itinéraire |
+| 7 — Location | 62–73 s | Offres, disponibilités, devis et réservations | Calendrier et itinéraire se composent autour d’un véhicule | L’itinéraire se redresse en ticket |
+| 8 — Comptoir | 73–83 s | Vente, moyens d’encaissement et stock | Le ticket devient une vente enregistrée | Trois moyens de vente convergent |
+| 9 — Suivi | 83–95 s | Clients, commandes et demandes de livraison | Trois flux séparés restent lisibles | Les flux deviennent les filtres du rapport |
+| 10 — Pilotage | 95–110 s | Tableau de bord, rapport, finances et retraits | Filtres et totaux sans valeur fictive | Le cadre du rapport ouvre la carte Promotions |
+| 11 — Promotions / marque | 110–117 s | Promotions à venir, puis marque et appel | Mention brève, puis finale MAXIMUS | Le cercle final rappelle celui de l’ouverture |
 
 ## Script détaillé
 
-### Scène 1 — « Vous vendez déjà » / 00.00–06.00 s
+### Scène 1 — « Vendre en ligne ne doit pas isoler le comptoir » / 00–07 s
 
-- **But :** reconnaître un commerçant qui vend déjà, mais n’a pas de site web.
-- **Texte exact à l’écran :** `VOUS VENDEZ.` à 00.20 s; `SANS SITE WEB ?` à 00.90 s. Petit repère `MAXIMUS · PRÉSENTATION COMMERCIALE` à partir de 04.10 s.
-- **Message :** le commerçant vend déjà, mais n’a pas encore de site web; aucune voix off.
-- **Composition :** portrait plein cadre recadré sur le commerçant et son téléphone; visage au-dessus du centre, texte ivoire sur une zone bleu nuit assombrie dans le tiers inférieur. Un cercle fin doré entoure brièvement le téléphone. Texte et visage gardent des zones distinctes.
-- **Idée visuelle :** le cercle autour du téléphone devient l’objet porteur de la scène suivante.
-- **Chorégraphie :** 00.00 s : photo déjà lisible, cercle et petit trait visibles. 00.20 s : `VOUS VENDEZ.` frappe à l’écran. 00.90 s : `SANS SITE WEB ?` se révèle sous la première ligne. Le cadrage évolue doucement; le cercle pulse vers 02.20 s. 04.10 s : l’emblème et le repère MAXIMUS apparaissent dans la zone sûre. 05.00 s : poussée finale; le cercle grandit jusqu’au raccord.
-- **Passage :** l’agrandissement du cercle et la poussée caméra révèlent le contour d’un téléphone dans la scène 2.
-- **Visuels et techniques :** photo de couverture existante; emblème officiel; masque typographique, parallaxe légère, cercle SVG.
-- **Son :** le fond instrumental continu démarre au premier cadre, sans effet sonore ni accent ajouté.
+- **But :** ouvrir sur un besoin réel et annoncer les deux canaux sans chiffres.
+- **Voix off :** « Vendre en ligne ne doit pas isoler le comptoir. MAXIMUS réunit vos ventes dans un même espace. »
+- **Texte à l’écran :** `VOUS VENDEZ.` puis `SANS SITE WEB ?`; repère `MAXIMUS · E-COMMERCE`.
+- **Composition :** conserver le portrait existant; cercle d’or autour du téléphone; texte ivoire sur le fond bleu nuit.
+- **Chorégraphie :** portrait déjà lisible; le cercle apparaît et pulse une fois; titre en deux temps; légère poussée caméra avant le raccord.
+- **Passage :** le cercle s’agrandit et devient le contour du téléphone de la boutique.
+- **Précision :** la photo est l’unique visage; ne pas inventer un témoignage ou une promesse de résultat.
 
-### Scène 2 — « Votre boutique publique » / 06.00–13.00 s
+### Scène 2 — « Votre boutique, à votre image » / 07–17 s
 
-- **But :** montrer la vitrine publique disponible même sans site web.
-- **Texte exact à l’écran :** `UNE BOUTIQUE PUBLIQUE` à 06.10 s; `Même sans site web.` à 06.28 s; `Vos produits, présentés à vos clients.` à 08.10 s. Dans le téléphone : `MAXIMUS`, `BOUTIQUE EN LIGNE`, `CATALOGUE` et `Boutique publique`.
-- **Message :** MAXIMUS donne une vitrine publique au commerçant, même sans site; aucune voix off.
-- **Composition :** téléphone vertical au centre; tuiles produit abstraites, sans prix, marques ni détails inventés. Les tuiles apparaissent à 06.58, 06.74 et 06.90 s.
-- **Idée visuelle :** le cercle précédent devient le contour du téléphone, puis le contour s’ouvre comme une vitrine.
-- **Chorégraphie :** 06.00 s : le cercle entrant se déplie en contour de téléphone; le téléphone arrive à sa place. 06.10 s : le titre et l’interface apparaissent. 06.58–06.90 s : les trois tuiles se révèlent l’une après l’autre. 07.10 s : `Boutique publique` apparaît dans l’interface. 08.10 s : le texte de présentation rejoint la scène. 09.45–10.70 s : un cadre doré souligne brièvement le catalogue. 11.10 s : la caméra amorce un rapprochement. 11.82–12.40 s : un trait doré sort du téléphone et traverse son bord supérieur.
-- **Passage :** la ligne de la fiche produit devient le bord supérieur d’un ticket de caisse; le téléphone se sépare en panneaux verticaux.
-- **Visuels et techniques :** cadres et tuiles UI non interactifs; pas de faux boutons, prix, textes produits, statistiques ou captures de données réelles.
-- **Son :** la même piste instrumentale continue, sans effet sonore.
+- **But :** montrer la configuration de la vitrine et son accès public.
+- **Voix off :** « Personnalisez l’identité de la boutique, sa page d’accueil, sa bannière et son adresse. Reliez votre propre domaine, choisissez la devise et réglez les options de commande. »
+- **Texte à l’écran :** `IDENTITÉ`, `ACCUEIL`, `BANNIÈRE`, `DOMAINE`; dans le téléphone `BOUTIQUE PUBLIQUE`.
+- **Composition :** conserver le téléphone et les tuiles abstraites de la scène existante; faire apparaître à côté une carte de réglages plutôt qu’un site web fictif.
+- **Chorégraphie :** le cadre entrant se déplie; les éléments d’identité se placent autour du téléphone; une ligne relie le réglage du domaine à la vitrine.
+- **Passage :** une tuile du catalogue se détache et devient la première fiche produit.
+- **Précision :** aucune URL inventée; les paiements en production ne sont pas déclarés validés par cette scène.
 
-### Scène 3 — « Vendez au comptoir » / 13.00–20.00 s
+### Scène 3 — « Un catalogue, plusieurs types d’offres » / 17–29 s
 
-- **But :** présenter la caisse comptoir et les trois moyens d’encaissement confirmés dans le deck.
-- **Texte exact à l’écran :** `CAISSE COMPTOIR` à 13.08 s; `Vendez au comptoir.` à 13.22 s; `MOYEN D’ENCAISSEMENT` à 13.40 s; `Enregistrez vos ventes et choisissez le moyen d’encaissement.` à 13.62 s; `Espèces`, `Wave` et `Orange Money` à 15.75, 16.47 et 17.19 s.
-- **Message :** enregistrer une vente au comptoir et choisir un moyen d’encaissement; aucune voix off.
-- **Composition :** ticket vertical et fenêtre de caisse stylisée dans une scène plus claire, sur champ ivoire. Trois noms de moyens d’encaissement occupent chacun une zone distincte. Aucun logo de service tiers n’est redessiné.
-- **Idée visuelle :** le ticket est une longue bande continue : il s’enroule, s’ouvre et sert de piste aux libellés de paiement.
-- **Chorégraphie :** 13.00 s : le ticket poursuit le trait de la scène précédente et se déroule. 13.08 s : `CAISSE COMPTOIR`; 13.22 s : `Vendez au comptoir.`; 13.40 s : le ticket affiche `MOYEN D’ENCAISSEMENT`. 13.62 s : `Enregistrez vos ventes et choisissez le moyen d’encaissement.` 14.55–15.65 s : un trait de lumière parcourt le ticket. 15.75 s : `Espèces`; 16.47 s : `Wave`; 17.19 s : `Orange Money`. Chaque moyen apparaît séparément. 18.15–18.73 s : un trait doré réunit le ticket; 18.58 s : un repère central prépare la chronologie.
-- **Passage :** les trois lignes se prolongent en chronologie d’activité, révélée dans la scène 4.
-- **Visuels et techniques :** ticket vectoriel, lignes de panier neutres, panneaux typographiques; aucune transaction ni somme fictive.
-- **Son :** la même piste instrumentale continue; aucun son de caisse ou de paiement.
+- **But :** couvrir catégories, produits physiques, fichiers numériques et location.
+- **Voix off :** « Organisez le catalogue par catégories. Ajoutez des produits physiques avec images, galerie, prix et stock. Publiez aussi des produits numériques avec leur fichier privé, ou des offres de location. »
+- **Texte à l’écran :** `CATÉGORIES`, `PRODUIT PHYSIQUE`, `FICHIER NUMÉRIQUE`, `LOCATION`; repères `GALERIE` et `STOCK`.
+- **Composition :** trois fiches neutres, sans nom, marque, prix, quantité ou fausse donnée de stock.
+- **Chorégraphie :** catégories s’alignent; l’image et la galerie s’ouvrent; une fiche physique révèle le repère de stock; les fiches numérique et location apparaissent ensuite dans des cadres distincts.
+- **Passage :** la fiche retenue se replie en panier côté client.
+- **Précision :** pas de campagne, coupon ou remise représentés comme actifs.
 
-### Scène 4 — « Gardez le fil » / 20.00–27.00 s
+### Scène 4 — « Le parcours côté client » / 29–41 s
 
-- **But :** faire comprendre que commandes et ventes récentes restent consultables.
-- **Texte exact à l’écran :** `SUIVI DES VENTES` à 20.08 s; `Gardez le fil de l’activité.` à 20.20 s; `CANAL`, `Boutique en ligne` puis `Vente comptoir` à 20.34 et 20.52 s; `Commandes`, `Ventes récentes` et `Synthèse du jour` à 21.20, 22.15 et 23.10 s.
-- **Message :** commandes et ventes récentes sont rassemblées pour consulter l’activité; aucune voix off.
-- **Composition :** scène sombre et structurée; deux cartes de canal convergent vers un repère vertical et trois cartes `Commandes`, `Ventes récentes`, `Synthèse du jour`. Aucune date, quantité, somme ou étape de commande n’est inventée.
-- **Idée visuelle :** les trois lignes de paiement deviennent deux flux de vente; les deux flux se rejoignent sans masquer leur origine.
-- **Chorégraphie :** 20.00 s : un repère doré apparaît et les lignes entrantes se séparent en deux pistes. 20.08 s : le repère `SUIVI DES VENTES`; 20.20 s : `Gardez le fil de l’activité.` 20.34 et 20.52 s : les libellés des deux canaux s’installent. 21.20, 22.15 et 23.10 s : les cartes de commandes, ventes récentes et synthèse arrivent une par une. 24.75–25.85 s : la pile se resserre; le point doré remonte vers un cadre circulaire, qui se forme de 25.45 à 26.40 s.
-- **Passage :** le cadre rond devient une fenêtre de filtre dans la scène de rapports; le mouvement de caméra recule au lieu de refaire une poussée.
-- **Visuels et techniques :** lignes de flux SVG, cartes sans données chiffrées, recadrage de caméra; aucune promesse de suivi en temps réel.
-- **Son :** la même piste instrumentale continue, sans effet sonore ajouté.
+- **But :** montrer la vitrine, le panier et les fonctions de compte client.
+- **Voix off :** « Sur la vitrine publique, les clients parcourent les fiches et ajoutent au panier. Ils peuvent créer un compte, enregistrer leurs coordonnées, adresses et favoris, puis consulter leur historique. »
+- **Texte à l’écran :** `VITRINE`, `PANIER`, `MON COMPTE`, `ADRESSES`, `FAVORIS`, `COMMANDES`.
+- **Composition :** téléphone central; panneaux clients plus petits autour, tous dans le même système graphique.
+- **Chorégraphie :** les fiches défilent; un produit rejoint le panier; les panneaux compte, adresses, favoris et commandes apparaissent sans nom ni information personnelle.
+- **Passage :** le panier s’ouvre en écran de commande.
+- **Précision :** ne pas promettre un passage invité pour toutes les méthodes; le parcours invité à la livraison est limité aux produits physiques.
 
-### Scène 5 — « Lire l’activité » / 27.00–35.00 s
+### Scène 5 — « Commander et suivre » / 41–55 s
 
-- **But :** montrer la fonction des rapports puis laisser un appel à découvrir le produit.
-- **Texte exact à l’écran :** `PÉRIODE` à 27.25 s; `SOURCE` à 27.49 s; `Totaux par devise` à 27.85 s; `BOUTIQUE · COMPTOIR · RAPPORTS` à 30.95 s; `MAXIMUS` à 31.16 s; `Le centre de pilotage de vos ventes` à 31.62 s; `Demandez une démonstration adaptée à votre commerce.` à 32.28 s.
-- **Message :** filtrez les rapports par période et source; MAXIMUS réunit boutique, comptoir et rapports; aucune voix off.
-- **Composition :** départ sur panneau rapport ivoire avec les deux filtres et le libellé `Totaux par devise`, sans montant. La composition s’inverse ensuite vers un champ bleu nuit presque vide; emblème officiel et marque au centre, phrase de marque sous l’emblème, appel en plus petit dans la zone sûre.
-- **Idée visuelle :** les lignes de la chronologie s’alignent en filtres et deviennent les branches géométriques de l’emblème officiel; la finale change nettement d’échelle et de contraste par rapport aux scènes de fonctionnalité.
-- **Chorégraphie :** 27.00 s : le rapport s’ouvre avec un cercle doré qui grandit derrière le panneau; 27.25 s : `PÉRIODE`; 27.49 s : `SOURCE`; 27.85 s : `Totaux par devise`. Les lignes restent volontairement sans chiffres. 29.80 s : le cercle s’efface avant le changement de champ. 30.15 s : le panneau bascule au bleu nuit; l’emblème officiel apparaît. 30.95 s : `BOUTIQUE · COMPTOIR · RAPPORTS`; 31.16 s : `MAXIMUS`; 31.62 s : la phrase de marque; 32.28 s : l’appel à la démonstration, lisible jusqu’au raccord. 34.12–34.86 s : le cercle de l’emblème retrouve la taille et la position du cercle autour du téléphone de l’ouverture.
-- **Passage :** boucle visuelle au premier cercle autour du téléphone; le dernier mouvement demeure visible pendant le raccord.
-- **Visuels et techniques :** panneau de rapport abstrait; emblème MAXIMUS d’origine uniquement; masque géométrique, inversion de champ bleu nuit/or.
-- **Son :** résolution musicale douce au lockup, sans note de fin qui interromprait la boucle.
+- **But :** présenter les options du checkout et le suivi des commandes.
+- **Voix off :** « Le checkout propose Wave ou Orange Money selon les moyens configurés. Pour les produits physiques, la boutique peut aussi proposer le paiement à la livraison. Les pièces jointes restent privées et sont acceptées uniquement si la boutique autorise cette option. »
+- **Texte à l’écran :** `WAVE`, `ORANGE MONEY`, `PAIEMENT À LA LIVRAISON`; progression `NOUVELLE → CONFIRMÉE → EN PRÉPARATION → EXPÉDIÉE → LIVRÉE`; repère `PIÈCE JOINTE PRIVÉE`.
+- **Composition :** checkout stylisé en haut, ligne de statuts en bas; le choix de livraison est distingué du paiement.
+- **Chorégraphie :** les options disponibles se révèlent sans logo tiers; une commande franchit les statuts autorisés; l’icône de pièce jointe rejoint une zone verrouillée.
+- **Passage :** le verrou devient le symbole d’accès au produit numérique payé.
+- **Précision :** les options sont décrites comme présentes dans le parcours logiciel; aucune réussite de paiement en production n’est affirmée.
 
-## Revue de variété et de précision
+### Scène 6 — « Le fichier après paiement confirmé » / 55–62 s
 
-- Les cinq scènes alternent photographie, vitrine téléphone, ticket de caisse, chronologie et conclusion de marque; elles ne réutilisent pas la même composition.
-- Les repères, tuiles, lignes et cartes sont animés par un geste produit; le mouvement ne repose pas uniquement sur l’entrée de titres.
-- Les transitions combinent au moins deux mécanismes et reprennent un élément visible de la scène précédente.
-- Le seul personnage photographié provient de la couverture existante; les visuels de produit restent des schémas, pas de fausses captures de données réelles.
-- Les textes demeurent dans la zone centrale sûre 9:16. Les montants, noms de produits, statistiques, dates et statuts non confirmés sont exclus.
-- La boucle finit sur le cercle qui ouvre le film; aucun champ vide n’est prévu dans la queue des scènes.
+- **But :** montrer la règle de livraison numérique vérifiée.
+- **Voix off :** « Après confirmation du paiement, le fichier numérique acheté devient accessible au téléchargement dans l’espace client. »
+- **Texte à l’écran :** `PAIEMENT CONFIRMÉ`, puis `TÉLÉCHARGEMENT DISPONIBLE`.
+- **Composition :** fiche numérique et verrou; aucun faux nom de fichier ni format mis en avant.
+- **Chorégraphie :** le verrou reste fermé jusqu’au repère de paiement; il s’ouvre ensuite et laisse apparaître une action de téléchargement.
+- **Passage :** la ligne sortante du fichier se prolonge en itinéraire de location.
+
+### Scène 7 — « Location et réservation » / 62–73 s
+
+- **But :** couvrir les offres et le parcours de réservation, dont les véhicules.
+- **Voix off :** « Publiez des offres de location, gérez leur disponibilité et traitez les réservations. Pour les véhicules, le devis prend en compte période, itinéraire et tarifs configurés. »
+- **Texte à l’écran :** `LOCATION`, `DISPONIBILITÉ`, `DEVIS`, `RÉSERVATION`.
+- **Composition :** silhouette de véhicule, calendrier non daté, ligne d’itinéraire et panneau de réservation.
+- **Chorégraphie :** la disponibilité encadre le véhicule; une route se trace; les panneaux devis et réservation restent distincts.
+- **Passage :** la route se redresse et devient la bande du ticket comptoir.
+- **Précision :** aucun tarif, distance ou délai n’est inventé.
+
+### Scène 8 — « Vente au comptoir » / 73–83 s
+
+- **But :** montrer l’enregistrement d’une vente et l’actualisation du stock.
+- **Voix off :** « Au comptoir, enregistrez chaque vente en espèces, Wave ou Orange Money. Le stock est mis à jour avec la vente. »
+- **Texte à l’écran :** `VENTE COMPTOIR`, `ESPÈCES`, `WAVE`, `ORANGE MONEY`, `STOCK MIS À JOUR`.
+- **Composition :** reprendre le ticket et la carte de caisse existants; trois moyens d’encaissement sur des lignes distinctes.
+- **Chorégraphie :** le ticket se déroule; les moyens apparaissent un à un; un repère de stock se met à jour sans afficher de quantité; la vente rejoint l’historique.
+- **Passage :** les éléments s’organisent en flux distincts de clients, commandes et demandes.
+- **Précision :** aucune somme, monnaie rendue ou vente de démonstration fictive.
+
+### Scène 9 — « Clients, commandes, livraisons » / 83–95 s
+
+- **But :** distinguer les listes clients, le cycle des commandes et le service de livraison.
+- **Voix off :** « Retrouvez les clients, leurs commandes et les demandes de livraison dans des espaces distincts. Définissez les zones, frais et délais applicables. »
+- **Texte à l’écran :** `CLIENTS`, `COMMANDES`, `DEMANDES DE LIVRAISON`, `ZONES`, `FRAIS`, `DÉLAIS`.
+- **Composition :** trois flux alignés, avec une frontière visuelle nette entre commandes et demandes indépendantes de livraison.
+- **Chorégraphie :** cartes client et commande restent liées; les demandes de livraison prennent une voie séparée; des zones abstraites se dessinent sans carte géographique fictive.
+- **Passage :** les lignes se redressent pour former les filtres du rapport.
+- **Précision :** aucune intégration de transporteur ou de suivi GPS n’est revendiquée.
+
+### Scène 10 — « Lire l’activité et les règlements » / 95–110 s
+
+- **But :** réunir le tableau de bord, le rapport et la gestion financière.
+- **Voix off :** « Le tableau de bord résume l’activité. Le rapport réunit ventes en ligne et au comptoir, filtre par période et source, et classe les totaux par devise. Finances suit règlements, soldes et retraits. »
+- **Texte à l’écran :** `TABLEAU DE BORD`, `PÉRIODE`, `SOURCE`, `TOTAUX PAR DEVISE`, `RÈGLEMENTS`, `SOLDES`, `RETRAITS`.
+- **Composition :** panneau rapport avec filtres sans valeur chiffrée; à côté, lignes de portefeuille différenciant fonds en attente et disponibles, sans montant.
+- **Chorégraphie :** les deux sources alimentent le rapport; les lignes deviennent ensuite l’historique du portefeuille et les demandes de retrait.
+- **Passage :** le cadre du rapport se resserre sur l’indication de la rubrique Promotions.
+- **Précision :** les tests de l’API ne remplacent pas une recette du fournisseur de paiement en production.
+
+### Scène 11 — « Promotions à venir » / 110–117 s
+
+- **But :** représenter honnêtement l’état de la rubrique avant de conclure.
+- **Voix off :** « La rubrique Promotions est annoncée comme à venir. MAXIMUS E-commerce : votre boutique et vos ventes, réunies. »
+- **Texte à l’écran :** d’abord `PROMOTIONS — À VENIR`; puis emblème MAXIMUS, `BOUTIQUE · COMMANDES · COMPTOIR` et `Demandez une démonstration adaptée à votre commerce.`
+- **Composition :** courte carte Promotions, suivie d’une finale bleu nuit et or.
+- **Chorégraphie :** la carte à venir reste lisible un instant, puis s’efface; l’emblème et l’appel à l’action apparaissent. Le cercle final rappelle le cercle de l’ouverture.
+- **Passage :** boucle graphique vers le premier cercle; fondu musical doux.
+- **Précision :** ne pas montrer de coupons, remises ou campagnes simulées.
+
+## Contrôle éditorial
+
+- Les interfaces à l’écran sont des schémas, pas des captures de données clients ou de résultats commerciaux.
+- Les prix, quantités, commissions, chiffres de vente, dates et performances fictifs sont exclus.
+- Wave et Orange Money sont montrés comme des choix présents dans le parcours; la validation de paiement en production n’est pas revendiquée.
+- Les campagnes Promotions sont signalées « à venir », jamais comme disponibles.
+- Pas de promesse de suivi en temps réel, de transporteur, de livraison garantie ou de retrait instantané.
