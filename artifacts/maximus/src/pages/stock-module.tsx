@@ -545,6 +545,7 @@ function RequestModal({ value, data, onClose, onChange, onSave }: { value: Stock
 
 function ProductModal({ value, suppliers, onClose, onSave }: { value: ProductForm | StockProduct; suppliers: StockSupplier[]; onClose: () => void; onSave: (body: ProductForm) => void }) {
   const { canCreate, canModify } = useStockAccess();
+  const isEditing = 'id' in value;
   const [form, setForm] = useState<ProductForm>({ ...blankProduct, ...value });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageError, setImageError] = useState('');
@@ -559,12 +560,12 @@ function ProductModal({ value, suppliers, onClose, onSave }: { value: ProductFor
     <div className="grid gap-4 sm:grid-cols-2">
       <Input label="Nom du produit" value={form.name} onChange={value => update('name', value)} />
       <Input label="SKU / référence" value={form.sku} onChange={value => update('sku', value)} />
-      <Input label="Code-barres" value={form.barcode} onChange={value => update('barcode', value)} />
-      <Input label="Marque" value={form.brand} onChange={value => update('brand', value)} />
+      {isEditing && <Input label="Code-barres" value={form.barcode} onChange={value => update('barcode', value)} />}
+      {isEditing && <Input label="Marque" value={form.brand} onChange={value => update('brand', value)} />}
       <Input label="Catégorie" value={form.category} onChange={value => update('category', value)} />
-      <Input label="Sous-catégorie" value={form.subcategory} onChange={value => update('subcategory', value)} />
+      {isEditing && <Input label="Sous-catégorie" value={form.subcategory} onChange={value => update('subcategory', value)} />}
       <Input label="Unité" value={form.unit} onChange={value => update('unit', value)} />
-      <div className="flex min-w-0 items-center gap-3">
+      {isEditing && <div className="flex min-w-0 items-center gap-3">
         <span className="shrink-0 text-xs font-bold">Photo</span>
         <label htmlFor="stock-product-image" aria-label={imageFile || form.imageUrl ? 'Remplacer la photo de l’article' : 'Ajouter une photo à l’article'} className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border bg-[hsl(var(--muted)/.35)] px-3 py-2 text-xs font-bold transition hover:bg-[hsl(var(--muted)/.6)]">
           <Upload size={14} aria-hidden="true" />
@@ -602,7 +603,7 @@ function ProductModal({ value, suppliers, onClose, onSave }: { value: ProductFor
               setImageFile(file);
             }}
           />
-      </div>
+      </div>}
       <Input label="Prix d’achat (FCFA)" type="number" value={String(form.purchasePrice)} onChange={value => update('purchasePrice', Number(value))} />
       <Input label="Prix de vente (FCFA)" type="number" value={String(form.salePrice)} onChange={value => update('salePrice', Number(value))} />
       <Input label="Stock minimum" type="number" value={String(form.minStock)} onChange={value => update('minStock', Number(value))} />
