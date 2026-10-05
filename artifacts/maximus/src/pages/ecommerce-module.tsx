@@ -30,6 +30,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
+import { Button } from '@workspace/maximus-design-system/components/ui/button';
 import {
   createEcommerceApi,
   type EcommercePosSalesBootstrap,
@@ -64,6 +65,7 @@ import { useAppDialog } from '@/components/confirm-dialog';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import { ResponsiveFilterGroup } from '@/components/responsive-filter-group';
 import { countActiveFilters } from '@/lib/filter-group';
+import { buildPublicProductUrl } from '@/lib/ecommerce-product-link';
 import { showAppToast } from '@workspace/maximus-design-system/hooks/use-toast';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
@@ -926,6 +928,26 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
   const canSellPhysical = !allowedFeatureIds || allowedFeatureIds.includes('vente-physique');
   const canSellDigital = !allowedFeatureIds || allowedFeatureIds.includes('vente-numerique');
   const canCreateProduct = canCreate && (canSellPhysical || canSellDigital);
+  const storeSlug = data.store.slug || slugify(data.store.name) || 'boutique';
+  const copyProductLink = async (product: EcommerceProduct) => {
+    if (data.store.status !== 'PUBLISHED' || product.status !== 'PUBLISHED') {
+      showAppToast('Publiez la boutique et le produit pour rendre son lien accessible.', 'info');
+      return;
+    }
+
+    if (!navigator.clipboard?.writeText) {
+      showAppToast('La copie du lien n’est pas disponible dans ce navigateur.', 'error');
+      return;
+    }
+
+    const url = buildPublicProductUrl(window.location.origin, storeSlug, product.slug);
+    try {
+      await navigator.clipboard.writeText(url);
+      showAppToast('Lien du produit copié.', 'success');
+    } catch {
+      showAppToast('Impossible de copier le lien. Vérifiez les autorisations du navigateur.', 'error');
+    }
+  };
   const open = (product?: EcommerceProduct, fulfillmentType: EcommerceProductFulfillmentType = 'PHYSICAL') => {
     setChooserOpen(false);
     setModal(product ?? 'new');
@@ -1001,7 +1023,13 @@ function Catalogue({ data, allowedFeatureIds, canCreate, canModify, run }: { dat
   return <div className="space-y-5 fade-up">
     <Panel title="Catalogue en ligne" description="Organisez les références qui alimentent directement votre vitrine." action={canCreateProduct ? <button type="button" onClick={openNewProduct} className="btn inline-flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-bold text-[hsl(var(--primary-foreground))]"><Plus size={15} />Ajouter un produit</button> : undefined}>
       <ResponsiveFilterGroup testId="ecommerce-catalogue-filters" activeCount={countActiveFilters([[status, 'ALL']])} onClear={() => setStatus('ALL')} search={<label className="relative min-w-0 flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" size={15} /><input aria-label="Rechercher un produit" value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher par nom, référence ou catégorie" className="w-full rounded-lg border bg-transparent py-2.5 pl-9 pr-3 text-sm" /></label>}><select aria-label="Filtrer par statut" value={status} onChange={event => setStatus(event.target.value as typeof status)} className="rounded-lg border bg-[hsl(var(--card))] px-3 py-2.5 text-sm"><option value="ALL">Tous les statuts</option><option value="PUBLISHED">Publié</option><option value="DRAFT">Brouillon</option><option value="ARCHIVED">Archivé</option></select></ResponsiveFilterGroup>
-         {filtered.length === 0 ? <Empty icon={Package} title={query || status !== 'ALL' ? 'Aucun produit trouvé' : 'Votre catalogue est vide'} text={query || status !== 'ALL' ? 'Modifiez vos filtres pour retrouver une référence.' : 'Ajoutez votre première référence pour commencer à vendre en ligne.'} action={canCreateProduct && !query ? <button type="button" onClick={openNewProduct} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter un produit</button> : undefined} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Produit</th><th className="px-4">Référence</th><th className="px-4">Prix</th><th className="px-4">Stock</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{filtered.map(product => <tr key={product.id}><td className="px-4 py-3"><div className="flex items-center gap-3">{product.imageUrl ? <img src={product.imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Package size={17} /></span>}<span className="min-w-0"><strong className="block truncate">{product.name}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{product.category}{product.featured ? ' · Vedette' : ''}</small></span></div></td><td className="mono px-4 py-3 text-xs">{product.sku}</td><td className="px-4 py-3 font-bold">{money(product.price, data.store.currency)}</td><td className={`px-4 py-3 font-bold ${product.stock <= 5 ? 'text-[hsl(var(--destructive))]' : ''}`}>{product.stock}</td><td className="px-4 py-3"><StatusPill value={product.status} /></td><td className="px-4 py-3"><div className="flex flex-wrap justify-end gap-1.5">{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Modifier" aria-label={`Modifier ${product.name}`} onClick={() => open(product)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Pencil size={13} />Modifier</button>}{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Archiver" aria-label={`Archiver ${product.name}`} onClick={() => void archive(product)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Archive size={13} />Archiver</button>}</div></td></tr>)}</tbody></table></div>}
+          {filtered.length === 0 ? <Empty icon={Package} title={query || status !== 'ALL' ? 'Aucun produit trouvé' : 'Votre catalogue est vide'} text={query || status !== 'ALL' ? 'Modifiez vos filtres pour retrouver une référence.' : 'Ajoutez votre première référence pour commencer à vendre en ligne.'} action={canCreateProduct && !query ? <button type="button" onClick={openNewProduct} className="text-xs font-bold text-[hsl(var(--primary))]">Ajouter un produit</button> : undefined} /> : <div className="table-scroll"><table className="w-full text-left text-sm"><thead><tr><th className="px-4">Produit</th><th className="px-4">Référence</th><th className="px-4">Prix</th><th className="px-4">Stock</th><th className="px-4">Statut</th><th className="px-4">Actions</th></tr></thead><tbody className="divide-y">{filtered.map(product => {
+            const canCopyLink = data.store.status === 'PUBLISHED' && product.status === 'PUBLISHED';
+            const unavailableLinkTitle = data.store.status !== 'PUBLISHED'
+              ? 'Publiez la boutique pour rendre le lien accessible.'
+              : 'Publiez le produit pour rendre le lien accessible.';
+            return <tr key={product.id}><td className="px-4 py-3"><div className="flex items-center gap-3">{product.imageUrl ? <img src={product.imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]"><Package size={17} /></span>}<span className="min-w-0"><strong className="block truncate">{product.name}</strong><small className="text-xs text-[hsl(var(--muted-foreground))]">{product.category}{product.featured ? ' · Vedette' : ''}</small></span></div></td><td className="mono px-4 py-3 text-xs">{product.sku}</td><td className="px-4 py-3 font-bold">{money(product.price, data.store.currency)}</td><td className={`px-4 py-3 font-bold ${product.stock <= 5 ? 'text-[hsl(var(--destructive))]' : ''}`}>{product.stock}</td><td className="px-4 py-3"><StatusPill value={product.status} /></td><td className="px-4 py-3"><div className="flex flex-wrap justify-end gap-1.5"><Button type="button" variant="outline" size="sm" disabled={!canCopyLink} title={canCopyLink ? `Copier le lien de ${product.name}` : unavailableLinkTitle} aria-label={`Copier le lien de ${product.name}`} data-testid="button-copy-product-link" onClick={() => void copyProductLink(product)} className="h-8 min-h-8 gap-1.5 px-2 text-[10px]"><Copy size={13} aria-hidden="true" /><span>Copier le lien</span></Button>{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Modifier" aria-label={`Modifier ${product.name}`} onClick={() => open(product)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold hover:bg-[hsl(var(--muted))]"><Pencil size={13} />Modifier</button>}{canModify && product.status !== 'ARCHIVED' && <button type="button" title="Archiver" aria-label={`Archiver ${product.name}`} onClick={() => void archive(product)} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[10px] font-bold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"><Archive size={13} />Archiver</button>}</div></td></tr>;
+          })}</tbody></table></div>}
     </Panel>
      {chooserOpen && <Modal title="Choisir le type de produit" onClose={() => setChooserOpen(false)}><div className={`grid gap-3 ${canSellPhysical && canSellDigital ? 'sm:grid-cols-2' : ''}`}>{canSellPhysical && <button type="button" onClick={() => open(undefined, 'PHYSICAL')} className="rounded-2xl border p-5 text-left transition hover:border-[hsl(var(--primary))]"><Package size={25} className="text-[hsl(var(--primary))]" /><strong className="mt-3 block">Produit physique</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">Gérez le stock, la livraison et la vente d’un article matériel.</span></button>}{canSellDigital && <button type="button" onClick={() => open(undefined, 'DIGITAL')} className="rounded-2xl border p-5 text-left transition hover:border-[hsl(var(--primary))]"><ArrowDownToLine size={25} className="text-[hsl(var(--primary))]" /><strong className="mt-3 block">Produit numérique</strong><span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">Joignez un fichier privé, délivré uniquement après paiement confirmé.</span></button>}</div></Modal>}
       {modal && <ProductModal modal={modal} form={form} categories={data.categories} canModify={canModify} setForm={setForm} onClose={() => setModal(null)} onSave={save} onRemoveGallery={async url => {
