@@ -149,7 +149,7 @@ class DemoWorkspaceTest extends TestCase
     public function test_demo_fixtures_use_existing_employee_accounts_and_add_accounts_created_later(): void
     {
         $this->prepareCompany();
-        ModuleCatalog::ensureCompanyAccess('kora', ['presences', 'transport']);
+        ModuleCatalog::ensureCompanyAccess('kora', ['presences', 'transport', 'paie']);
         $manager = $this->createLinkedEmployeeAccount(
             'demo-linked-manager',
             'employee-manager-kora',
@@ -168,6 +168,46 @@ class DemoWorkspaceTest extends TestCase
             'employee',
             ['kora-sector-2'],
         );
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'company_id' => null,
+            'payload' => json_encode([
+                'orgNodes' => [
+                    [
+                        'id' => 'kora-org-root',
+                        'companyId' => 'kora',
+                        'name' => 'Siège Kora',
+                        'code' => 'KORA',
+                        'parentId' => null,
+                        'moduleIds' => ['presences', 'transport', 'paie'],
+                    ],
+                    [
+                        'id' => 'kora-sector-1',
+                        'companyId' => 'kora',
+                        'name' => 'Équipe transport',
+                        'code' => 'KORA-TRP',
+                        'parentId' => 'kora-org-root',
+                        'moduleIds' => ['presences', 'transport', 'paie'],
+                    ],
+                    [
+                        'id' => 'kora-sector-2',
+                        'companyId' => 'kora',
+                        'name' => 'Équipe commerciale',
+                        'code' => 'KORA-COM',
+                        'parentId' => 'kora-org-root',
+                        'moduleIds' => ['presences', 'transport', 'paie'],
+                    ],
+                ],
+                'employees' => [
+                    ['id' => 'employee-manager-kora', 'companyId' => 'kora', 'sectorId' => 'kora-sector-1'],
+                    ['id' => 'employee-kora-1', 'companyId' => 'kora', 'sectorId' => 'kora-sector-1'],
+                    ['id' => 'employee-kora-2', 'companyId' => 'kora', 'sectorId' => 'kora-sector-2'],
+                ],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         DemoWorkspace::setEnabled('kora', true);
         $demoCompanyId = DemoWorkspace::datasetCompanyId('kora');
@@ -196,9 +236,25 @@ class DemoWorkspaceTest extends TestCase
             true,
             flags: JSON_THROW_ON_ERROR,
         );
+        $this->assertEqualsCanonicalizing(
+            ['kora-org-root', 'kora-sector-1', 'kora-sector-2'],
+            array_column($demoState['orgNodes'], 'id'),
+        );
         $this->assertContains(
             $employee->employee_id,
             array_column($demoState['employees'], 'id'),
+        );
+        $demoUnit = collect($demoState['orgNodes'])->firstWhere('id', 'kora-sector-1');
+        $this->assertSame('Équipe transport', $demoUnit['name']);
+        $this->assertSame('KORA-TRP', $demoUnit['code']);
+        $this->assertSame('kora-org-root', $demoUnit['parentId']);
+        $this->assertCount(
+            1,
+            array_filter($demoState['orgNodes'], static fn (array $node): bool => ($node['id'] ?? null) === 'kora-sector-1'),
+        );
+        $this->assertSame(
+            [],
+            array_filter($demoState['orgNodes'], static fn (array $node): bool => str_starts_with((string) ($node['code'] ?? ''), 'DEMO-UNIT-')),
         );
         $this->assertDatabaseHas('presence_items', [
             'company_id' => $demoCompanyId,
@@ -230,7 +286,8 @@ class DemoWorkspaceTest extends TestCase
         $employeeState = $this->withSessionFor($employee)
             ->getJson('/api/app-state/bootstrap')
             ->assertOk()
-            ->assertJsonPath('dataset', 'demo');
+            ->assertJsonPath('dataset', 'demo')
+            ->assertJsonPath('data.orgNodes.0.name', 'Équipe transport');
         $this->assertSame(
             [$employee->employee_id],
             array_column($employeeState->json('data.employees'), 'id'),
@@ -394,6 +451,9 @@ class DemoWorkspaceTest extends TestCase
                     [
                         'id' => 'kora-sector-parent',
                         'companyId' => 'kora',
+                        'name' => 'Direction comptable',
+                        'code' => 'KORA-ROOT',
+                        'type' => 'service',
                         'parentId' => null,
                         'moduleIds' => ['stocks', 'paie'],
                         'moduleFeatures' => ['stocks' => ['products', 'reports']],
@@ -401,9 +461,19 @@ class DemoWorkspaceTest extends TestCase
                     [
                         'id' => 'kora-sector-child',
                         'companyId' => 'kora',
+                        'name' => 'Comptabilité fournisseurs',
+                        'code' => 'KORA-AP',
+                        'type' => 'service',
                         'parentId' => 'kora-sector-parent',
                         'moduleIds' => ['stocks', 'paie'],
                         'moduleFeatures' => ['stocks' => ['products', 'entries']],
+                    ],
+                ],
+                'employees' => [
+                    [
+                        'id' => 'employee-demo-features',
+                        'companyId' => 'kora',
+                        'sectorId' => 'kora-sector-child',
                     ],
                 ],
             ], JSON_THROW_ON_ERROR),
@@ -432,6 +502,9 @@ class DemoWorkspaceTest extends TestCase
         );
         $demoState = $loadDemoState();
         $demoUnit = collect($demoState['orgNodes'])->firstWhere('id', 'kora-sector-child');
+        $this->assertSame('Comptabilité fournisseurs', $demoUnit['name']);
+        $this->assertSame('KORA-AP', $demoUnit['code']);
+        $this->assertSame('kora-sector-parent', $demoUnit['parentId']);
         $this->assertSame(['stocks', 'paie'], $demoUnit['moduleIds']);
         $this->assertSame(['products'], $demoUnit['moduleFeatures']['stocks']);
         $demoEmployee = collect($demoState['employees'])->firstWhere('id', $employee->employee_id);
@@ -441,9 +514,11 @@ class DemoWorkspaceTest extends TestCase
         $demoState['orgNodes'] = array_map(
             static function (array $node): array {
                 if (($node['id'] ?? null) === 'kora-sector-child') {
+                    $node['code'] = 'DEMO-UNIT-LEGACY';
                     $node['moduleIds'] = [];
                     unset($node['moduleFeatures']);
                     $node['name'] = 'Unité modifiée en démo';
+                    $node['parentId'] = null;
                     $node['location'] = 'Dakar — emplacement conservé';
                 }
 
@@ -455,22 +530,12 @@ class DemoWorkspaceTest extends TestCase
             'payload' => json_encode($demoState, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
         ]);
 
-        $employeeScope = DemoWorkspace::employeeScope('kora', $employee->employee_id);
-        $marker = json_decode(
-            (string) DB::table('maximus_app_states')->where('scope', $employeeScope)->value('payload'),
-            true,
-            flags: JSON_THROW_ON_ERROR,
-        );
-        unset($marker['unitAccessVersion']);
-        DB::table('maximus_app_states')->where('scope', $employeeScope)->update([
-            'payload' => json_encode($marker, JSON_THROW_ON_ERROR),
-        ]);
-
         DemoWorkspace::setEnabled('kora', true);
         $repairedUnit = collect($loadDemoState()['orgNodes'])->firstWhere('id', 'kora-sector-child');
         $this->assertSame(['stocks', 'paie'], $repairedUnit['moduleIds']);
         $this->assertSame(['products'], $repairedUnit['moduleFeatures']['stocks']);
         $this->assertSame('Unité modifiée en démo', $repairedUnit['name']);
+        $this->assertSame('kora-sector-parent', $repairedUnit['parentId']);
         $this->assertSame('Dakar — emplacement conservé', $repairedUnit['location']);
 
         $employeeBootstrap = $this->withSessionFor($employee)

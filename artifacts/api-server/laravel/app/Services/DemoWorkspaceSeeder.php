@@ -17,7 +17,7 @@ final class DemoWorkspaceSeeder
         $now = now();
         $ids = fn (string $name): string => 'demo-'.substr(hash('sha256', $companyId), 0, 16).'-'.$name;
 
-        $this->seedAppState($companyId, $ids, $now);
+        $this->seedAppState($companyId, $ids, $now, $this->firstCompanyOrganizationUnitId($companyId));
         $this->seedControl($datasetCompanyId, $ids, $now);
         $this->seedPresence($datasetCompanyId, $ids, $now);
         $this->seedStock($datasetCompanyId, $ids, $now);
@@ -43,6 +43,34 @@ final class DemoWorkspaceSeeder
         $workspaceNodes = is_array($workspaceState['orgNodes'] ?? null)
             ? $workspaceState['orgNodes']
             : [];
+        $organizationNodes = [];
+        foreach ($workspaceNodes as $node) {
+            if (! is_array($node)
+                || (string) ($node['companyId'] ?? $node['company_id'] ?? '') !== $companyId) {
+                continue;
+            }
+
+            $nodeId = trim((string) ($node['id'] ?? ''));
+            if ($nodeId !== '') {
+                $node['companyId'] = $companyId;
+                $organizationNodes[$nodeId] = $node;
+            }
+        }
+        $organizationEmployees = [];
+        foreach (is_array($workspaceState['employees'] ?? null) ? $workspaceState['employees'] : [] as $employee) {
+            if (! is_array($employee)
+                || (string) ($employee['companyId'] ?? $employee['company_id'] ?? '') !== $companyId) {
+                continue;
+            }
+
+            $employeeId = trim((string) ($employee['id'] ?? ''));
+            if ($employeeId !== '') {
+                $organizationEmployees[$employeeId] = $employee;
+            }
+        }
+        $now = now();
+        $this->syncDemoOrganizationNodes($companyId, array_values($organizationNodes), $now);
+
         $users = AuthUser::query()
             ->where('company_id', $companyId)
             ->whereIn('role', ['employee', 'sector_manager'])
@@ -65,7 +93,6 @@ final class DemoWorkspaceSeeder
                 ? json_decode($linkRow->payload, true)
                 : ($linkRow?->payload ?? []);
             $linkPayload = is_array($linkPayload) ? $linkPayload : [];
-            $upgradeLegacyUnitScopes = (int) ($linkPayload['unitAccessVersion'] ?? 0) < 1;
 
             $fingerprint = substr(hash('sha256', $employeeId), 0, 12);
             $accountIds = fn (string $name): string => $ids('account-'.$fingerprint.'-'.$name);
@@ -78,24 +105,22 @@ final class DemoWorkspaceSeeder
                 is_array($user->sector_ids) ? $user->sector_ids : [],
                 static fn (mixed $sectorId): bool => is_string($sectorId) && trim($sectorId) !== '',
             )));
-            $sectorId = $sectorIds[0] ?? null;
-            $unitAccessBySector = [];
-            foreach ($sectorIds as $linkedSectorId) {
-                $unitAccessBySector[$linkedSectorId] = $this->effectiveUnitAccess(
-                    $workspaceNodes,
-                    $companyId,
-                    $linkedSectorId,
-                );
-            }
+            $sectorIds = array_values(array_filter(
+                $sectorIds,
+                static fn (string $sectorId): bool => isset($organizationNodes[$sectorId]),
+            ));
+            $organizationEmployee = $organizationEmployees[$employeeId] ?? [];
+            $organizationSectorId = trim((string) ($organizationEmployee['sectorId'] ?? $organizationEmployee['sector_id'] ?? ''));
+            $sectorId = $organizationSectorId !== '' && in_array($organizationSectorId, $sectorIds, true)
+                ? $organizationSectorId
+                : ($sectorIds[0] ?? null);
 
             $this->addEmployeeToDemoAppState(
                 $companyId,
                 $user,
                 $employeeId,
                 $displayName,
-                $sectorIds,
-                $unitAccessBySector,
-                $upgradeLegacyUnitScopes,
+                $sectorId,
                 $accountIds,
                 $now,
             );
@@ -108,7 +133,7 @@ final class DemoWorkspaceSeeder
             // skip seeding: insertOrIgnore and appendStateRecord backfill
             // missing fixtures without overwriting employee edits.
             $linkPayload['initialized'] = true;
-            $linkPayload['unitAccessVersion'] = 1;
+            unset($linkPayload['unitAccessVersion']);
             DB::table('maximus_app_states')->updateOrInsert(
                 ['scope' => $linkScope],
                 [
@@ -127,9 +152,7 @@ final class DemoWorkspaceSeeder
         AuthUser $user,
         string $employeeId,
         string $displayName,
-        array $sectorIds,
-        array $unitAccessBySector,
-        bool $upgradeLegacyUnitScopes,
+        ?string $sectorId,
         callable $ids,
         mixed $now,
     ): void {
@@ -141,7 +164,6 @@ final class DemoWorkspaceSeeder
 
         $payload = is_string($row->payload) ? json_decode($row->payload, true) : ($row->payload ?? []);
         $state = is_array($payload) ? $payload : [];
-        $sectorId = $sectorIds[0] ?? null;
         $roleId = $ids('role');
         $parts = preg_split('/\s+/', $displayName, 2) ?: [];
         $this->appendStateRecord($state, 'employees', [
@@ -168,25 +190,6 @@ final class DemoWorkspaceSeeder
             'sectorId' => $sectorId,
             'modulePermissions' => is_array($user->permissions) ? $user->permissions : [],
         ]);
-
-        foreach ($sectorIds as $index => $linkedSectorId) {
-            $unit = [
-                'id' => $linkedSectorId,
-                'companyId' => $companyId,
-                'code' => 'DEMO-UNIT-'.strtoupper(substr(hash('sha256', $linkedSectorId), 0, 8)),
-                'name' => 'Unité de démonstration '.($index + 1),
-                'type' => 'service',
-                'parentId' => null,
-                'managerEmployeeId' => $user->role === 'sector_manager' ? $employeeId : null,
-            ];
-            $unitAccess = $unitAccessBySector[$linkedSectorId] ?? [];
-            foreach (['moduleIds', 'moduleFeatures'] as $scopeKey) {
-                if (array_key_exists($scopeKey, $unitAccess)) {
-                    $unit[$scopeKey] = $unitAccess[$scopeKey];
-                }
-            }
-            $this->ensureDemoEmployeeOrgNode($state, $unit, $upgradeLegacyUnitScopes);
-        }
 
         $taskId = $ids('control-task');
         $this->appendStateRecord($state, 'controlTasks', [
@@ -239,8 +242,8 @@ final class DemoWorkspaceSeeder
     }
 
     /**
-     * Copy the effective real-unit ceiling onto the flat demo unit. Account
-     * permissions still decide what the employee is assigned within that ceiling.
+     * Copy the organization tree into demo state with each unit's effective
+     * ancestor ceiling. Account permissions remain the employee's assigned rights.
      */
     private function effectiveUnitAccess(array $workspaceNodes, string $companyId, string $sectorId): array
     {
@@ -319,40 +322,120 @@ final class DemoWorkspaceSeeder
     }
 
     /**
-     * Old demo-linked units were seeded with moduleIds=[] which denies every
-     * feature. Repair only that untouched generated default once per employee.
+     * Reuse the existing organization tree in the isolated demo state. Existing
+     * demo edits are retained; only generated legacy placeholders are repaired.
      */
-    private function ensureDemoEmployeeOrgNode(array &$state, array $record, bool $upgradeLegacyUnitScopes): void
+    private function syncDemoOrganizationNodes(string $companyId, array $workspaceNodes, mixed $now): void
     {
-        $records = is_array($state['orgNodes'] ?? null) ? $state['orgNodes'] : [];
-        foreach ($records as $index => $existing) {
-            if (! is_array($existing) || (string) ($existing['id'] ?? '') !== (string) $record['id']) {
+        if ($workspaceNodes === []) {
+            return;
+        }
+
+        $scope = DemoWorkspace::stateScope($companyId);
+        $row = DB::table('maximus_app_states')
+            ->where('scope', $scope)
+            ->lockForUpdate()
+            ->first();
+        if (! $row) {
+            throw new \RuntimeException('DEMO_APP_STATE_NOT_INITIALIZED');
+        }
+
+        $payload = is_string($row->payload) ? json_decode($row->payload, true) : ($row->payload ?? []);
+        $state = is_array($payload) ? $payload : [];
+        $records = is_array($state['orgNodes'] ?? null) ? array_values($state['orgNodes']) : [];
+        $changed = false;
+
+        foreach ($workspaceNodes as $source) {
+            if (! is_array($source)) {
                 continue;
             }
-            if ($upgradeLegacyUnitScopes
-                && (string) ($existing['companyId'] ?? '') === (string) $record['companyId']
-                && ($existing['code'] ?? null) === $record['code']
+
+            $nodeId = trim((string) ($source['id'] ?? ''));
+            if ($nodeId === '') {
+                continue;
+            }
+
+            $source['id'] = $nodeId;
+            $source['companyId'] = $companyId;
+            $source['parentId'] = $source['parentId'] ?? $source['parent_id'] ?? null;
+            $access = $this->effectiveUnitAccess($workspaceNodes, $companyId, $nodeId);
+            foreach (['moduleIds', 'moduleFeatures'] as $scopeKey) {
+                if (array_key_exists($scopeKey, $access)) {
+                    $source[$scopeKey] = $access[$scopeKey];
+                } else {
+                    unset($source[$scopeKey]);
+                }
+            }
+
+            $index = null;
+            foreach ($records as $recordIndex => $record) {
+                if (is_array($record) && (string) ($record['id'] ?? '') === $nodeId) {
+                    $index = $recordIndex;
+                    break;
+                }
+            }
+
+            if ($index === null) {
+                $records[] = $source;
+                $changed = true;
+
+                continue;
+            }
+
+            $existing = $records[$index];
+            $isGeneratedPlaceholder = (string) ($existing['companyId'] ?? $existing['company_id'] ?? '') === $companyId
                 && str_starts_with((string) ($existing['code'] ?? ''), 'DEMO-UNIT-')
                 && ($existing['type'] ?? null) === 'service'
-                && ($existing['parentId'] ?? null) === null
-                && ($existing['moduleIds'] ?? null) === []
-                && ! array_key_exists('moduleFeatures', $existing)) {
+                && ($existing['parentId'] ?? null) === null;
+            if (! $isGeneratedPlaceholder) {
+                continue;
+            }
+
+            $hasUntouchedEmptyScope = ($existing['moduleIds'] ?? null) === []
+                && ! array_key_exists('moduleFeatures', $existing);
+            foreach ($source as $key => $value) {
+                if (! array_key_exists($key, $existing)) {
+                    $existing[$key] = $value;
+                }
+            }
+
+            foreach (['companyId', 'code', 'type', 'parentId', 'managerEmployeeId'] as $key) {
+                if (array_key_exists($key, $source)) {
+                    $existing[$key] = $source[$key];
+                } else {
+                    unset($existing[$key]);
+                }
+            }
+            if (str_starts_with((string) ($existing['name'] ?? ''), 'Unité de démonstration ')
+                && array_key_exists('name', $source)) {
+                $existing['name'] = $source['name'];
+            }
+            if ($hasUntouchedEmptyScope) {
                 foreach (['moduleIds', 'moduleFeatures'] as $scopeKey) {
-                    if (array_key_exists($scopeKey, $record)) {
-                        $existing[$scopeKey] = $record[$scopeKey];
+                    if (array_key_exists($scopeKey, $source)) {
+                        $existing[$scopeKey] = $source[$scopeKey];
                     } else {
                         unset($existing[$scopeKey]);
                     }
                 }
-                $records[$index] = $existing;
-                $state['orgNodes'] = array_values($records);
             }
 
+            if ($existing !== $records[$index]) {
+                $records[$index] = $existing;
+                $changed = true;
+            }
+        }
+
+        if (! $changed) {
             return;
         }
 
-        $records[] = $record;
         $state['orgNodes'] = array_values($records);
+        DB::table('maximus_app_states')->where('scope', $scope)->update([
+            'payload' => json_encode($state, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'version' => ((int) $row->version) + 1,
+            'updated_at' => $now,
+        ]);
     }
 
     private function appendStateRecord(array &$state, string $collection, array $record): void
@@ -582,12 +665,31 @@ final class DemoWorkspaceSeeder
         }
     }
 
-    private function seedAppState(string $companyId, callable $ids, mixed $now): void
+    private function firstCompanyOrganizationUnitId(string $companyId): ?string
+    {
+        $payload = DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload');
+        $state = is_string($payload) ? json_decode($payload, true) : ($payload ?? []);
+        $nodes = is_array($state) && is_array($state['orgNodes'] ?? null) ? $state['orgNodes'] : [];
+
+        foreach ($nodes as $node) {
+            if (! is_array($node)
+                || (string) ($node['companyId'] ?? $node['company_id'] ?? '') !== $companyId) {
+                continue;
+            }
+            $nodeId = trim((string) ($node['id'] ?? ''));
+            if ($nodeId !== '') {
+                return $nodeId;
+            }
+        }
+
+        return null;
+    }
+
+    private function seedAppState(string $companyId, callable $ids, mixed $now, ?string $nodeId): void
     {
         $employeeOne = $ids('employee-amina');
         $employeeTwo = $ids('employee-moussa');
         $roleId = $ids('role-manager');
-        $nodeId = $ids('unit-dakar');
         $date = $now->toDateString();
         $state = [
             'companies' => [],
@@ -631,17 +733,7 @@ final class DemoWorkspaceSeeder
                 'sectorId' => $nodeId,
                 'modulePermissions' => [],
             ]],
-            'orgNodes' => [[
-                'id' => $nodeId,
-                'companyId' => $companyId,
-                'code' => 'DAKAR-DEMO',
-                'name' => 'Agence de Dakar',
-                'type' => 'service',
-                'parentId' => null,
-                'location' => 'Dakar',
-                'moduleIds' => [],
-                'managerEmployeeId' => $employeeOne,
-            ]],
+            'orgNodes' => [],
             'products' => [
                 ['id' => $ids('catalog-computer'), 'sku' => 'DEMO-INFO-001', 'name' => 'Ordinateur portable', 'category' => 'Informatique', 'stock' => 12, 'threshold' => 3, 'price' => 425000, 'companyId' => $companyId],
                 ['id' => $ids('catalog-home'), 'sku' => 'DEMO-MAISON-001', 'name' => 'Détergent multi-usage', 'category' => 'Produits ménagers', 'stock' => 48, 'threshold' => 10, 'price' => 3500, 'companyId' => $companyId],
