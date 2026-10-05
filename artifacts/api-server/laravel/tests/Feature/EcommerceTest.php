@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AuthUser;
+use App\Models\Company;
 use App\Services\EcommerceDomainVerifier;
 use App\Support\CompanyRegistry;
 use App\Support\ModuleCatalog;
@@ -42,6 +43,40 @@ class EcommerceTest extends TestCase
         $this->asActor()
             ->getJson('/api/ecommerce/pos-sales?companyId=kora')
             ->assertForbidden();
+    }
+
+    public function test_company_profile_update_does_not_revoke_existing_pos_feature_grant(): void
+    {
+        $this->setEcommerceFeatures(['dashboard', 'catalogue', 'vente-comptoir']);
+        $company = Company::query()->create([
+            'id' => 'kora',
+            'name' => 'KORA',
+            'manager' => 'Responsable KORA',
+            'email' => 'kora@example.test',
+            'status' => 'ACTIF',
+            'requested_modules' => ['ecommerce'],
+        ]);
+        $company->update([
+            'requested_modules' => ['ecommerce'],
+            'requested_module_features' => [
+                'ecommerce' => ['dashboard', 'catalogue'],
+            ],
+            'requested_module_pack_ids' => ['ecommerce' => []],
+            'requested_module_permissions' => ['ecommerce' => []],
+        ]);
+        $request = $this->asActor();
+
+        $request->getJson('/api/ecommerce/pos-sales?companyId=kora')->assertOk();
+        $request->patchJson('/api/companies/kora', [
+            'name' => (string) $company->name,
+            'manager' => (string) $company->manager,
+            'email' => (string) $company->email,
+            'phone' => (string) ($company->phone ?? ''),
+            'country' => (string) ($company->country ?? ''),
+            'sector' => (string) ($company->sector ?? ''),
+        ])->assertOk();
+
+        $request->getJson('/api/ecommerce/pos-sales?companyId=kora')->assertOk();
     }
 
     public function test_sales_report_combines_sources_scopes_company_and_groups_paid_revenue_by_currency(): void
