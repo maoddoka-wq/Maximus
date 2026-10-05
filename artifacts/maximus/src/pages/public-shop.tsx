@@ -13,7 +13,7 @@ import {
   type EcommerceCarReservation,
   type EcommerceCarReservationStatus,
   type EcommerceCarTripType,
-  type PaymentProvider,
+  type PublicCheckoutPaymentMethod,
   type PublicPaymentStatus,
   type PublicShopBootstrap,
 } from '@/lib/ecommerce-api';
@@ -258,6 +258,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const [cartNotice, setCartNotice] = useState('');
   const [logoPreviewOpen, setLogoPreviewOpen] = useState(false);
   const [submitted, setSubmitted] = useState<PaymentSummary | null>(null);
+  const [cashOrderConfirmation, setCashOrderConfirmation] = useState<{ reference: string; total: number } | null>(null);
   const [checkoutKey, setCheckoutKey] = useState<string | null>(null);
   const [submittingOrder, setSubmittingOrder] = useState(false);
   const [submittingDelivery, setSubmittingDelivery] = useState(false);
@@ -266,10 +267,10 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authForm, setAuthForm] = useState({ name: '', email: '', phone: '', password: '' });
-  const [checkoutForm, setCheckoutForm] = useState({ customerName: '', customerEmail: '', customerPhone: '', shippingAddress: '', note: '' });
+  const [checkoutForm, setCheckoutForm] = useState({ customerName: '', customerPhone: '', shippingAddress: '', note: '' });
   const [orderAttachments, setOrderAttachments] = useState<File[]>([]);
   const [checkoutDeliveryZoneId, setCheckoutDeliveryZoneId] = useState('');
-  const [paymentProvider, setPaymentProvider] = useState<PaymentProvider>('WAVE');
+  const [paymentProvider, setPaymentProvider] = useState<PublicCheckoutPaymentMethod>('WAVE');
   const [deliveryForm, setDeliveryForm] = useState({ requesterName: '', requesterEmail: '', requesterPhone: '', address: '', deliveryZoneId: '', serviceType: 'STANDARD' as EcommerceDeliveryServiceType, desiredDate: '', note: '' });
   const [deliverySubmitted, setDeliverySubmitted] = useState<EcommerceDeliveryRequest | null>(null);
   const [immobilierSubmitted, setImmobilierSubmitted] = useState(false);
@@ -304,6 +305,11 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const shopStorageKey = useMemo(() => clientPwaStorageKey(slug, domain), [domain, slug]);
   const total = useMemo(() => cart.reduce((sum, line) => sum + line.product.price * line.quantity, 0), [cart]);
   const cartCount = useMemo(() => cart.reduce((sum, line) => sum + line.quantity, 0), [cart]);
+  const supportsCashOnDelivery = useMemo(() => cart.length > 0 && cart.every(line =>
+    !line.product.rentalId
+    && line.product.productType !== 'RENTAL'
+    && line.product.fulfillmentType === 'PHYSICAL',
+  ), [cart]);
   const accountSection = useMemo<AccountSection>(() => {
     if (routePath.includes('/compte/commandes')) return 'orders';
     if (routePath.endsWith('/profil')) return 'profile';
@@ -394,8 +400,8 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       setProfileForm({ name: bootstrap.customer.name, phone: bootstrap.customer.phone });
       const firstAddress = bootstrap.addresses.find(address => address.isDefault) ?? bootstrap.addresses[0];
        setDeliveryForm(form => ({ ...form, requesterName: bootstrap.customer.name, requesterEmail: bootstrap.customer.email, requesterPhone: bootstrap.customer.phone, address: firstAddress ? addressText(firstAddress) : form.address }));
-      if (firstAddress) setCheckoutForm(form => ({ ...form, customerName: bootstrap.customer.name, customerEmail: bootstrap.customer.email, customerPhone: bootstrap.customer.phone, shippingAddress: addressText(firstAddress) }));
-      else setCheckoutForm(form => ({ ...form, customerName: bootstrap.customer.name, customerEmail: bootstrap.customer.email, customerPhone: bootstrap.customer.phone }));
+      if (firstAddress) setCheckoutForm(form => ({ ...form, customerName: bootstrap.customer.name, customerPhone: bootstrap.customer.phone, shippingAddress: addressText(firstAddress) }));
+      else setCheckoutForm(form => ({ ...form, customerName: bootstrap.customer.name, customerPhone: bootstrap.customer.phone }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Votre espace client est indisponible.');
     } finally {
@@ -470,6 +476,12 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       ? { rentalId: line.product.rentalId, quantity: line.quantity }
       : { productSlug: line.product.slug, quantity: line.quantity })));
   }, [cart, customer, data, shopStorageKey]);
+
+  useEffect(() => {
+    if (!supportsCashOnDelivery && paymentProvider === 'CASH_ON_DELIVERY') {
+      setPaymentProvider('WAVE');
+    }
+  }, [paymentProvider, supportsCashOnDelivery]);
 
   useEffect(() => {
     if (loading || !data || !paymentReturn) return;
@@ -617,6 +629,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     try {
        const orderInput = {
          ...checkoutForm,
+         paymentMethod: paymentProvider,
          deliveryZoneId: checkoutDeliveryZoneId || undefined,
          idempotencyKey: currentKey,
          items: cart.map(line => line.product.rentalId
@@ -627,6 +640,22 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
        const order = domain
          ? await publicEcommerceApi.createDomainOrder(orderInput)
          : await publicEcommerceApi.createOrder(slug ?? '', orderInput);
+       if (paymentProvider === 'CASH_ON_DELIVERY') {
+         if (order.paymentMethod !== 'CASH_ON_DELIVERY') {
+           throw new Error('Le moyen de paiement enregistré ne correspond pas à cette commande. Vérifiez la commande avant de réessayer.');
+         }
+         setCheckoutKey(null);
+         setCart([]);
+         setOrderAttachments([]);
+         setCashOrderConfirmation({ reference: order.reference, total: order.total });
+         if (customer) {
+           void api.bootstrap().then(setCustomerData).catch(() => undefined);
+         }
+         return;
+       }
+       if (order.paymentMethod === 'CASH_ON_DELIVERY') {
+         throw new Error('Cette commande est enregistrée pour un paiement à la livraison. Aucune charge en ligne n’a été créée.');
+       }
       const returnUrl = () => {
         const returnPath = customer
           ? shopPath(`/compte/commandes/${encodeURIComponent(order.id)}`)
@@ -823,7 +852,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
     const primaryMobileNav = publicNav.filter(item => ['/accueil', '/boutique', '/panier'].includes(item.path));
     const additionalMobileNav = publicNav.filter(item => !primaryMobileNav.some(primary => primary.path === item.path));
     const additionalMobileNavActive = additionalMobileNav.some(item => isPublicNavActive(item.path));
-     const mobileNavVisible = !isAuthRoute && !submitted && !isTransportRoute;
+      const mobileNavVisible = !isAuthRoute && !submitted && !cashOrderConfirmation && !isTransportRoute;
      const mobileNavBottomPadding = mobileNavVisible
        ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-[calc(4rem+env(safe-area-inset-bottom))]'
        : 'pb-4 sm:pb-9';
@@ -848,7 +877,8 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
       </div>}
        {submitted ? <PaymentResultPanel summary={submitted} currency={store.currency} store={store} orderId={paymentReturn?.orderId ?? ''} onContinue={() => { setSubmitted(null); go(''); }} onOrders={customer ? () => { setSubmitted(null); go('/compte/commandes'); } : undefined} />
          : isAuthRoute ? <AuthPanel mode={authMode} onModeChange={mode => { setAuthMode(mode); go(mode === 'register' ? '/inscription-client' : '/connexion'); }} form={authForm} setForm={setAuthForm} onSubmit={() => void submitAuth()} onBack={() => go('')} />
-              : isCartRoute ? <CartPanelV2 cart={cart} total={total + deliveryFee} requiresShipping={requiresShipping} zones={data.deliveryZones} deliveryZoneId={checkoutDeliveryZoneId} setDeliveryZoneId={setCheckoutDeliveryZoneId} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} attachments={orderAttachments} setAttachments={setOrderAttachments} paymentProvider={paymentProvider} setPaymentProvider={setPaymentProvider} onChange={change} onSubmit={() => void submitOrder()} submitting={submittingOrder} onBack={() => go('')} />
+              : isCartRoute && cashOrderConfirmation ? <CashOrderConfirmation reference={cashOrderConfirmation.reference} total={cashOrderConfirmation.total} currency={store.currency} onContinue={() => { setCashOrderConfirmation(null); go(''); }} onOrders={customer ? () => { setCashOrderConfirmation(null); go('/compte/commandes'); } : undefined} />
+              : isCartRoute ? <CartPanelV2 cart={cart} total={total + deliveryFee} requiresShipping={requiresShipping} zones={data.deliveryZones} deliveryZoneId={checkoutDeliveryZoneId} setDeliveryZoneId={setCheckoutDeliveryZoneId} store={store} customer={customer} form={checkoutForm} setForm={setCheckoutForm} attachments={orderAttachments} setAttachments={setOrderAttachments} paymentProvider={paymentProvider} setPaymentProvider={setPaymentProvider} supportsCashOnDelivery={supportsCashOnDelivery} onChange={change} onSubmit={() => void submitOrder()} submitting={submittingOrder} onBack={() => go('')} />
               : isAccountRoute && customer ? <AccountPanel store={store} section={accountSection} customer={customer} products={products} customerData={customerData} customerLoading={customerLoading} customerActionPending={customerActionPending} selectedOrder={selectedOrder} profileForm={profileForm} setProfileForm={setProfileForm} passwordForm={passwordForm} setPasswordForm={setPasswordForm} addressForm={addressForm} setAddressForm={setAddressForm} editingAddressId={editingAddressId} setEditingAddressId={setEditingAddressId} onProfile={() => void runCustomerAction(saveProfile)} onPassword={() => void runCustomerAction(savePassword)} onAddress={() => void runCustomerAction(saveAddress)} onDeleteAddress={id => void runCustomerAction(() => deleteAddress(id))} onFavorite={product => void runCustomerAction(() => toggleFavorite(product))} onDownload={(orderId, itemId) => void runCustomerAction(() => api.downloadDigitalProduct(orderId, itemId))} onDownloadAttachment={(orderId, attachmentId) => void runCustomerAction(() => api.downloadOrderAttachment(orderId, attachmentId))} onOrder={id => go(id ? `/compte/commandes/${encodeURIComponent(id)}` : '/compte/commandes')} onLogout={() => void runCustomerAction(async () => { await api.logout(); setCustomer(null); setCustomerData(null); setCart([]); go(''); })} onNavigate={go} />
             : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
               : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
@@ -2607,9 +2637,11 @@ function AuthPanel({ mode, onModeChange, form, setForm, onSubmit, onBack }: { mo
   return <section className="mx-auto w-full min-w-0 max-w-md"><ShopBackLink label="Retour à la boutique" onClick={onBack} testId="button-auth-back" /><div className="mt-5 rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 sm:p-8"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--shop-primary)]/10 text-[var(--shop-primary)]"><LockKeyhole size={22} aria-hidden="true" /></div><h1 className="mt-5 break-words text-2xl font-bold tracking-[-.035em]">{mode === 'login' ? 'Bienvenue dans votre espace' : 'Créer votre compte client'}</h1><p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{mode === 'login' ? 'Suivez vos commandes et retrouvez vos informations de livraison.' : 'Votre compte est propre à cette boutique et ne donne accès qu’à vos données.'}</p><div className="mt-6 min-w-0 space-y-3">{mode === 'register' && <><input aria-label="Nom complet" className="shop-field" placeholder="Nom complet" value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} /><input aria-label="Téléphone" className="shop-field" placeholder="Téléphone" value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} /></>}<input aria-label="Email" className="shop-field" placeholder="Email" type="email" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} /><input aria-label="Mot de passe (8 caractères minimum)" className="shop-field" placeholder="Mot de passe (8 caractères minimum)" type="password" value={form.password} onChange={event => setForm({ ...form, password: event.target.value })} /></div><button type="button" onClick={onSubmit} className="mt-5 w-full rounded-xl py-3.5 text-sm font-bold bg-[var(--shop-accent)] text-[var(--shop-accent-foreground)] transition-opacity hover:opacity-90">{mode === 'login' ? 'Se connecter' : 'Créer mon compte'}</button><button type="button" onClick={() => onModeChange(mode === 'login' ? 'register' : 'login')} className="mt-4 w-full rounded-lg py-2 text-sm font-semibold text-[var(--shop-primary)] underline-offset-4 hover:underline">{mode === 'login' ? 'Créer un compte' : 'J’ai déjà un compte'}</button></div></section>;
 }
 
-function CartPanelV2({ cart, total, requiresShipping, zones, deliveryZoneId, setDeliveryZoneId, store, customer, form, setForm, attachments, setAttachments, paymentProvider, setPaymentProvider, onChange, onSubmit, submitting, onBack }: { cart: CartLine[]; total: number; requiresShipping: boolean; zones: PublicShopBootstrap['deliveryZones']; deliveryZoneId: string; setDeliveryZoneId: (id: string) => void; store: PublicShopBootstrap['store']; customer: EcommerceCustomer | null; form: { customerName: string; customerEmail: string; customerPhone: string; shippingAddress: string; note: string }; setForm: (form: { customerName: string; customerEmail: string; customerPhone: string; shippingAddress: string; note: string }) => void; attachments: File[]; setAttachments: (attachments: File[]) => void; paymentProvider: PaymentProvider; setPaymentProvider: (provider: PaymentProvider) => void; onChange: (slug: string, delta: number) => void; onSubmit: () => void; submitting: boolean; onBack: () => void }) {
+function CartPanelV2({ cart, total, requiresShipping, zones, deliveryZoneId, setDeliveryZoneId, store, customer, form, setForm, attachments, setAttachments, paymentProvider, setPaymentProvider, supportsCashOnDelivery, onChange, onSubmit, submitting, onBack }: { cart: CartLine[]; total: number; requiresShipping: boolean; zones: PublicShopBootstrap['deliveryZones']; deliveryZoneId: string; setDeliveryZoneId: (id: string) => void; store: PublicShopBootstrap['store']; customer: EcommerceCustomer | null; form: { customerName: string; customerPhone: string; shippingAddress: string; note: string }; setForm: (form: { customerName: string; customerPhone: string; shippingAddress: string; note: string }) => void; attachments: File[]; setAttachments: (attachments: File[]) => void; paymentProvider: PublicCheckoutPaymentMethod; setPaymentProvider: (provider: PublicCheckoutPaymentMethod) => void; supportsCashOnDelivery: boolean; onChange: (slug: string, delta: number) => void; onSubmit: () => void; submitting: boolean; onBack: () => void }) {
   const requiresZone = requiresShipping && zones.length > 0;
-  const canSubmit = !submitting && Boolean(form.customerName.trim()) && Boolean(form.customerEmail.trim()) && (!requiresShipping || Boolean(form.shippingAddress.trim())) && (!requiresZone || Boolean(deliveryZoneId)) && cart.length > 0;
+  const canSubmit = !submitting && Boolean(form.customerName.trim()) && (!requiresShipping || Boolean(form.shippingAddress.trim())) && (!requiresZone || Boolean(deliveryZoneId)) && cart.length > 0;
+  const paymentMethods: [PublicCheckoutPaymentMethod, string][] = [['WAVE', 'Wave'], ['ORANGE_MONEY', 'Orange Money']];
+  if (supportsCashOnDelivery) paymentMethods.push(['CASH_ON_DELIVERY', 'Paiement à la livraison']);
   return <section className="mx-auto max-w-6xl">
     <ShopBackLink label="Continuer mes achats" onClick={onBack} testId="button-cart-back" />
     <div className="mt-5">
@@ -2655,16 +2687,35 @@ function CartPanelV2({ cart, total, requiresShipping, zones, deliveryZoneId, set
         <h2 className="mt-8 text-base font-bold tracking-[-.02em]">Vos coordonnées</h2>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5"><ShopLabel htmlFor="checkout-name">Nom complet</ShopLabel><ShopInput id="checkout-name" data-testid="input-checkout-name" required autoComplete="name" className="h-11" placeholder="Nom complet" value={form.customerName} onChange={event => setForm({ ...form, customerName: event.target.value })} /></div>
-          <div className="space-y-1.5"><ShopLabel htmlFor="checkout-email">Email</ShopLabel><ShopInput id="checkout-email" data-testid="input-checkout-email" required autoComplete="email" className="h-11" placeholder="Email" type="email" value={form.customerEmail} onChange={event => setForm({ ...form, customerEmail: event.target.value })} /></div>
           <div className="space-y-1.5"><ShopLabel htmlFor="checkout-phone">Téléphone</ShopLabel><ShopInput id="checkout-phone" data-testid="input-checkout-phone" autoComplete="tel" className="h-11" placeholder="Téléphone" value={form.customerPhone} onChange={event => setForm({ ...form, customerPhone: event.target.value })} /></div>
           {requiresShipping ? <div className="space-y-1.5 sm:col-span-2"><ShopLabel htmlFor="checkout-address">Adresse de livraison</ShopLabel><Textarea id="checkout-address" data-testid="input-checkout-address" required rows={3} placeholder="Adresse de livraison" value={form.shippingAddress} onChange={event => setForm({ ...form, shippingAddress: event.target.value })} /></div> : <p className="rounded-xl border border-[var(--shop-primary)]/25 bg-[var(--shop-primary)]/5 px-3 py-3 text-xs text-[hsl(var(--foreground))] sm:col-span-2">Cette commande contient uniquement des produits numériques. Aucun envoi physique n’est nécessaire.</p>}
           <div className="space-y-1.5 sm:col-span-2"><ShopLabel htmlFor="checkout-note">Note pour la boutique (facultatif)</ShopLabel><Textarea id="checkout-note" data-testid="input-checkout-note" rows={2} placeholder="Note pour la boutique (facultatif)" value={form.note} onChange={event => setForm({ ...form, note: event.target.value })} /></div>
         </div>
-        <fieldset className="mt-6 rounded-2xl border border-[hsl(var(--border))] p-4"><legend className="px-1 text-base font-bold">Moyen de paiement</legend><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Choisissez votre moyen préféré. Le paiement sera sécurisé par DiamanoPay.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{([['WAVE', 'Wave'], ['ORANGE_MONEY', 'Orange Money']] as const).map(([value, label]) => <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${paymentProvider === value ? 'border-[var(--shop-primary)] bg-[var(--shop-primary)]/10' : 'hover:bg-[hsl(var(--muted))]'}`}><input type="radio" name="payment-provider" value={value} checked={paymentProvider === value} onChange={() => setPaymentProvider(value)} />{label}</label>)}</div></fieldset>
+         <fieldset className="mt-6 rounded-2xl border border-[hsl(var(--border))] p-4"><legend className="px-1 text-base font-bold">Moyen de paiement</legend><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Payez en ligne avec DiamanoPay ou réglez votre commande à la livraison.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{paymentMethods.map(([value, label]) => <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${paymentProvider === value ? 'border-[var(--shop-primary)] bg-[var(--shop-primary)]/10' : 'hover:bg-[hsl(var(--muted))]'}`}><input type="radio" name="payment-provider" value={value} checked={paymentProvider === value} onChange={() => setPaymentProvider(value)} />{label}</label>)}</div></fieldset>
         {customer && <p className="mt-3 text-xs text-[hsl(var(--muted-foreground))]">Cette commande sera rattachée à votre compte client.</p>}
-        <button type="button" data-testid="button-checkout-pay" onClick={onSubmit} disabled={!canSubmit} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] py-3.5 text-sm font-bold text-[var(--shop-accent-foreground)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{submitting && <RefreshCw size={15} className="animate-spin" />}{submitting ? 'Préparation du paiement…' : `Payer avec ${paymentProvider === 'WAVE' ? 'Wave' : 'Orange Money'}`}</button></ShopPanel></div>
+        <button type="button" data-testid="button-checkout-pay" onClick={onSubmit} disabled={!canSubmit} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--shop-accent)] py-3.5 text-sm font-bold text-[var(--shop-accent-foreground)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{submitting && <RefreshCw size={15} className="animate-spin" />}{submitting ? (paymentProvider === 'CASH_ON_DELIVERY' ? 'Enregistrement de la commande…' : 'Préparation du paiement…') : paymentProvider === 'CASH_ON_DELIVERY' ? 'Confirmer la commande' : `Payer avec ${paymentProvider === 'WAVE' ? 'Wave' : 'Orange Money'}`}</button></ShopPanel></div>
       </>}
     </div>
+  </section>;
+}
+
+function CashOrderConfirmation({ reference, total, currency, onContinue, onOrders }: { reference: string; total: number; currency: PublicShopBootstrap['store']['currency']; onContinue: () => void; onOrders?: () => void }) {
+  return <section className="mx-auto w-full max-w-xl">
+    <ShopPanel title="Commande enregistrée">
+      <div role="status" className="space-y-4 text-center">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--shop-primary)]/10 text-[var(--shop-primary)]"><Check size={23} aria-hidden="true" /></span>
+        <h1 className="text-xl font-bold">Votre commande est confirmée</h1>
+        <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">Vous réglerez votre commande à la livraison.</p>
+        <div className="rounded-xl bg-[hsl(var(--muted)/.5)] p-4 text-sm">
+          <p>Référence : <strong>{reference}</strong></p>
+          <p className="mt-1">Total à régler : <strong>{money(total, currency)}</strong></p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+          {onOrders && <Button type="button" variant="outline" size="lg" onClick={onOrders} className="rounded-xl font-bold">Voir mes commandes</Button>}
+          <Button type="button" size="lg" onClick={onContinue} className="rounded-xl font-bold" style={{ backgroundColor: 'var(--shop-accent)', color: 'var(--shop-accent-foreground)', borderColor: 'var(--shop-accent)' }}>Continuer mes achats</Button>
+        </div>
+      </div>
+    </ShopPanel>
   </section>;
 }
 
@@ -2732,7 +2783,7 @@ function OrderSection({ orders, selectedOrder, onOrder, onDownload, onDownloadAt
       <button type="button" onClick={() => onOrder('')} className="mb-5 inline-flex items-center gap-2 text-sm font-semibold"><ArrowLeft size={15} />Toutes les commandes</button>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0"><p className="text-xs text-[hsl(var(--muted-foreground))]">{readableDate(selectedOrder.createdAt)}</p><h2 className="mt-1 break-words text-xl font-bold">{selectedOrder.reference}</h2></div>
-        <div className="shrink-0 text-left sm:text-right"><p className="text-sm font-bold">{selectedOrder.status}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Paiement : {selectedOrder.paymentStatus}</p></div>
+        <div className="shrink-0 text-left sm:text-right"><p className="text-sm font-bold">{selectedOrder.status}</p><p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Paiement : {selectedOrder.paymentStatus}</p>{selectedOrder.paymentMethod && <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Moyen : {selectedOrder.paymentMethod === 'CASH_ON_DELIVERY' ? 'À la livraison' : selectedOrder.paymentMethod === 'ORANGE_MONEY' ? 'Orange Money' : 'Wave'}</p>}</div>
       </div>
        {paymentFailed && <div role="alert" className="mt-5 rounded-xl border border-[hsl(var(--destructive)/.3)] bg-[hsl(var(--destructive)/.08)] px-4 py-3 text-sm text-[hsl(var(--destructive))]">
          <strong className="block">Paiement échoué</strong>

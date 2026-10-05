@@ -13,6 +13,7 @@ export type EcommerceDeliveryRequestStatus = 'DEMANDEE' | 'CONFIRMEE' | 'EN_COUR
 export type EcommerceDeliveryServiceType = 'STANDARD' | 'URGENT';
 export type SellerWithdrawalStatus = 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
 export type PaymentProvider = 'WAVE' | 'ORANGE_MONEY';
+export type PublicCheckoutPaymentMethod = PaymentProvider | 'CASH_ON_DELIVERY';
 
 export interface EcommercePosSaleItem {
   id: string;
@@ -335,7 +336,7 @@ export interface EcommerceOrder {
   companyId: string;
   reference: string;
   customerName: string;
-  customerEmail: string;
+  customerEmail: string | null;
   customerPhone: string;
   shippingAddress: string;
   note: string;
@@ -344,6 +345,7 @@ export interface EcommerceOrder {
   deliveryZoneFee?: number;
   total: number;
   status: EcommerceOrderStatus;
+  paymentMethod?: PublicCheckoutPaymentMethod | null;
   paymentStatus: 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
   paymentCheckoutUrl: string | null;
   paymentFailureReason: string;
@@ -551,7 +553,7 @@ export interface EcommerceCustomerOrder {
   id: string;
   reference: string;
   customerName: string;
-  customerEmail: string;
+  customerEmail: string | null;
   customerPhone: string;
   shippingAddress: string;
   note: string;
@@ -561,6 +563,7 @@ export interface EcommerceCustomerOrder {
   total: number;
   status: EcommerceOrderStatus;
   paymentStatus: EcommerceOrder['paymentStatus'];
+  paymentMethod?: PublicCheckoutPaymentMethod | null;
   paymentFailureReason: string;
   createdAt: string;
   items: EcommerceOrderItem[];
@@ -704,10 +707,11 @@ export const createEcommerceApi = (companyId: string) => {
 
 type PublicOrderCreateBody = {
   customerName: string;
-  customerEmail: string;
+  customerEmail?: string;
   customerPhone?: string;
   shippingAddress: string;
   deliveryZoneId?: string;
+  paymentMethod?: PublicCheckoutPaymentMethod;
   note?: string;
   idempotencyKey?: string;
   items: { productSlug?: string; rentalId?: string; quantity: number }[];
@@ -740,8 +744,8 @@ export const publicEcommerceApi = {
   quoteDomainLocation: (id: string, params: { startsAt: string; endsAt: string; departure: string; destination: string }) => request<EcommerceCarQuote>(`/shop-domain/location/${encodeURIComponent(id)}/quote?startsAt=${encodeURIComponent(params.startsAt)}&endsAt=${encodeURIComponent(params.endsAt)}&departure=${encodeURIComponent(params.departure)}&destination=${encodeURIComponent(params.destination)}`),
   reserveLocation: (slug: string, body: { rentalId: string; startsAt: string; endsAt: string; tripType: EcommerceCarTripType; departure: string; destination: string; customerName: string; customerEmail: string; customerPhone?: string; }, idempotencyKey?: string) => request<EcommerceCarReservation>(`/shop/${encodeURIComponent(slug)}/location/reservations`, { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }),
   reserveDomainLocation: (body: { rentalId: string; startsAt: string; endsAt: string; tripType: EcommerceCarTripType; departure: string; destination: string; customerName: string; customerEmail: string; customerPhone?: string; }, idempotencyKey?: string) => request<EcommerceCarReservation>('/shop-domain/location/reservations', { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }),
-  createOrder: (slug: string, body: PublicOrderCreateBody) => request<{ id: string; reference: string; total: number; paymentStatus: string }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: publicOrderRequestBody(body) }),
-  createDomainOrder: (body: PublicOrderCreateBody) => request<{ id: string; reference: string; total: number; paymentStatus: string }>('/shop-domain/orders', { method: 'POST', body: publicOrderRequestBody(body) }),
+  createOrder: (slug: string, body: PublicOrderCreateBody) => request<{ id: string; reference: string; total: number; paymentStatus: string; paymentMethod?: PublicCheckoutPaymentMethod | null }>(`/shop/${encodeURIComponent(slug)}/orders`, { method: 'POST', body: publicOrderRequestBody(body) }),
+  createDomainOrder: (body: PublicOrderCreateBody) => request<{ id: string; reference: string; total: number; paymentStatus: string; paymentMethod?: PublicCheckoutPaymentMethod | null }>('/shop-domain/orders', { method: 'POST', body: publicOrderRequestBody(body) }),
   createDeliveryRequest: (slug: string, body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; deliveryZoneId?: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>(`/shop/${encodeURIComponent(slug)}/delivery-requests`, { method: 'POST', body: JSON.stringify(body) }),
   createDomainDeliveryRequest: (body: { requesterName: string; requesterEmail: string; requesterPhone?: string; address: string; deliveryZoneId?: string; serviceType: EcommerceDeliveryServiceType; desiredDate?: string; note?: string }) => request<EcommerceDeliveryRequest>('/shop-domain/delivery-requests', { method: 'POST', body: JSON.stringify(body) }),
   createPayment: (slug: string, orderId: string, body?: { redirectUrl?: string; provider?: PaymentProvider }) =>

@@ -1747,11 +1747,12 @@ class EcommerceController extends Controller
         $attachmentsEnabled = (bool) ($store->allow_order_attachments ?? false);
         $input = Validator::make($request->all(), [
             'customerName' => ['required', 'string', 'min:2', 'max:120'],
-            'customerEmail' => ['required', 'email', 'max:160'],
+            'customerEmail' => ['nullable', 'email', 'max:160'],
             'customerPhone' => ['nullable', 'string', 'max:40'],
             'shippingAddress' => ['nullable', 'string', 'max:500'],
             'note' => ['nullable', 'string', 'max:500'],
             'deliveryZoneId' => ['nullable', 'string', 'max:160'],
+            'paymentMethod' => ['sometimes', 'string', 'in:WAVE,ORANGE_MONEY,CASH_ON_DELIVERY'],
             'items' => ['required', 'array', 'min:1', 'max:50'],
             'items.*.productSlug' => ['nullable', 'string', 'min:2', 'max:160'],
             'items.*.rentalId' => ['nullable', 'string', 'min:2', 'max:160'],
@@ -1761,6 +1762,7 @@ class EcommerceController extends Controller
                 ? ['file', 'mimetypes:application/pdf,image/jpeg,image/png,image/webp', 'max:2048']
                 : ['prohibited'],
         ])->validate();
+        $input['paymentMethod'] = $input['paymentMethod'] ?? 'WAVE';
         $attachments = $input['attachments'] ?? [];
         unset($input['attachments']);
 
@@ -1775,10 +1777,15 @@ class EcommerceController extends Controller
                 ->where('idempotency_key', $idempotencyKey)
                 ->first();
             if ($existing) {
+                if ($existing->payment_method !== null && $existing->payment_method !== $input['paymentMethod']) {
+                    return response()->json(['error' => 'Cette clé correspond déjà à une commande utilisant un autre moyen de paiement.'], 409);
+                }
+
                 return response()->json([
                     'id' => $existing->id,
                     'reference' => $existing->reference,
                     'total' => (int) $existing->total,
+                    'paymentMethod' => $existing->payment_method ?? null,
                     'paymentStatus' => $existing->payment_status ?? 'UNPAID',
                     'paymentCheckoutUrl' => $existing->payment_checkout_url ?? null,
                     'deliveryZoneId' => $existing->delivery_zone_id ?? null,
@@ -1827,8 +1834,10 @@ class EcommerceController extends Controller
                 $lines = [];
                 $total = 0;
                 $hasPhysicalProduct = false;
+                $cashOnDeliveryEligible = true;
                 foreach ($input['items'] as $item) {
                     if (! empty($item['rentalId'])) {
+                        $cashOnDeliveryEligible = false;
                         $rental = DB::table('ecommerce_rentals')
                             ->where('id', $item['rentalId'])
                             ->where('company_id', $store->company_id)
@@ -1875,6 +1884,10 @@ class EcommerceController extends Controller
                         throw new \RuntimeException('PRODUCT_NOT_FOUND');
                     }
                     $fulfillmentType = (string) ($product->fulfillment_type ?? 'PHYSICAL');
+                    $productType = (string) ($product->product_type ?? 'SALE');
+                    if ($fulfillmentType !== 'PHYSICAL' || $productType === 'RENTAL') {
+                        $cashOnDeliveryEligible = false;
+                    }
                     if (! $this->allowsProductFulfillment((string) $store->company_id, $fulfillmentType)) {
                         throw new \RuntimeException('PRODUCT_TYPE_NOT_AUTHORIZED');
                     }
@@ -1898,7 +1911,7 @@ class EcommerceController extends Controller
                         'unit_price' => $product->price,
                         'quantity' => $quantity,
                         'line_total' => $lineTotal,
-                        'product_type' => $product->product_type ?? 'SALE',
+                        'product_type' => $productType,
                         'rental_period' => $product->rental_period,
                         'fulfillment_type' => $fulfillmentType,
                         'digital_file_name' => $product->digital_file_name ?? null,
@@ -1915,6 +1928,9 @@ class EcommerceController extends Controller
                 if ($hasPhysicalProduct && $activeDeliveryZones->isNotEmpty() && ! $deliveryZone) {
                     throw new \RuntimeException('DELIVERY_ZONE_REQUIRED');
                 }
+                if ($input['paymentMethod'] === 'CASH_ON_DELIVERY' && (! $hasPhysicalProduct || ! $cashOnDeliveryEligible)) {
+                    throw new \RuntimeException('CASH_ON_DELIVERY_NOT_SUPPORTED');
+                }
                 $deliveryFee = $hasPhysicalProduct ? (int) ($deliveryZone->fee ?? 0) : 0;
                 $total += $deliveryFee;
 
@@ -1927,7 +1943,7 @@ class EcommerceController extends Controller
                     'idempotency_key' => $idempotencyKey !== '' ? $idempotencyKey : null,
                     'reference' => $reference,
                     'customer_name' => $input['customerName'],
-                    'customer_email' => $input['customerEmail'],
+                    'customer_email' => $customer?->email ?? ($input['customerEmail'] ?? null),
                     'customer_phone' => $input['customerPhone'] ?? '',
                     'shipping_address' => trim((string) ($input['shippingAddress'] ?? '')),
                     'note' => $input['note'] ?? '',
@@ -1937,6 +1953,7 @@ class EcommerceController extends Controller
                     'total' => $total,
                     'currency' => (string) ($store->currency ?? 'XOF'),
                     'status' => 'NOUVELLE',
+                    'payment_method' => $input['paymentMethod'],
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -1989,6 +2006,7 @@ class EcommerceController extends Controller
                     'id' => $id,
                     'reference' => $reference,
                     'total' => $total,
+                    'paymentMethod' => $input['paymentMethod'],
                     'paymentStatus' => 'UNPAID',
                     'deliveryZoneId' => $hasPhysicalProduct ? $deliveryZone?->id : null,
                     'deliveryZoneName' => $hasPhysicalProduct ? $deliveryZone?->name : null,
@@ -2007,6 +2025,7 @@ class EcommerceController extends Controller
                 'PRODUCT_TYPE_NOT_AUTHORIZED' => 'Ce type de produit n’est pas activé pour cette boutique.',
                 'SHIPPING_ADDRESS_REQUIRED' => 'Une adresse est nécessaire pour une commande physique.',
                 'DELIVERY_ZONE_REQUIRED' => 'Veuillez sélectionner une zone de livraison.',
+                'CASH_ON_DELIVERY_NOT_SUPPORTED' => 'Le paiement à la livraison est uniquement disponible pour les commandes de produits physiques.',
                 'ATTACHMENT_STORAGE_FAILED' => 'Une pièce jointe n’a pas pu être enregistrée.',
                 default => 'La commande n’a pas pu être enregistrée.',
             };
@@ -2015,7 +2034,9 @@ class EcommerceController extends Controller
                 'error' => $message,
             ], in_array($error->getMessage(), ['STOCK_INSUFFICIENT', 'RENTAL_UNAVAILABLE'], true)
                 ? 409
-                : ($error->getMessage() === 'ATTACHMENT_STORAGE_FAILED' ? 500 : 400));
+                : (in_array($error->getMessage(), ['CASH_ON_DELIVERY_NOT_SUPPORTED'], true)
+                    ? 422
+                    : ($error->getMessage() === 'ATTACHMENT_STORAGE_FAILED' ? 500 : 400)));
         }
     }
 
@@ -2319,6 +2340,7 @@ class EcommerceController extends Controller
             'deliveryZoneFee' => (int) ($row->delivery_zone_fee ?? 0),
             'total' => (int) $row->total,
             'status' => $row->status,
+            'paymentMethod' => $row->payment_method ?? null,
             'paymentStatus' => $row->payment_status ?? 'UNPAID',
             'paymentCheckoutUrl' => $row->payment_checkout_url ?? null,
             'paymentFailureReason' => $row->payment_failure_reason ?? '',

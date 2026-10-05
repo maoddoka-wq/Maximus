@@ -91,6 +91,9 @@ final class EcommercePaymentController extends Controller
                 if (! $order) {
                     return response()->json(['error' => 'Commande introuvable.'], 404);
                 }
+                if (($order->payment_method ?? null) === 'CASH_ON_DELIVERY') {
+                    return response()->json(['error' => 'Cette commande est payable à la livraison et ne peut pas ouvrir un checkout en ligne.'], 422);
+                }
                 $reservation = DB::table('ecommerce_car_reservations')
                     ->where('order_id', $order->id)->lockForUpdate()->first();
                 if ($reservation) {

@@ -56,6 +56,7 @@
 - [Catalogue d’inscription](registration-catalog-boundary.md) — l’inscription publique lit uniquement le catalogue publié, jamais l’état workspace ou son brouillon.
 - [Autorisation effective des modules](module-access-source.md) — l’accès courant vient des autorisations persistées, pas seulement de la demande initiale d’inscription.
 - [Commission e-commerce](ecommerce-commission-policy.md) — chaque vente est répartie à 3 % DiamanoPay, 2 % MAXIMUS et 95 % vendeur, avec registre MAXIMUS idempotent.
+- [Paiement à la livraison](ecommerce-cash-on-delivery.md) — garder la commande impayée et ne créditer aucun portefeuille avant confirmation explicite de l’encaissement.
 - [Réconciliation des règlements MAXIMUS](maximus-settlement-reconciliation.md) — une vente `PAID` peut reconstruire séparément les écritures vendeur et MAXIMUS sans double crédit.
 - [Frontière financière de la paie](payroll-financial-boundary.md) — créditer le solde uniquement après webhook signé, chiffrer les comptes et réserver les fonds avant virement.
 - [Catalogue Paie](payroll-catalog.md) — les packs doivent utiliser les slugs des libellés et matérialiser leurs permissions lors du provisionnement entreprise.

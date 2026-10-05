@@ -66,6 +66,77 @@ class EcommerceCustomerTest extends TestCase
         $this->assertDatabaseHas('ecommerce_products', ['id' => $productId, 'stock' => 2]);
     }
 
+    public function test_guest_can_place_a_physical_cash_on_delivery_order_without_email_or_online_charge(): void
+    {
+        Http::fake();
+        $this->createStore('kora', 'kora-cash-delivery');
+        $this->createProduct('kora', 'cafe-cash-delivery', 2500, 3);
+
+        $order = $this->postJson('/api/shop/kora-cash-delivery/orders', [
+            'customerName' => 'Client sans e-mail',
+            'customerPhone' => '+221700000000',
+            'shippingAddress' => 'Dakar, Sénégal',
+            'paymentMethod' => 'CASH_ON_DELIVERY',
+            'items' => [['productSlug' => 'cafe-cash-delivery', 'quantity' => 1]],
+        ])
+            ->assertCreated()
+            ->assertJsonPath('paymentMethod', 'CASH_ON_DELIVERY')
+            ->assertJsonPath('paymentStatus', 'UNPAID')
+            ->json();
+
+        $this->assertDatabaseHas('ecommerce_orders', [
+            'id' => $order['id'],
+            'customer_email' => null,
+            'payment_method' => 'CASH_ON_DELIVERY',
+            'payment_status' => 'UNPAID',
+            'payment_charge_id' => null,
+        ]);
+
+        \App\Support\CompanyPaymentAccess::ensure('kora', 'ACTIF');
+        $this->postJson('/api/shop/kora-cash-delivery/orders/'.$order['id'].'/payment', [
+            'provider' => 'WAVE',
+        ])->assertUnprocessable();
+        Http::assertNothingSent();
+    }
+
+    public function test_cash_on_delivery_rejects_a_digital_order(): void
+    {
+        Storage::fake('digital');
+        $this->createStore('kora', 'kora-digital-cash-delivery');
+        DB::table('maximus_company_modules')->updateOrInsert(
+            ['company_id' => 'kora', 'module_id' => 'ecommerce'],
+            [
+                'id' => 'company-module-kora-ecommerce',
+                'status' => 'ACTIF',
+                'feature_ids' => json_encode(['dashboard', 'catalogue', 'vente-physique', 'vente-numerique']),
+                'configuration' => json_encode(['featureScope' => 'explicit']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+        $productId = $this->createProduct('kora', 'digital-cash-delivery', 2500, 3);
+        $filePath = 'digital/kora/cash-delivery.pdf';
+        Storage::disk('digital')->put($filePath, 'digital test file');
+        DB::table('ecommerce_products')->where('id', $productId)->update([
+            'fulfillment_type' => 'DIGITAL',
+            'digital_file_path' => $filePath,
+            'digital_file_name' => 'cash-delivery.pdf',
+            'digital_file_mime' => 'application/pdf',
+            'digital_file_size' => 17,
+        ]);
+        $customer = $this->createCustomer('cash-delivery-digital-customer', 'kora', 'cash-delivery-digital@example.test');
+        $token = EcommerceCustomerAuth::issueSession($customer);
+
+        $this->withCredentials()->withUnencryptedCookie(EcommerceCustomerAuth::COOKIE, $token)
+            ->postJson('/api/shop/kora-digital-cash-delivery/orders', [
+                'customerName' => 'Client',
+                'paymentMethod' => 'CASH_ON_DELIVERY',
+                'items' => [['productSlug' => 'digital-cash-delivery', 'quantity' => 1]],
+            ])->assertUnprocessable();
+
+        $this->assertSame(0, DB::table('ecommerce_orders')->count());
+    }
+
     public function test_order_attachments_are_private_and_limited_to_the_owning_customer(): void
     {
         Storage::fake('digital');
