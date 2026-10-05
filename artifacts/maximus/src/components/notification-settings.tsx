@@ -27,11 +27,31 @@ function pushSupportMessage(): string | null {
 export function NotificationSettings() {
   const [soundEnabled, setSoundEnabled] = useState(isNotificationSoundEnabled);
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushAccessAllowed, setPushAccessAllowed] = useState<boolean | null>(null);
+  const [pushAccessError, setPushAccessError] = useState('');
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('default');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const unsupportedMessage = pushSupportMessage();
+
+  useEffect(() => {
+    let cancelled = false;
+    void maximusPushApi.access()
+      .then(({ allowed }) => {
+        if (!cancelled) setPushAccessAllowed(allowed);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPushAccessAllowed(false);
+          setPushAccessError('Impossible de vérifier l’autorisation MAXIMUS. Réessayez plus tard.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (unsupportedMessage || typeof Notification === 'undefined') {
@@ -64,6 +84,12 @@ export function NotificationSettings() {
     setMessage('');
 
     try {
+      if (pushAccessAllowed !== true) {
+        throw new Error(
+          pushAccessError || 'MAXIMUS doit autoriser les notifications push de votre entreprise avant leur activation.',
+        );
+      }
+
       const supportError = pushSupportMessage();
       if (supportError) throw new Error(supportError);
 
@@ -170,18 +196,29 @@ export function NotificationSettings() {
               <h3 className="text-sm font-semibold">Notifications hors application</h3>
               <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
                 {unsupportedMessage
-                  ?? (pushEnabled
-                    ? 'Activées pour ce navigateur.'
-                    : permission === 'denied'
-                      ? 'L’autorisation est refusée dans les réglages du navigateur.'
-                      : 'Autorisez les notifications pour recevoir un message lorsque MAXIMUS est fermé.')}
+                  ?? (pushAccessAllowed === null
+                    ? 'Vérification de l’autorisation MAXIMUS…'
+                    : pushAccessError
+                      || (!pushAccessAllowed
+                        ? 'MAXIMUS n’a pas autorisé les notifications push pour cette entreprise. Le son local reste disponible.'
+                        : pushEnabled
+                          ? 'Activées pour ce navigateur.'
+                          : permission === 'denied'
+                            ? 'L’autorisation est refusée dans les réglages du navigateur.'
+                            : 'Autorisez les notifications pour recevoir un message lorsque MAXIMUS est fermé.'))}
               </p>
             </div>
             <Button
               type="button"
               variant={pushEnabled ? 'secondary' : 'outline'}
               size="sm"
-              disabled={busy || Boolean(unsupportedMessage) || permission === 'denied'}
+              disabled={
+                busy
+                || Boolean(unsupportedMessage)
+                || permission === 'denied'
+                || pushAccessAllowed === null
+                || (!pushAccessAllowed && !pushEnabled)
+              }
               onClick={() => void (pushEnabled ? disablePush() : enablePush())}
             >
               {busy ? 'Patientez…' : pushEnabled ? 'Désactiver' : 'Activer'}

@@ -4,15 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Services\MaximusPushNotificationService;
+use App\Support\ApplicationIdentity;
+use App\Support\CompanyPaymentAccess;
+use App\Support\CompanyWorkspaceVisibility;
+use App\Support\ModuleCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use App\Support\ModuleCatalog;
-use App\Support\ApplicationIdentity;
-use App\Support\CompanyPaymentAccess;
-use App\Support\CompanyWorkspaceVisibility;
 
 final class InstallationController extends Controller
 {
@@ -35,8 +36,8 @@ final class InstallationController extends Controller
         $installationId ??= $input['installationId'] ?? null;
         $query = DB::table('maximus_installations')->where('company_id', $companyId);
         $existing = $installationId ? (clone $query)->where('id', $installationId)->first() : null;
-        abort_if($installationId && !$existing, 404);
-        if (!$installationId && !($input['createNew'] ?? false)) {
+        abort_if($installationId && ! $existing, 404);
+        if (! $installationId && ! ($input['createNew'] ?? false)) {
             abort_if((clone $query)->count() > 1, 409, 'Précisez installationId pour renouveler une installation, ou createNew pour en créer une.');
             $existing = $query->first();
         }
@@ -90,10 +91,11 @@ final class InstallationController extends Controller
             'revoked_at' => now(),
             'updated_at' => now(),
         ]);
+
         return response()->json(['ok' => true]);
     }
 
-    public function configuration(Request $request): JsonResponse
+    public function configuration(Request $request, MaximusPushNotificationService $push): JsonResponse
     {
         $installation = $request->attributes->get('installation');
         $company = Company::query()->whereKey((string) $installation->company_id)
@@ -125,6 +127,10 @@ final class InstallationController extends Controller
         ]);
         $moduleIds = $this->synchronizedModuleIds($company);
         $paymentAccess = CompanyPaymentAccess::payload((string) $company->id);
+        $pushNotificationAccess = [
+            'companyId' => (string) $company->id,
+            'enabled' => $push->isCompanyPushEnabled((string) $company->id),
+        ];
         $publicSiteAccess = [
             'companyId' => (string) $company->id,
             'enabled' => (bool) DB::table('company_public_site_access')
@@ -175,6 +181,7 @@ final class InstallationController extends Controller
             'catalog' => ModuleCatalog::publishedCatalog($moduleIds),
             'domains' => $domains,
             'paymentAccess' => $paymentAccess,
+            'pushNotificationAccess' => $pushNotificationAccess,
             'publicSiteAccess' => $publicSiteAccess,
             'erpAccess' => $this->erpAccess((string) $installation->id),
         ]);
@@ -232,6 +239,7 @@ final class InstallationController extends Controller
     private function erpAccess(string $installationId): array
     {
         $addresses = DB::table('maximus_installation_addresses')->where('installation_id', $installationId)->where('status', 'ACTIVE')->get();
+
         return [
             'canonicalUrl' => $addresses->firstWhere('is_primary', true)?->url,
             'allowedHosts' => $addresses->pluck('hostname')->unique()->values()->all(),
@@ -247,6 +255,7 @@ final class InstallationController extends Controller
             'last_sync_at' => now(),
             'updated_at' => now(),
         ]);
+
         return response()->json(['ok' => true]);
     }
 

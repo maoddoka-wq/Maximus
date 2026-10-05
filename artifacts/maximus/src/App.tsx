@@ -145,6 +145,7 @@ import {
 import { InstallationUnavailable } from '@/components/installation-unavailable';
 import { InstallationSyncNotice } from '@/components/installation-sync-notice';
 import { CompanyInstallationAccess } from '@/components/company-installation-access';
+import { CompanyPushNotificationAccess } from '@/components/company-push-notification-access';
 import { CompanySubscriptionExpiryNotice } from '@/components/company-subscription-expiry-notice';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company-payment-api';
@@ -4014,6 +4015,11 @@ function CompanyDetail({
         companyName={company.name}
         refreshKey={installationRefreshKey}
         loginUrl={usesDedicatedPrimary ? null : loginSettings?.url}
+      />
+      <CompanyPushNotificationAccess
+        companyId={company.id}
+        companyName={company.name}
+        dedicatedInstallation={usesDedicatedPrimary}
       />
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

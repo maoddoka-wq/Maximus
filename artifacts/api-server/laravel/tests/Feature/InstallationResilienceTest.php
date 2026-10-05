@@ -2,14 +2,15 @@
 
 namespace Tests\Feature;
 
-use App\Models\Company;
-use App\Models\AuthUser;
 use App\Models\AuthSession;
+use App\Models\AuthUser;
+use App\Models\Company;
 use App\Services\InstallationSyncService;
 use App\Support\ApplicationIdentity;
 use App\Support\InstallationSyncState;
 use App\Support\ModuleCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -21,6 +22,7 @@ class InstallationResilienceTest extends TestCase
     use RefreshDatabase;
 
     private string $isolatedStorage;
+
     private mixed $previousBuild;
 
     public function createApplication()
@@ -30,6 +32,7 @@ class InstallationResilienceTest extends TestCase
         $app['config']->set('database.connections.sqlite.database', ':memory:');
         $app['config']->set('database.connections.sqlite.url', null);
         $app['config']->set('cache.default', 'array');
+
         return $app;
     }
 
@@ -68,7 +71,7 @@ class InstallationResilienceTest extends TestCase
         $company = $sync->apply($this->payload(), true);
         $before = $company->getAttributes();
         $success = InstallationSyncState::summary()['lastSuccessAt'];
-        Http::fake(fn () => throw new \Illuminate\Http\Client\ConnectionException('Do not publish tokens or upstream exception details'));
+        Http::fake(fn () => throw new ConnectionException('Do not publish tokens or upstream exception details'));
         try {
             $sync->fetch();
             $this->fail('Network error should be reported.');
@@ -160,6 +163,37 @@ class InstallationResilienceTest extends TestCase
             'enabled' => false,
             'homepage_enabled' => true,
             'banner_enabled' => false,
+        ]);
+    }
+
+    public function test_sync_applies_central_push_authorization_and_preserves_it_when_omitted(): void
+    {
+        $sync = app(InstallationSyncService::class);
+        $payload = $this->payload();
+        $payload['pushNotificationAccess'] = [
+            'companyId' => 'sync-company',
+            'enabled' => false,
+        ];
+
+        $sync->apply($payload, true);
+        $this->assertDatabaseHas('maximus_company_push_access', [
+            'company_id' => 'sync-company',
+            'enabled' => false,
+            'updated_by' => 'maximus-sync',
+        ]);
+
+        $payload['pushNotificationAccess']['enabled'] = true;
+        $sync->apply($payload);
+        $this->assertDatabaseHas('maximus_company_push_access', [
+            'company_id' => 'sync-company',
+            'enabled' => true,
+        ]);
+
+        unset($payload['pushNotificationAccess']);
+        $sync->apply($payload);
+        $this->assertDatabaseHas('maximus_company_push_access', [
+            'company_id' => 'sync-company',
+            'enabled' => true,
         ]);
     }
 

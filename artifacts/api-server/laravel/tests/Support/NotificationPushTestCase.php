@@ -14,6 +14,9 @@ abstract class NotificationPushTestCase extends TestCase
     /** @var list<string> */
     protected array $testUserIds = [];
 
+    /** @var list<string> */
+    protected array $testCompanyIds = [];
+
     protected ?object $previousWorkspaceState = null;
 
     protected function setUp(): void
@@ -27,6 +30,18 @@ abstract class NotificationPushTestCase extends TestCase
 
     protected function tearDown(): void
     {
+        if ($this->testCompanyIds !== []) {
+            DB::table('maximus_company_push_access')
+                ->whereIn('company_id', array_values(array_unique($this->testCompanyIds)))
+                ->delete();
+            DB::table('maximus_company_subscription_prices')
+                ->whereIn('company_id', array_values(array_unique($this->testCompanyIds)))
+                ->delete();
+            DB::table('maximus_company_subscriptions')
+                ->whereIn('company_id', array_values(array_unique($this->testCompanyIds)))
+                ->delete();
+        }
+
         if ($this->previousWorkspaceState === null) {
             DB::table('maximus_app_states')->where('scope', 'workspace')->delete();
         } else {
@@ -58,6 +73,18 @@ abstract class NotificationPushTestCase extends TestCase
     ): AuthUser {
         $id = 'push-test-'.str()->uuid();
         $this->testUserIds[] = $id;
+        if ($companyId !== null && $companyId !== '') {
+            $this->testCompanyIds[] = $companyId;
+            DB::table('maximus_company_subscription_prices')->updateOrInsert(
+                ['company_id' => $companyId],
+                [
+                    'custom_monthly_amount' => 0,
+                    'updated_by' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+            );
+        }
 
         return AuthUser::query()->create([
             'id' => $id,
@@ -79,6 +106,33 @@ abstract class NotificationPushTestCase extends TestCase
 
     private function ensureNotificationTables(): void
     {
+        if (! Schema::hasTable('companies')) {
+            Schema::create('companies', function (Blueprint $table): void {
+                $table->string('id')->primary();
+                $table->string('status')->default('ACTIF');
+                $table->timestampTz('deleted_at')->nullable();
+                $table->timestampsTz();
+            });
+        }
+
+        if (! Schema::hasTable('maximus_company_subscription_prices')) {
+            Schema::create('maximus_company_subscription_prices', function (Blueprint $table): void {
+                $table->string('company_id')->primary();
+                $table->unsignedBigInteger('custom_monthly_amount')->nullable();
+                $table->string('updated_by')->nullable();
+                $table->timestampsTz();
+            });
+        }
+
+        if (! Schema::hasTable('maximus_company_subscriptions')) {
+            Schema::create('maximus_company_subscriptions', function (Blueprint $table): void {
+                $table->string('company_id')->primary();
+                $table->timestampTz('current_period_started_at')->nullable();
+                $table->timestampTz('current_period_ends_at')->nullable();
+                $table->timestampsTz();
+            });
+        }
+
         if (! Schema::hasTable('auth_users')) {
             Schema::create('auth_users', function (Blueprint $table): void {
                 $table->string('id')->primary();
@@ -129,6 +183,15 @@ abstract class NotificationPushTestCase extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        if (! Schema::hasTable('maximus_company_push_access')) {
+            Schema::create('maximus_company_push_access', function (Blueprint $table): void {
+                $table->string('company_id')->primary();
+                $table->boolean('enabled')->default(false);
+                $table->string('updated_by')->nullable();
+                $table->timestampsTz();
+            });
+        }
 
         if (! Schema::hasTable('maximus_push_subscriptions')) {
             Schema::create('maximus_push_subscriptions', function (Blueprint $table): void {

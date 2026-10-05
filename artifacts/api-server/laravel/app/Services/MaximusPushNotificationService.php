@@ -16,11 +16,39 @@ use Throwable;
 class MaximusPushNotificationService
 {
     private const SETTINGS_TABLE = 'maximus_push_notification_settings';
+
     private const SUBSCRIPTIONS_TABLE = 'maximus_push_subscriptions';
+
+    private const COMPANY_ACCESS_TABLE = 'maximus_company_push_access';
 
     public function publicKey(): string
     {
         return $this->vapidKeys()['publicKey'];
+    }
+
+    public function canSubscribe(string $userId): bool
+    {
+        $user = DB::table('auth_users')->where('id', $userId)->first(['role', 'company_id']);
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->role === 'maximus_admin') {
+            return true;
+        }
+
+        $companyId = is_string($user->company_id) ? trim($user->company_id) : '';
+
+        return $companyId !== '' && $this->isCompanyPushEnabled($companyId);
+    }
+
+    public function isCompanyPushEnabled(string $companyId): bool
+    {
+        $enabled = DB::table(self::COMPANY_ACCESS_TABLE)
+            ->where('company_id', $companyId)
+            ->value('enabled');
+
+        return in_array($enabled, [true, 1, '1', 't', 'true'], true);
     }
 
     public function subscribe(string $userId, string $endpoint, string $publicKey, string $authSecret): void
@@ -57,7 +85,7 @@ class MaximusPushNotificationService
      * Resolve push recipients using the same audience and company rules as
      * getVisibleNotifications() in the MAXIMUS client.
      *
-     * @param array<string, mixed> $notification
+     * @param  array<string, mixed>  $notification
      * @return Collection<int, object>
      */
     public function recipientSubscriptions(array $notification, string $actorUserId): Collection
@@ -80,6 +108,12 @@ class MaximusPushNotificationService
 
                 $visibleUsers->orWhere(function (Builder $companyUsers) use ($companyId): void {
                     $companyUsers->where('users.role', '!=', 'maximus_admin');
+                    $companyUsers->whereExists(function (Builder $access): void {
+                        $access->selectRaw('1')
+                            ->from(self::COMPANY_ACCESS_TABLE.' as company_push_access')
+                            ->whereColumn('company_push_access.company_id', 'users.company_id')
+                            ->where('company_push_access.enabled', true);
+                    });
                     if ($companyId !== '') {
                         $companyUsers->where('users.company_id', $companyId);
                     }
@@ -96,7 +130,7 @@ class MaximusPushNotificationService
     }
 
     /**
-     * @param array<int, array<string, mixed>> $notifications
+     * @param  array<int, array<string, mixed>>  $notifications
      */
     public function dispatchNewNotifications(array $notifications, string $actorUserId, string $requestHost): void
     {
@@ -165,6 +199,7 @@ class MaximusPushNotificationService
                     DB::table(self::SUBSCRIPTIONS_TABLE)
                         ->where('endpoint_hash', hash('sha256', $report->getEndpoint()))
                         ->delete();
+
                     continue;
                 }
 

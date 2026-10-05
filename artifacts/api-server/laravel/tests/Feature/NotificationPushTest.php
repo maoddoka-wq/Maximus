@@ -70,6 +70,20 @@ class NotificationPushTest extends NotificationPushTestCase
         $companyAdminB = $this->createPushTestUser('company_admin', 'push-company-b');
         $inactiveAdmin = $this->createPushTestUser('company_admin', 'push-company-a', 'INACTIF');
         $users = [$platformAdmin, $companyAdminA, $employeeA, $companyAdminB, $inactiveAdmin];
+        DB::table('maximus_company_push_access')->insert([
+            [
+                'company_id' => 'push-company-a',
+                'enabled' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'company_id' => 'push-company-b',
+                'enabled' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
 
         foreach ($users as $user) {
             $service->subscribe(

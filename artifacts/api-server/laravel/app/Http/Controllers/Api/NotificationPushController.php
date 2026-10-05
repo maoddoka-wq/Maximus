@@ -10,10 +10,25 @@ use Throwable;
 
 class NotificationPushController extends Controller
 {
+    public function access(Request $request, MaximusPushNotificationService $push): JsonResponse
+    {
+        $userId = $this->authenticatedUserId($request);
+        if (! $userId) {
+            return response()->json(['error' => 'Session MAXIMUS absente ou expirée.'], 401);
+        }
+
+        return response()->json(['allowed' => $push->canSubscribe($userId)]);
+    }
+
     public function publicKey(Request $request, MaximusPushNotificationService $push): JsonResponse
     {
-        if (! $this->authenticatedUserId($request)) {
+        $userId = $this->authenticatedUserId($request);
+        if (! $userId) {
             return response()->json(['error' => 'Session MAXIMUS absente ou expirée.'], 401);
+        }
+
+        if (! $push->canSubscribe($userId)) {
+            return $this->accessDenied();
         }
 
         try {
@@ -32,6 +47,10 @@ class NotificationPushController extends Controller
         $userId = $this->authenticatedUserId($request);
         if (! $userId) {
             return response()->json(['error' => 'Session MAXIMUS absente ou expirée.'], 401);
+        }
+
+        if (! $push->canSubscribe($userId)) {
+            return $this->accessDenied();
         }
 
         $payload = $request->validate([
@@ -65,6 +84,14 @@ class NotificationPushController extends Controller
         $push->unsubscribe($userId, $payload['endpoint']);
 
         return response()->json(['ok' => true]);
+    }
+
+    private function accessDenied(): JsonResponse
+    {
+        return response()->json([
+            'code' => 'PUSH_ACCESS_NOT_AUTHORIZED',
+            'error' => 'L’administration MAXIMUS n’a pas autorisé les notifications push pour cette entreprise.',
+        ], 403);
     }
 
     private function authenticatedUserId(Request $request): ?string

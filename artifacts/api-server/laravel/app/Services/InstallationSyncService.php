@@ -3,11 +3,12 @@
 namespace App\Services;
 
 use App\Models\Company;
-use App\Support\ModuleCatalog;
 use App\Support\ApplicationIdentity;
+use App\Support\CompanyPaymentAccess;
 use App\Support\CompanyWorkspaceVisibility;
 use App\Support\InstallationContext;
 use App\Support\InstallationSyncState;
+use App\Support\ModuleCatalog;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\DB;
@@ -69,6 +70,7 @@ final class InstallationSyncService
             throw new RuntimeException('La configuration reçue de MAXIMUS est invalide.');
         }
         $this->validatePayload($payload, $initial);
+
         return $payload;
     }
 
@@ -104,6 +106,7 @@ final class InstallationSyncService
         if ($strict && $packageVersion !== $centralVersion) {
             throw new RuntimeException('La copie locale ('.$packageVersion.') ne correspond pas à MAXIMUS principal ('.$centralVersion.'). Recréez l’archive depuis le même commit déployé.');
         }
+
         return $packageVersion !== $centralVersion
             ? 'Versions applicatives différentes ; protocole compatible. Aucune mise à jour automatique du logiciel.'
             : null;
@@ -119,6 +122,9 @@ final class InstallationSyncService
                 : null;
             $publicSiteAccess = array_key_exists('publicSiteAccess', $payload)
                 ? $this->validatePublicSiteAccess($payload['publicSiteAccess'], $payload['company']['id'] ?? null)
+                : null;
+            $pushNotificationAccess = array_key_exists('pushNotificationAccess', $payload)
+                ? $this->validatePushNotificationAccess($payload['pushNotificationAccess'], $payload['company']['id'] ?? null)
                 : null;
             $companyData = is_array($payload['company'] ?? null) ? $payload['company'] : [];
             if (array_key_exists('moduleNavigationMode', $companyData)
@@ -140,13 +146,20 @@ final class InstallationSyncService
                 : null;
             $access = array_key_exists('erpAccess', $payload)
                 ? $this->validateErpAccess($payload['erpAccess']) : InstallationSyncState::erpAccess();
-            $company = $this->applyValidated($payload, $paymentAccess, $hiddenWorkspaceFeatures, $publicSiteAccess);
+            $company = $this->applyValidated(
+                $payload,
+                $paymentAccess,
+                $hiddenWorkspaceFeatures,
+                $publicSiteAccess,
+                $pushNotificationAccess,
+            );
             // Publish the entire access snapshot only after the database transaction succeeds.
             InstallationSyncState::record([
                 'lastSuccessAt' => now()->toIso8601String(), 'state' => 'synced', 'lastError' => null,
                 'versionWarning' => $warning, 'erpAccess' => $access,
                 'configurationVersion' => (int) ($payload['configurationVersion'] ?? 0),
             ]);
+
             return $company;
         } catch (\Throwable $exception) {
             InstallationSyncState::record(['state' => 'rejected', 'lastError' => 'Configuration non appliquée intégralement. Vérifier le diagnostic local avant de réessayer.']);
@@ -178,6 +191,7 @@ final class InstallationSyncService
                 throw new RuntimeException('URL ERP canonique invalide.');
             }
         }
+
         return ['canonicalUrl' => $url, 'allowedHosts' => array_values(array_unique($hosts))];
     }
 
@@ -195,7 +209,7 @@ final class InstallationSyncService
 
         $providers = [];
         foreach ($access['providers'] as $provider) {
-            if (! is_string($provider) || $provider !== \App\Support\CompanyPaymentAccess::PROVIDER_DIAMANOPAY) {
+            if (! is_string($provider) || $provider !== CompanyPaymentAccess::PROVIDER_DIAMANOPAY) {
                 throw new RuntimeException('Fournisseur de paiement non pris en charge par la configuration centrale.');
             }
             $providers[] = $provider;
@@ -227,13 +241,27 @@ final class InstallationSyncService
         ], static fn (mixed $value): bool => $value !== null);
     }
 
+    /** @return array{enabled: bool} */
+    private function validatePushNotificationAccess(mixed $access, mixed $companyId): array
+    {
+        if (! is_array($access)
+            || ! is_string($companyId)
+            || $companyId === ''
+            || ($access['companyId'] ?? null) !== $companyId
+            || ! is_bool($access['enabled'] ?? null)) {
+            throw new RuntimeException('Configuration des notifications push invalide.');
+        }
+
+        return ['enabled' => $access['enabled']];
+    }
+
     private function applyValidated(
         array $payload,
         ?array $paymentAccess = null,
         ?array $hiddenWorkspaceFeatures = null,
         ?array $publicSiteAccess = null,
-    ): Company
-    {
+        ?array $pushNotificationAccess = null,
+    ): Company {
         $companyData = is_array($payload['company'] ?? null) ? $payload['company'] : [];
         $companyId = trim((string) ($companyData['id'] ?? ''));
         $moduleData = is_array($payload['modules'] ?? null) ? $payload['modules'] : [];
@@ -259,6 +287,7 @@ final class InstallationSyncService
             $paymentAccess,
             $hiddenWorkspaceFeatures,
             $publicSiteAccess,
+            $pushNotificationAccess,
         ): Company {
             ModuleCatalog::importPublishedCatalog($catalog);
             ModuleCatalog::ensureCatalog();
@@ -398,6 +427,32 @@ final class InstallationSyncService
                         ->update($values);
                 } else {
                     DB::table('company_public_site_access')->insert([
+                        'company_id' => $companyId,
+                        ...$values,
+                        'created_at' => now(),
+                    ]);
+                }
+            }
+
+            if ($pushNotificationAccess !== null) {
+                if (! Schema::hasTable('maximus_company_push_access')) {
+                    throw new RuntimeException('La table locale des autorisations de notifications push est absente.');
+                }
+
+                $existingPushAccess = DB::table('maximus_company_push_access')
+                    ->where('company_id', $companyId)
+                    ->exists();
+                $values = [
+                    'enabled' => $pushNotificationAccess['enabled'],
+                    'updated_by' => 'maximus-sync',
+                    'updated_at' => now(),
+                ];
+                if ($existingPushAccess) {
+                    DB::table('maximus_company_push_access')
+                        ->where('company_id', $companyId)
+                        ->update($values);
+                } else {
+                    DB::table('maximus_company_push_access')->insert([
                         'company_id' => $companyId,
                         ...$values,
                         'created_at' => now(),

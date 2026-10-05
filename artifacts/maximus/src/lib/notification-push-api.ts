@@ -9,6 +9,7 @@ type PushSubscriptionPayload = {
 };
 
 export const maximusPushApi = {
+  access: () => requestJson<{ allowed: boolean }>('/notifications/push/access'),
   publicKey: () => requestJson<{ publicKey: string }>('/notifications/push/public-key'),
   subscribe: (subscription: PushSubscriptionPayload) =>
     requestJson<{ ok: true }>('/notifications/push/subscriptions', {

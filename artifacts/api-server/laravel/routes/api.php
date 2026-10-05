@@ -2,31 +2,31 @@
 
 use App\Http\Controllers\Api\AppStateController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\MobileAuthController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CompanyNavigationSettingsController;
-use App\Http\Controllers\Api\DemoWorkspaceController;
 use App\Http\Controllers\Api\CompanyPaymentController;
 use App\Http\Controllers\Api\CompanyPublicSiteAccessController;
-use App\Http\Controllers\Api\CompanyPublicSiteSettingsController;
 use App\Http\Controllers\Api\CompanyPublicSiteDomainsController;
+use App\Http\Controllers\Api\CompanyPublicSiteSettingsController;
+use App\Http\Controllers\Api\CompanyPushNotificationAccessController;
+use App\Http\Controllers\Api\DemoWorkspaceController;
 use App\Http\Controllers\Api\DiagnosticTokenController;
-use App\Http\Controllers\Api\MaximusWalletController;
-use App\Http\Controllers\Api\MaximusAssistantController;
-use App\Http\Controllers\Api\OnboardingDraftController;
-use App\Http\Controllers\Api\ModuleController;
-use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\EcommerceSubscriptionController;
+use App\Http\Controllers\Api\InstallationAccessController;
+use App\Http\Controllers\Api\InstallationController;
+use App\Http\Controllers\Api\MaximusAssistantController;
+use App\Http\Controllers\Api\MaximusWalletController;
+use App\Http\Controllers\Api\MobileAuthController;
+use App\Http\Controllers\Api\ModuleController;
+use App\Http\Controllers\Api\NotificationPushController;
+use App\Http\Controllers\Api\OnboardingDraftController;
+use App\Http\Controllers\Api\PlatformSettingsController;
 use App\Http\Controllers\Api\SubscriptionBillingController;
 use App\Http\Controllers\Api\SystemHealthController;
-use App\Http\Controllers\Api\InstallationController;
-use App\Http\Controllers\Api\InstallationAccessController;
-use App\Http\Controllers\Api\NotificationPushController;
-use App\Services\SystemHealthService;
-use App\Support\InstallationContext;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\DB;
 use App\Support\ApplicationIdentity;
+use App\Support\InstallationContext;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return response()->json([
@@ -42,8 +42,8 @@ Route::get('/healthz', function () {
             'ok' => DB::select('select 1') !== [],
             'database' => true,
             'status' => 'OPERATIONAL',
-                'applicationVersion' => ApplicationIdentity::deployedVersion(),
-                'syncProtocolVersion' => ApplicationIdentity::SYNC_PROTOCOL_VERSION,
+            'applicationVersion' => ApplicationIdentity::deployedVersion(),
+            'syncProtocolVersion' => ApplicationIdentity::SYNC_PROTOCOL_VERSION,
             'checkedAt' => now()->toISOString(),
         ]);
     } catch (Throwable $exception) {
@@ -118,6 +118,8 @@ Route::middleware(['maximus.central', 'maximus.auth'])->prefix('companies')->gro
     Route::patch('/{companyId}/payment-settings', [CompanyPaymentController::class, 'update']);
     Route::get('/{companyId}/public-site-access', [CompanyPublicSiteAccessController::class, 'show']);
     Route::patch('/{companyId}/public-site-access', [CompanyPublicSiteAccessController::class, 'update']);
+    Route::get('/{companyId}/notifications/push-access', [CompanyPushNotificationAccessController::class, 'show']);
+    Route::patch('/{companyId}/notifications/push-access', [CompanyPushNotificationAccessController::class, 'update']);
     Route::delete('/{companyId}', [CompanyController::class, 'destroy']);
 });
 
@@ -149,10 +151,10 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription', 'm
         Route::post('/logo', [CompanyPublicSiteSettingsController::class, 'uploadLogo']);
         Route::post('/hero-images', [CompanyPublicSiteSettingsController::class, 'uploadHeroImages']);
         Route::delete('/hero-images/{imageId}', [CompanyPublicSiteSettingsController::class, 'deleteHeroImage']);
-    Route::get('/domains', [CompanyPublicSiteDomainsController::class, 'index']);
-    Route::post('/domains', [CompanyPublicSiteDomainsController::class, 'store']);
-    Route::post('/domains/{id}/verify', [CompanyPublicSiteDomainsController::class, 'verify']);
-    Route::delete('/domains/{id}', [CompanyPublicSiteDomainsController::class, 'destroy']);
+        Route::get('/domains', [CompanyPublicSiteDomainsController::class, 'index']);
+        Route::post('/domains', [CompanyPublicSiteDomainsController::class, 'store']);
+        Route::post('/domains/{id}/verify', [CompanyPublicSiteDomainsController::class, 'verify']);
+        Route::delete('/domains/{id}', [CompanyPublicSiteDomainsController::class, 'destroy']);
     });
 
 Route::middleware('maximus.auth')->prefix('auth/company-admins')->group(function (): void {
@@ -173,6 +175,7 @@ Route::middleware(['maximus.auth', 'maximus.subscription'])->prefix('app-state')
 });
 
 Route::middleware('maximus.auth')->prefix('notifications/push')->group(function (): void {
+    Route::get('/access', [NotificationPushController::class, 'access']);
     Route::get('/public-key', [NotificationPushController::class, 'publicKey'])
         ->middleware('maximus.subscription');
     Route::post('/subscriptions', [NotificationPushController::class, 'subscribe'])
