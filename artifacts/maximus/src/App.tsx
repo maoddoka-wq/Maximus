@@ -121,7 +121,7 @@ import { applyCompanyTheme, companyThemeVariables } from '@/lib/company-theme';
 import { canonicalAppPath, normalizeRoutePath, type Session } from '@/lib/navigation';
 import { AdminRouter, CompanyRouter } from '@/routes/app-routes';
 import { PageHeader, Sidebar, Topbar } from '@/components/app-chrome';
-import { AuthCard, AuthHighlights, AuthLayout } from '@/components/auth-layout';
+import { AuthCard, AuthLayout } from '@/components/auth-layout';
 import { DashboardHero, DashboardPanel, PanelEmpty, QuickLinkTile, SignalItem } from '@/components/dashboard-parts';
 import { Button } from '@workspace/maximus-design-system/components/ui/button';
 import { Alert, AlertDescription } from '@workspace/maximus-design-system/components/ui/alert';
@@ -146,6 +146,8 @@ import { InstallationUnavailable } from '@/components/installation-unavailable';
 import { InstallationSyncNotice } from '@/components/installation-sync-notice';
 import { CompanyInstallationAccess } from '@/components/company-installation-access';
 import { CompanyPushNotificationAccess } from '@/components/company-push-notification-access';
+import { CompanyPushNotificationAccessPage } from '@/components/company-push-notification-access-page';
+import { CompanyPushNotificationPrompt } from '@/components/company-push-notification-prompt';
 import { CompanySubscriptionExpiryNotice } from '@/components/company-subscription-expiry-notice';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
 import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company-payment-api';
@@ -285,6 +287,11 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     kicker: 'Centre de contrôle',
     title: 'Notifications',
     description: 'Les signaux utiles, sans bruit.',
+  },
+  '/maximus/notifications/autorisation': {
+    kicker: 'Centre de contrôle',
+    title: 'Autorisation des notifications push',
+    description: 'Activez ou bloquez les notifications système pour chaque entreprise.',
   },
   '/maximus/journal': {
     kicker: 'Traçabilité',
@@ -1485,6 +1492,14 @@ function AppContent() {
           }}
         />
         <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
+          {!isAdmin && companyId && currentCompany && companyRoutePath !== '/entreprise/notifications' && (
+            <CompanyPushNotificationPrompt
+              key={companyId}
+              companyId={companyId}
+              companyName={currentCompany.name}
+              onNavigate={navigate}
+            />
+          )}
           {!isAdmin && companyId && (
             <CompanySubscriptionExpiryNotice
               companyId={companyId}
@@ -1579,6 +1594,7 @@ function AppContent() {
                     sectors: SectorPresetsPage,
                     subscriptions: SubscriptionsPage,
                     notifications: NotificationsPage,
+                    pushAuthorization: CompanyPushNotificationAccessPage,
                     journal: JournalPage,
                     platformSettings: PlatformSettingsPage,
                     empty: EmptyState,
@@ -1722,15 +1738,6 @@ function Login({
               MAXIMUS réunit vos équipes, vos opérations et vos chiffres essentiels pour vous aider à mieux gérer
               aujourd’hui et à grandir demain.
             </p>
-            <div className="mt-10">
-              <AuthHighlights
-                items={[
-                  { icon: LayoutGrid, title: 'Modules métier', text: 'Stock, commerce, finance, présences, paie et plus, activés selon votre entreprise.' },
-                  { icon: ShieldCheck, title: 'Accès par rôle', text: 'Chaque employé voit uniquement les fonctionnalités qui lui sont autorisées.' },
-                  { icon: Building2, title: 'Espaces entreprises', text: 'Chaque entreprise dispose de son espace, de ses couleurs et de son organisation.' },
-                ]}
-              />
-            </div>
           </div>
           <p className="mono mt-12 text-[10px] uppercase tracking-[.18em] text-[hsl(var(--sidebar-foreground)/.5)]">
             Sénégal · Côte d’Ivoire · UEMOA

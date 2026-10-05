@@ -1,4 +1,5 @@
 import { requestJson } from '@/lib/api-request';
+import { isIosDevice, isStandalonePwa, registerMaximusPushServiceWorker } from '@/lib/pwa';
 
 type PushSubscriptionPayload = {
   endpoint: string;
@@ -22,6 +23,59 @@ export const maximusPushApi = {
       body: JSON.stringify({ endpoint }),
     }),
 };
+
+export function getPushSupportMessage(): string | null {
+  if (typeof window === 'undefined') return null;
+  if (!window.isSecureContext) return 'Les notifications nécessitent une connexion HTTPS sécurisée.';
+  if (!('Notification' in window) || !('PushManager' in window) || !('serviceWorker' in navigator)) {
+    return 'Ce navigateur ne prend pas en charge les notifications système.';
+  }
+  if (isIosDevice() && !isStandalonePwa()) {
+    return 'Sur iPhone ou iPad, installez MAXIMUS sur l’écran d’accueil avant d’activer les notifications.';
+  }
+  return null;
+}
+
+export async function hasCurrentBrowserPushSubscription(): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return false;
+
+  const scope = new URL(import.meta.env.BASE_URL, window.location.origin).href;
+  const registration = await navigator.serviceWorker.getRegistration(scope);
+  return Boolean(await registration?.pushManager.getSubscription());
+}
+
+export async function subscribeCurrentBrowserToPush(): Promise<void> {
+  const supportError = getPushSupportMessage();
+  if (supportError) throw new Error(supportError);
+
+  const permission = Notification.permission === 'granted'
+    ? 'granted'
+    : await Notification.requestPermission();
+  if (permission !== 'granted') {
+    throw new Error('Autorisez les notifications dans votre navigateur pour recevoir les alertes.');
+  }
+
+  const { publicKey } = await maximusPushApi.publicKey();
+  const registration = await registerMaximusPushServiceWorker();
+  await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription()
+    ?? await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: decodeVapidPublicKey(publicKey),
+    });
+
+  const subscriptionJson = subscription.toJSON();
+  if (!subscriptionJson.endpoint || !subscriptionJson.keys?.p256dh || !subscriptionJson.keys.auth) {
+    throw new Error('Le navigateur n’a pas fourni les informations nécessaires à l’abonnement.');
+  }
+  await maximusPushApi.subscribe({
+    endpoint: subscriptionJson.endpoint,
+    keys: {
+      p256dh: subscriptionJson.keys.p256dh,
+      auth: subscriptionJson.keys.auth,
+    },
+  });
+}
 
 export async function disableCurrentBrowserPushSubscription() {
   if (!('serviceWorker' in navigator)) return;

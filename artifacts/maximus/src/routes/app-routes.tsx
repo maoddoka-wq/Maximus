@@ -46,6 +46,7 @@ export type AdminRouteScreens = {
   sectors: Screen;
   subscriptions: Screen;
   notifications: Screen;
+  pushAuthorization: Screen;
   journal: Screen;
   platformSettings: Screen;
   empty: Screen;
@@ -146,6 +147,9 @@ export function AdminRouter({
   }
   if (routePath === '/maximus/notifications') {
     return renderScreen(screens.notifications, { data, mutate, context: { isAdmin: true } });
+  }
+  if (routePath === '/maximus/notifications/autorisation') {
+    return renderScreen(screens.pushAuthorization, { data });
   }
   if (routePath === '/maximus/journal') {
     return renderScreen(screens.journal, { data });

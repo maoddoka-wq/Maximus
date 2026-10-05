@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  BellRing,
   Building2,
   CreditCard,
   FileBarChart,
@@ -81,6 +82,7 @@ export const adminNav: NavigationItem[] = [
   { href: '/maximus/modules', label: 'Modules', icon: LayoutGrid },
   { href: '/maximus/secteurs', label: 'Secteurs d’activité', icon: Building2 },
   { href: '/maximus/abonnements', label: 'Abonnements', icon: CreditCard },
+  { href: '/maximus/notifications/autorisation', label: 'Notifications push', icon: BellRing },
   { href: '/maximus/journal', label: 'Journal d’activité', icon: FileBarChart },
   { href: '/maximus/parametres/portefeuille', label: 'Réglages MAXIMUS', icon: Settings },
 ];
@@ -109,6 +111,10 @@ export const adminNavGroups: SidebarFeatureGroup[] = [
     items: adminNav.filter(item => item.href === '/maximus/abonnements' || item.href === '/maximus/journal'),
   },
   {
+    label: 'Notifications',
+    items: adminNav.filter(item => item.href === '/maximus/notifications/autorisation'),
+  },
+  {
     label: 'Configuration',
     items: adminNav.filter(item => item.href === '/maximus/parametres/portefeuille'),
   },
@@ -116,6 +122,7 @@ export const adminNavGroups: SidebarFeatureGroup[] = [
 
 const companyCoreNav: NavigationItem[] = [
   { href: '/entreprise/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
+  { href: '/entreprise/notifications', label: 'Notifications', icon: BellRing, module: null },
   { href: '/entreprise/controle', label: 'Contrôle & coordination', icon: ListChecks, module: null },
   { href: '/entreprise/organisation', label: 'Organisation & accès', icon: GitBranch, module: null, peopleAdminOnly: true },
   { href: '/entreprise/guide-configuration', label: 'Guide de configuration', icon: BookOpen, module: null, peopleAdminOnly: true },
