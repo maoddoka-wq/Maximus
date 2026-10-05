@@ -41,7 +41,7 @@
 - [Limites du défilement mobile](mobile-scroll-boundary.md) — confiner le débordement de page sans supprimer le défilement nécessaire aux tableaux et rails de produits.
 - [Portefeuille vendeur](vendor-wallet-policy.md) — confirmer le solde après paiement, puis le rendre retirable après livraison ou sept jours sans litige.
 - [Réponse DiamanoPay](diamanopay-response-shape.md) — les charges peuvent être enveloppées dans `data` et utiliser `chargeId`/`checkoutUrl`, pas seulement les clés snake_case racine.
-- [Autorisation des notifications push](push-notification-access.md) — MAXIMUS autorise les push par entreprise; chaque navigateur garde son consentement individuel.
+- [Autorisation des notifications push](push-notification-access.md) — réglage MAXIMUS dans la fiche entreprise > Accès & permissions; consentement individuel par navigateur.
 - [Garde de création de paiement](payment-creation-guard.md) — verrouiller la commande pendant la création du checkout et réutiliser toute charge PENDING existante.
 - [Idempotence des ventes comptoir](pos-sale-idempotency.md) — garder la même clé pour relancer le même panier, et une clé distincte pour un contenu différent.
 - [Configuration des vitrines publiques](public-commerce-capabilities.md) — MAXIMUS contrôle séparément le site, l’accueil et la bannière; la bannière cachée conserve ses images.

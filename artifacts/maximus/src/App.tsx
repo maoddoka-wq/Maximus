@@ -146,7 +146,6 @@ import { InstallationUnavailable } from '@/components/installation-unavailable';
 import { InstallationSyncNotice } from '@/components/installation-sync-notice';
 import { CompanyInstallationAccess } from '@/components/company-installation-access';
 import { CompanyPushNotificationAccess } from '@/components/company-push-notification-access';
-import { CompanyPushNotificationAccessPage } from '@/components/company-push-notification-access-page';
 import { CompanyPushNotificationPrompt } from '@/components/company-push-notification-prompt';
 import { CompanySubscriptionExpiryNotice } from '@/components/company-subscription-expiry-notice';
 import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
@@ -287,11 +286,6 @@ const pageMeta: Record<string, { kicker: string; title: string; description: str
     kicker: 'Centre de contrôle',
     title: 'Notifications',
     description: 'Les signaux utiles, sans bruit.',
-  },
-  '/maximus/notifications/autorisation': {
-    kicker: 'Centre de contrôle',
-    title: 'Autorisation des notifications push',
-    description: 'Activez ou bloquez les notifications système pour chaque entreprise.',
   },
   '/maximus/journal': {
     kicker: 'Traçabilité',
@@ -1594,7 +1588,6 @@ function AppContent() {
                     sectors: SectorPresetsPage,
                     subscriptions: SubscriptionsPage,
                     notifications: NotificationsPage,
-                    pushAuthorization: CompanyPushNotificationAccessPage,
                     journal: JournalPage,
                     platformSettings: PlatformSettingsPage,
                     empty: EmptyState,
@@ -4022,11 +4015,6 @@ function CompanyDetail({
         companyName={company.name}
         refreshKey={installationRefreshKey}
         loginUrl={usesDedicatedPrimary ? null : loginSettings?.url}
-      />
-      <CompanyPushNotificationAccess
-        companyId={company.id}
-        companyName={company.name}
-        dedicatedInstallation={usesDedicatedPrimary}
       />
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -9212,6 +9200,11 @@ function CompanyModulesDetail({
       <MaximusNavigationSettings company={company} gate={authGate} onSaved={onNavigationSaved} />
       <AuthorizationGate gate={authGate} testId="access-authorization-gate" title="Accès et autorisations verrouillés">
       <div className="space-y-5">
+      <CompanyPushNotificationAccess
+        companyId={company.id}
+        companyName={company.name}
+        dedicatedInstallation={Boolean(company.primaryInstallationId)}
+      />
       <section className="card-surface rounded-2xl p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>

@@ -82,7 +82,6 @@ export const adminNav: NavigationItem[] = [
   { href: '/maximus/modules', label: 'Modules', icon: LayoutGrid },
   { href: '/maximus/secteurs', label: 'Secteurs d’activité', icon: Building2 },
   { href: '/maximus/abonnements', label: 'Abonnements', icon: CreditCard },
-  { href: '/maximus/notifications/autorisation', label: 'Notifications push', icon: BellRing },
   { href: '/maximus/journal', label: 'Journal d’activité', icon: FileBarChart },
   { href: '/maximus/parametres/portefeuille', label: 'Réglages MAXIMUS', icon: Settings },
 ];
@@ -109,10 +108,6 @@ export const adminNavGroups: SidebarFeatureGroup[] = [
   {
     label: 'Suivi',
     items: adminNav.filter(item => item.href === '/maximus/abonnements' || item.href === '/maximus/journal'),
-  },
-  {
-    label: 'Notifications',
-    items: adminNav.filter(item => item.href === '/maximus/notifications/autorisation'),
   },
   {
     label: 'Configuration',
