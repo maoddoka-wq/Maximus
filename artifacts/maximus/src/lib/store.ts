@@ -59,6 +59,7 @@ export interface Company {
   loginUrl?: string;
   primaryInstallationId?: string | null;
   primaryInstallationMode?: 'dedicated' | 'on_premise' | null;
+  demoMode?: boolean;
   deletionLocked?: boolean;
   managerRoleId?: string;
 }

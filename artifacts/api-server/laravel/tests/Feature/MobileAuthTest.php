@@ -7,6 +7,7 @@ use App\Support\CompanyRegistry;
 use App\Support\MaximusAuth;
 use App\Support\MaximusPassword;
 use App\Support\ModuleCatalog;
+use App\Support\DemoWorkspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -76,6 +77,10 @@ class MobileAuthTest extends TestCase
         $this->getJson('/api/auth/mobile/session', $headers)
             ->assertOk()
             ->assertJsonPath('user.employeeId', $employee->employee_id);
+        $this->getJson('/api/transport/bootstrap', $headers)
+            ->assertOk()
+            ->assertJsonPath('drivers.0.id', $driver->json('id'));
+        DemoWorkspace::setEnabled('kora', true);
         $this->getJson('/api/transport/bootstrap', $headers)
             ->assertOk()
             ->assertJsonPath('drivers.0.id', $driver->json('id'));

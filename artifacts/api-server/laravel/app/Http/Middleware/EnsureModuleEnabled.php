@@ -11,7 +11,8 @@ class EnsureModuleEnabled
 {
     public function handle(Request $request, Closure $next, string $moduleId): Response
     {
-        $companyId = $request->attributes->get('companyId');
+        $companyId = $request->attributes->get('realCompanyId')
+            ?? $request->attributes->get('companyId');
         $actor = $request->attributes->get('authActor');
         if (($actor['role'] ?? null) === 'maximus_admin' && !$companyId) {
             return $next($request);

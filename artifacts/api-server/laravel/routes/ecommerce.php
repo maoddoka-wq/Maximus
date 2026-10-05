@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/payments/diamanopay/webhook', [SellerWalletController::class, 'webhook']);
 
-Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription', 'maximus.module:ecommerce'])
+Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription', 'maximus.demo-data', 'maximus.module:ecommerce'])
     ->prefix('ecommerce')
     ->group(function (): void {
         Route::get('/bootstrap', [EcommerceController::class, 'bootstrap']);
@@ -19,9 +19,9 @@ Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription', 'm
         Route::post('/pos-sales', [EcommercePosController::class, 'store'])->middleware('throttle:60,1');
         Route::get('/sales-report', [EcommerceSalesReportController::class, 'index']);
         Route::get('/wallet', [SellerWalletController::class, 'bootstrap']);
-        Route::post('/wallet/reconcile', [SellerWalletController::class, 'reconcilePayments']);
+        Route::post('/wallet/reconcile', [SellerWalletController::class, 'reconcilePayments'])->middleware('maximus.demo-money');
         Route::patch('/wallet/payout-account', [SellerWalletController::class, 'updatePayoutAccount']);
-        Route::post('/wallet/withdrawals', [SellerWalletController::class, 'requestWithdrawal'])->middleware('throttle:withdrawals');
+        Route::post('/wallet/withdrawals', [SellerWalletController::class, 'requestWithdrawal'])->middleware(['throttle:withdrawals', 'maximus.demo-money']);
         Route::patch('/store', [EcommerceController::class, 'updateStore']);
         Route::post('/store/logo', [EcommerceController::class, 'uploadStoreLogo']);
         Route::post('/store/hero-images', [EcommerceController::class, 'uploadStoreHeroImages']);

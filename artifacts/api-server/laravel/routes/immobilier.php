@@ -3,7 +3,7 @@
 use App\Http\Controllers\Api\ImmobilierController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription', 'maximus.module:immobilier'])
+Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription', 'maximus.demo-data', 'maximus.module:immobilier'])
     ->prefix('immobilier')
     ->group(function (): void {
         Route::get('/bootstrap', [ImmobilierController::class, 'bootstrap']);

@@ -3,6 +3,7 @@ import type { StoreData } from './store';
 
 type AppStateResponse = {
   scope: string;
+  dataset: 'real' | 'demo';
   version: number;
   data: Partial<StoreData>;
 };

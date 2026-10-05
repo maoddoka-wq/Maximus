@@ -86,6 +86,13 @@ class EcommerceController extends Controller
             'logoUrl' => ['sometimes', 'nullable', 'string', 'max:500'],
             'allowOrderAttachments' => ['sometimes', 'boolean'],
         ])->validate();
+        if ($request->attributes->get('demoMode') === true
+            && ($input['status'] ?? null) === 'PUBLISHED') {
+            return response()->json([
+                'error' => 'Une boutique de démonstration ne peut pas être publiée sur le site public.',
+                'code' => 'DEMO_STORE_PUBLISH_BLOCKED',
+            ], 403);
+        }
         $company = $this->company($request);
         $row = $this->ensureStore($company);
         $storeValues = [

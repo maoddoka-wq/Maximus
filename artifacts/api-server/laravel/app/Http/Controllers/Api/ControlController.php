@@ -29,22 +29,28 @@ class ControlController extends Controller
         $scope = $query['scope'] ?? 'all';
         $actor = $request->attributes->get('authActor');
         $requestedCompany = $query['companyId'] ?? null;
+        $datasetCompanyId = $request->attributes->get('companyId');
+        $realCompanyId = $request->attributes->get('realCompanyId') ?? $datasetCompanyId;
         if ($actor['role'] !== 'maximus_admin') {
             if (empty($actor['companyId'])) {
                 return response()->json(['error' => 'Aucune entreprise n’est associée à cet acteur.'], 403);
             }
-            if ($requestedCompany && $requestedCompany !== $actor['companyId']) {
+            if ($realCompanyId && $realCompanyId !== $actor['companyId']) {
                 return response()->json(['error' => 'Accès à cette entreprise non autorisé.'], 403);
             }
-            $companyId = $actor['companyId'];
+            $companyId = is_string($datasetCompanyId) && $datasetCompanyId !== ''
+                ? $datasetCompanyId
+                : $actor['companyId'];
         } else {
-            $companyId = $requestedCompany;
+            $companyId = is_string($datasetCompanyId) && $datasetCompanyId !== ''
+                ? $datasetCompanyId
+                : $requestedCompany;
         }
 
         if ($scope !== 'admin' && ! $companyId) {
             return response()->json(['error' => 'companyId requis pour ce périmètre'], 400);
         }
-        if (! ControlAuthorization::canRead($actor, $companyId)) {
+        if (! ControlAuthorization::canRead($actor, $realCompanyId ?: $companyId)) {
             return response()->json(['error' => 'Périmètre de contrôle non autorisé.'], 403);
         }
 
@@ -89,9 +95,14 @@ class ControlController extends Controller
         $input = $this->validateTask($request);
         $actor = $request->attributes->get('authActor');
         $input['companyId'] = (string) $request->attributes->get('companyId');
+        $authorizationInput = $input;
+        $authorizationInput['companyId'] = (string) (
+            $request->attributes->get('realCompanyId')
+            ?? $request->attributes->get('companyId')
+        );
         $input['createdBy'] = $actor['displayName'];
 
-        if (! ControlAuthorization::canCreate($actor, $input)) {
+        if (! ControlAuthorization::canCreate($actor, $authorizationInput)) {
             return response()->json(['error' => 'Création hors périmètre autorisé.'], 403);
         }
 
@@ -133,6 +144,7 @@ class ControlController extends Controller
         ])->validate();
         $actor = $request->attributes->get('authActor');
         $companyId = $request->attributes->get('companyId');
+        $authorizationCompanyId = $request->attributes->get('realCompanyId') ?? $companyId;
         $task = ControlTask::query()->find($id);
 
         if (! $task) {
@@ -140,7 +152,9 @@ class ControlController extends Controller
         }
 
         $before = $this->task($task);
-        if ($task->company_id !== $companyId || ! ControlAuthorization::canUpdate($actor, $before)) {
+        $authorizationTask = $before;
+        $authorizationTask['companyId'] = $authorizationCompanyId;
+        if ($task->company_id !== $companyId || ! ControlAuthorization::canUpdate($actor, $authorizationTask)) {
             return response()->json(['error' => 'Modification hors périmètre autorisé.'], 403);
         }
 

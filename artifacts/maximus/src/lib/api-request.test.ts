@@ -1,11 +1,12 @@
 import { afterEach, describe, test } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { ApiRequestError, requestJson } from './api-request';
+import { ApiRequestError, requestJson, setApiDatasetMode } from './api-request';
 
 const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  setApiDatasetMode('real');
 });
 
 describe('api-request', () => {
@@ -43,5 +44,20 @@ describe('api-request', () => {
         error.kind === 'timeout' &&
         error.message.includes('trop de temps'),
     );
+  });
+
+  test('transmet le jeu de données actif et change de jeu sans réutiliser la requête', async () => {
+    const datasets: string[] = [];
+    globalThis.fetch = async (_input, init) => {
+      datasets.push(new Headers(init?.headers).get('X-Maximus-Dataset') ?? '');
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    };
+
+    setApiDatasetMode('real');
+    await requestJson('/dataset-real', undefined, { dedupe: false });
+    setApiDatasetMode('demo');
+    await requestJson('/dataset-demo', undefined, { dedupe: false });
+
+    assert.deepEqual(datasets, ['real', 'demo']);
   });
 });

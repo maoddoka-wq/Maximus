@@ -54,6 +54,7 @@ import { ActionButton as DesignSystemActionButton } from '@workspace/maximus-des
 import { Badge } from '@workspace/maximus-design-system/components/ui/badge';
 import { Card } from '@workspace/maximus-design-system/components/ui/card';
 import { Checkbox } from '@workspace/maximus-design-system/components/ui/checkbox';
+import { Switch } from '@workspace/maximus-design-system/components/ui/switch';
 import { AuthorizationGate } from '@/components/authorization-gate';
 import { useAuthorizationGate } from '@/lib/authorization-gate';
 import { NavigationSettingsContext } from '@/lib/navigation-settings-context';
@@ -105,6 +106,7 @@ import {
   sanitizeStoreData,
 } from '@/lib/store';
 import { appStateApi, AppStateRequestError } from '@/lib/app-state-api';
+import { setApiDatasetMode } from '@/lib/api-request';
 import { appStateScopeMatchesSession } from '@/lib/app-state-scope';
 import {
   discardCatalogDraft,
@@ -480,6 +482,7 @@ function AppContent() {
   appStateVersionRef.current = appStateVersion;
   sessionRef.current = session;
   useEffect(() => {
+    setApiDatasetMode('real');
     pendingAppStateDeletes.current = pendingAppStateDeletes.current
       .filter(deletion => deletion.session === session);
   }, [session]);
@@ -613,8 +616,9 @@ function AppContent() {
     request = pendingSave
       .then(async () => {
         if (sessionRef.current !== requestSession) return false;
-        const { data: remoteData, scope, version } = await appStateApi.bootstrap();
+        const { data: remoteData, scope, version, dataset } = await appStateApi.bootstrap();
         if (sessionRef.current !== requestSession) return false;
+        setApiDatasetMode(dataset);
         const nextData = sanitizeStoreData(remoteData);
         if (!appStateScopeMatchesSession(requestSession, scope, nextData)) {
           throw new AppStateRequestError('La réponse métier ne correspond pas à la session active.', 409);
@@ -1480,6 +1484,17 @@ function AppContent() {
           }}
         />
         <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
+          {!isAdmin && currentCompany && (
+            <CompanyDemoModeBanner
+              company={currentCompany}
+              canManage={companyAdmin}
+              onUpdated={(enabled) => mutate((draft) => {
+                const item = draft.companies.find((candidate) => candidate.id === currentCompany.id);
+                if (item) item.demoMode = enabled;
+              })}
+              onRefresh={() => refreshAppState()}
+            />
+          )}
           {!isAdmin && companyId && (
             <CompanySubscriptionExpiryNotice
               companyId={companyId}
@@ -1645,6 +1660,83 @@ function AppContent() {
       <Toaster />
     </div>
     </NavigationSettingsContext.Provider>
+  );
+}
+
+function CompanyDemoModeBanner({
+  company,
+  canManage,
+  onUpdated,
+  onRefresh,
+}: {
+  company: Company;
+  canManage: boolean;
+  onUpdated: (enabled: boolean) => void;
+  onRefresh: () => Promise<boolean>;
+}) {
+  const { alert, confirm } = useAppDialog();
+  const [saving, setSaving] = useState(false);
+  const enabled = company.demoMode === true;
+
+  if (!enabled && !canManage) return null;
+
+  const changeMode = async () => {
+    const nextEnabled = !enabled;
+    if (!(await confirm({
+      title: nextEnabled ? 'Activer le mode Démonstration ?' : 'Désactiver le mode Démonstration ?',
+      description: nextEnabled
+        ? 'Les données fictives seront modifiables. Les données réelles resteront intactes et aucun paiement ou virement réel ne pourra être lancé.'
+        : 'Les données réelles seront réaffichées. Les données de démonstration resteront conservées.',
+      confirmLabel: nextEnabled ? 'Activer le mode' : 'Désactiver le mode',
+    }))) return;
+
+    setSaving(true);
+    try {
+      const response = await companyRequestApi.updateDemoMode(company.id, nextEnabled);
+      setApiDatasetMode(response.enabled ? 'demo' : 'real');
+      onUpdated(response.enabled);
+      await onRefresh();
+    } catch (error) {
+      await alert({
+        title: 'Changement de mode impossible',
+        description: error instanceof Error ? error.message : 'Le mode Démonstration n’a pas pu être modifié.',
+        confirmLabel: 'Compris',
+        tone: 'danger',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      data-testid="company-demo-mode-banner"
+      role="status"
+      className="mb-5 flex flex-col gap-3 rounded-xl border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.08)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div>
+        <strong className="block text-sm text-[hsl(var(--primary))]">
+          {enabled ? 'Mode Démonstration actif' : 'Mode Démonstration'}
+        </strong>
+        <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+          {enabled
+            ? 'Vous travaillez sur des données fictives isolées. Les données réelles restent inchangées; les paiements et virements réels sont désactivés.'
+            : 'Activez un espace fictif modifiable sans toucher aux données réelles.'}
+        </span>
+      </div>
+      {canManage && (
+        <label className="inline-flex shrink-0 items-center gap-3 rounded-lg border bg-[hsl(var(--background))] px-3 py-2 text-xs font-bold">
+          <span>Mode Démonstration</span>
+          <Switch
+            checked={enabled}
+            disabled={saving}
+            aria-label={`${enabled ? 'Désactiver' : 'Activer'} le mode Démonstration`}
+            data-testid="switch-own-company-demo-mode"
+            onCheckedChange={() => void changeMode()}
+          />
+        </label>
+      )}
+    </div>
   );
 }
 
@@ -3373,6 +3465,7 @@ function CompaniesPage({
   );
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [updatingDeletionLock, setUpdatingDeletionLock] = useState<string | null>(null);
+  const [updatingDemoMode, setUpdatingDemoMode] = useState<string | null>(null);
   const list = directoryCompanies
     .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
     .filter(
@@ -3428,6 +3521,34 @@ function CompaniesPage({
       });
     } finally {
       setUpdatingDeletionLock(null);
+    }
+  };
+  const toggleDemoMode = async (company: Company) => {
+    const enabling = company.demoMode !== true;
+    if (!(await confirm({
+      title: enabling ? 'Activer le mode Démonstration ?' : 'Désactiver le mode Démonstration ?',
+      description: enabling
+        ? 'Les utilisateurs verront des données fictives modifiables. Les données réelles resteront intactes et les paiements et virements réels seront bloqués.'
+        : 'Les données réelles de cette entreprise seront réaffichées. Les données de démonstration resteront conservées pour une prochaine activation.',
+      confirmLabel: enabling ? 'Activer le mode' : 'Désactiver le mode',
+    }))) return;
+
+    setUpdatingDemoMode(company.id);
+    try {
+      const response = await companyRequestApi.updateDemoMode(company.id, enabling);
+      mutate((draft) => {
+        const item = draft.companies.find((candidate) => candidate.id === company.id);
+        if (item) item.demoMode = response.enabled;
+      }, response.enabled ? 'Mode Démonstration activé.' : 'Mode Démonstration désactivé.');
+    } catch (error) {
+      await alert({
+        title: 'Changement de mode impossible',
+        description: error instanceof Error ? error.message : 'Le mode Démonstration n’a pas pu être modifié.',
+        confirmLabel: 'Compris',
+        tone: 'danger',
+      });
+    } finally {
+      setUpdatingDemoMode(null);
     }
   };
   if (selected)
@@ -3520,6 +3641,22 @@ function CompaniesPage({
               <LockKeyhole size={14} />
               <span>{c.deletionLocked !== false ? 'Déverrouiller' : 'Verrouiller'}</span>
             </button>
+            <label
+              className="inline-flex items-center gap-2 rounded-lg border px-2.5 py-2 text-xs font-bold"
+              title={c.primaryInstallationId
+                ? 'Le mode Démonstration se gère depuis l’installation dédiée de cette entreprise.'
+                : 'Afficher des données de démonstration isolées pour cette entreprise.'}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Switch
+                checked={c.demoMode === true}
+                disabled={Boolean(c.primaryInstallationId) || updatingDemoMode === c.id}
+                aria-label={`${c.demoMode ? 'Désactiver' : 'Activer'} le mode Démonstration pour ${c.name}`}
+                data-testid={`switch-company-demo-mode-${c.id}`}
+                onCheckedChange={() => void toggleDemoMode(c)}
+              />
+              <span>Démonstration</span>
+            </label>
             <button
               data-testid={`button-delete-company-${c.id}`}
               aria-label={`Supprimer ${c.name}`}

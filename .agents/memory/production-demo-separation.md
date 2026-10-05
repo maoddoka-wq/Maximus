@@ -1,10 +1,10 @@
 ---
 name: Séparation production et démonstration
-description: Les données fictives doivent rester confinées au développement local et ne jamais alimenter le fallback production.
+description: Le mode explicite isole les jeux fictifs par entreprise et ne détourne jamais les flux de l’application Chauffeur.
 ---
 
-Quand une entreprise est en mode Démonstration, chaque module MAXIMUS doit afficher des données fictives adaptées à ce module. Les données de démonstration doivent rester séparées des données réelles : ne pas les coder dans le frontend ni les provisionner par le runtime. La base Replit de démonstration est la seule source de ses données de démo ; le fallback et la production restent alimentés par leurs bases actives.
+Quand une entreprise active explicitement le mode Démonstration, son jeu fictif est initialisé dans la base active mais sous un périmètre distinct : un scope dédié pour l’app-state et un identifiant d’entreprise synthétique pour les tables métier. Le premier amorçage est transactionnel; les modifications sont conservées après désactivation et réactivation. Ne jamais afficher de fixtures locales du frontend ni amorcer les jeux fictifs au démarrage normal. L’application Chauffeur reste sur les données opérationnelles réelles; seuls les appels ERP web suivent le mode Démonstration.
 
-**Why:** Le mode Démonstration doit permettre de présenter chaque module sans contaminer les données réelles. Des fixtures locales présentes dans un store frontend peuvent être embarquées puis affichées sur une instance Render réelle, ce qui expose des comptes et fausse les données de l’entreprise.
+**Why:** Le mode doit être utilisable dans le central comme dans une installation entreprise sans écraser les enregistrements réels ni dépendre d’une base Replit spéciale. Les chauffeurs actifs ne doivent pas perdre leurs courses ou envoyer leur GPS vers une identité synthétique.
 
-**How to apply:** Étendre le jeu de données de démonstration à chaque module et faire pointer l’entreprise de démonstration vers cette source isolée. Toute nouvelle donnée de démo doit être ajoutée directement à la base de démonstration, jamais au bundle, aux routes actives ou à un seed versionné. Les données métier du frontend passent par l’API et la base active.
+**How to apply:** Toute nouvelle route métier ERP doit résoudre le dataset d’après la session entreprise et son en-tête, puis appliquer permissions et abonnements à l’entreprise réelle. Les mutations doivent cibler l’identifiant synthétique; les comptes réels, sites publics actifs et mouvements financiers restent protégés. Garder les appels avec jeton Chauffeur sur l’entreprise réelle et mettre les données de démo dans la base, jamais dans le bundle frontend.

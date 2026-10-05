@@ -3,6 +3,9 @@
 use App\Http\Middleware\AuthenticateDiagnosticToken;
 use App\Http\Middleware\AuthenticateInstallationToken;
 use App\Http\Middleware\AuthenticateMaximus;
+use App\Http\Middleware\BlockDemoMoneyMovement;
+use App\Http\Middleware\BlockDemoRealAccountMutation;
+use App\Http\Middleware\BlockDemoLiveConfiguration;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Http\Middleware\EnsureCompanySubscriptionActive;
 use App\Http\Middleware\EnsurePublicSiteAuthorized;
@@ -11,6 +14,7 @@ use App\Http\Middleware\RequireCentralInstallation;
 use App\Http\Middleware\RequireInstallationHost;
 use App\Http\Middleware\RequireInstallationPublicCompany;
 use App\Http\Middleware\ResolveCompanyContext;
+use App\Http\Middleware\ResolveDemoWorkspace;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\VerifyCookieRequestOrigin;
 use App\Support\MaximusAuth;
@@ -44,6 +48,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'maximus.company' => ResolveCompanyContext::class,
             'maximus.subscription' => EnsureCompanySubscriptionActive::class,
             'maximus.module' => EnsureModuleEnabled::class,
+            'maximus.demo-data' => ResolveDemoWorkspace::class,
+            'maximus.demo-money' => BlockDemoMoneyMovement::class,
+            'maximus.demo-identity' => BlockDemoRealAccountMutation::class,
+            'maximus.demo-live-config' => BlockDemoLiveConfiguration::class,
             'maximus.public-site' => EnsurePublicSiteAuthorized::class,
             'maximus.central' => RequireCentralInstallation::class,
             'maximus.installation.token' => AuthenticateInstallationToken::class,

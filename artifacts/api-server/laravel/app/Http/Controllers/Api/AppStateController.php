@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Services\MaximusPushNotificationService;
 use App\Services\PublicRegistrationPolicy;
 use App\Support\CompanyStateBoundary;
+use App\Support\DemoWorkspace;
 use App\Support\ModuleAuthorization;
 use App\Support\ModuleCatalog;
 use App\Support\RolePermissionAuthorization;
@@ -127,7 +128,19 @@ class AppStateController extends Controller
             return response()->json(['error' => 'Acteur MAXIMUS introuvable.'], 401);
         }
 
-        $row = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $role = $actor['role'] ?? null;
+        $companyId = (string) ($actor['companyId'] ?? '');
+        $demoEnabled = $role !== 'maximus_admin'
+            && $companyId !== ''
+            && DemoWorkspace::isEnabled($companyId);
+        $scope = $demoEnabled ? DemoWorkspace::stateScope($companyId) : 'workspace';
+        $row = DB::table('maximus_app_states')->where('scope', $scope)->first();
+        if ($demoEnabled && ! $row) {
+            return response()->json([
+                'error' => 'Le jeu de données de démonstration n’a pas pu être initialisé.',
+                'code' => 'DEMO_DATASET_NOT_INITIALIZED',
+            ], 503);
+        }
         $payload = $row?->payload;
         $state = is_string($payload) ? json_decode($payload, true) : ($payload ?? []);
 
@@ -135,7 +148,7 @@ class AppStateController extends Controller
             $state = [];
         }
         $stateVersion = (int) ($row?->version ?? 0);
-        if (empty($state['companies']) && AuthUser::query()->whereNotNull('company_id')->exists()) {
+        if (! $demoEnabled && empty($state['companies']) && AuthUser::query()->whereNotNull('company_id')->exists()) {
             $recoveredState = $this->recoverStateFromAccounts();
             // Recovery is only responsible for rebuilding account-scoped
             // records. Keep the catalog already persisted in app-state:
@@ -183,6 +196,7 @@ class AppStateController extends Controller
             'scope' => ($actor['role'] ?? null) === 'maximus_admin'
                 ? 'workspace'
                 : 'company:'.((string) ($actor['companyId'] ?? '')),
+            'dataset' => $demoEnabled ? 'demo' : 'real',
             'version' => $stateVersion,
             'data' => $state,
         ]);
@@ -380,9 +394,24 @@ class AppStateController extends Controller
             : '';
         $requestHost = $request->getHost();
 
-        return DB::transaction(function () use ($actor, $data, $actorUserId, $requestHost): JsonResponse {
+        $companyId = (string) ($actor['companyId'] ?? '');
+        $isCompanyActor = ($actor['role'] ?? null) !== 'maximus_admin';
+        $demoEnabled = $isCompanyActor && $companyId !== '' && DemoWorkspace::isEnabled($companyId);
+        $dataset = $demoEnabled ? 'demo' : 'real';
+        $requestedDataset = $request->header('X-Maximus-Dataset');
+        if (($demoEnabled && $requestedDataset !== 'demo')
+            || ($requestedDataset !== null && $requestedDataset !== $dataset)) {
+            return response()->json([
+                'error' => 'Le mode de données a changé. Rechargez l’espace avant d’enregistrer.',
+                'code' => 'DATASET_MODE_CHANGED',
+                'dataset' => $dataset,
+            ], 409);
+        }
+        $scope = $demoEnabled ? DemoWorkspace::stateScope($companyId) : 'workspace';
+
+        return DB::transaction(function () use ($actor, $data, $actorUserId, $requestHost, $companyId, $demoEnabled, $dataset, $scope): JsonResponse {
             $current = DB::table('maximus_app_states')
-                ->where('scope', 'workspace')
+                ->where('scope', $scope)
                 ->lockForUpdate()
                 ->first();
             $currentPayload = is_string($current?->payload)
@@ -400,7 +429,6 @@ class AppStateController extends Controller
                     return response()->json(['error' => 'Cet acteur ne peut pas enregistrer l’état métier global.'], 403);
                 }
 
-                $companyId = (string) ($actor['companyId'] ?? '');
                 if ($companyId === '') {
                     return response()->json(['error' => 'Aucune entreprise associée à cet acteur.'], 403);
                 }
@@ -460,9 +488,9 @@ class AppStateController extends Controller
 
             $nextVersion = ((int) ($current->version ?? 0)) + 1;
             DB::table('maximus_app_states')->updateOrInsert(
-                ['scope' => 'workspace'],
+                ['scope' => $scope],
                 [
-                    'company_id' => null,
+                    'company_id' => $demoEnabled ? $companyId : null,
                     'payload' => json_encode($currentPayload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
                     'version' => $nextVersion,
                     'updated_at' => now(),
@@ -470,7 +498,7 @@ class AppStateController extends Controller
                 ],
             );
 
-            if ($current) {
+            if ($current && ! $demoEnabled) {
                 $newNotifications = $this->newlyAddedNotifications(
                     $previousNotifications,
                     is_array($currentPayload['notifications'] ?? null)
@@ -488,7 +516,7 @@ class AppStateController extends Controller
                 }
             }
 
-            return response()->json(['ok' => true, 'version' => $nextVersion]);
+            return response()->json(['ok' => true, 'version' => $nextVersion, 'dataset' => $dataset]);
         });
     }
 
@@ -1039,6 +1067,7 @@ class AppStateController extends Controller
                     'navigationCustomAllowed' => (bool) $company->navigation_custom_allowed,
                     'primaryInstallationId' => $company->erp_installation_id,
                     'primaryInstallationMode' => $installations->get($company->erp_installation_id)?->mode,
+                    'demoMode' => DemoWorkspace::isEnabled((string) $company->id),
                 ]);
             },
             $state['companies'],

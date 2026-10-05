@@ -90,6 +90,11 @@ export const companyRequestApi = {
       method: 'PATCH',
       body: JSON.stringify({ locked }),
     }),
+  updateDemoMode: (companyId: string, enabled: boolean) =>
+    request<{ ok: true; companyId: string; enabled: boolean; initialized: boolean }>(
+      `/companies/${encodeURIComponent(companyId)}/demo-mode`,
+      { method: 'PATCH', body: JSON.stringify({ enabled }) },
+    ),
   loginSettings: (companyId: string) =>
     request<{ settings: { companyId: string; customAllowed: boolean; mode: 'MAXIMUS' | 'CUSTOM'; slug: string; url: string } }>(
       `/companies/${encodeURIComponent(companyId)}/login-settings`,

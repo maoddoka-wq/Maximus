@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MobileAuthController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CompanyNavigationSettingsController;
+use App\Http\Controllers\Api\DemoWorkspaceController;
 use App\Http\Controllers\Api\CompanyPaymentController;
 use App\Http\Controllers\Api\CompanyPublicSiteAccessController;
 use App\Http\Controllers\Api\CompanyPublicSiteSettingsController;
@@ -93,6 +94,7 @@ Route::middleware(['maximus.central', 'maximus.auth'])->prefix('company-requests
 Route::middleware('maximus.auth')->prefix('companies')->group(function (): void {
     Route::get('/{companyId}/navigation-settings', [CompanyNavigationSettingsController::class, 'show']);
     Route::patch('/{companyId}/navigation-settings', [CompanyNavigationSettingsController::class, 'update']);
+    Route::patch('/{companyId}/demo-mode', [DemoWorkspaceController::class, 'update']);
 });
 
 Route::middleware(['maximus.central', 'maximus.auth'])->prefix('companies')->group(function (): void {
@@ -134,12 +136,12 @@ Route::get('/company-profile-images/{companyId}/{filename}', [CompanyController:
     ->middleware('maximus.installation.public')
     ->where(['companyId' => '[A-Za-z0-9_-]+', 'filename' => '[A-Za-z0-9_.-]+']);
 
-Route::middleware(['maximus.auth', 'maximus.subscription'])->prefix('auth/accounts')->group(function (): void {
-    Route::post('/', [AuthController::class, 'createAccount']);
-    Route::delete('/{employeeId}', [AuthController::class, 'deleteAccount']);
+Route::middleware(['maximus.auth', 'maximus.subscription', 'maximus.demo-data'])->prefix('auth/accounts')->group(function (): void {
+    Route::post('/', [AuthController::class, 'createAccount'])->middleware('maximus.demo-identity');
+    Route::delete('/{employeeId}', [AuthController::class, 'deleteAccount'])->middleware('maximus.demo-identity');
 });
 
-Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription'])
+Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription', 'maximus.demo-live-config'])
     ->prefix('company-public-site')
     ->group(function (): void {
         Route::get('/', [CompanyPublicSiteSettingsController::class, 'show']);
@@ -157,7 +159,8 @@ Route::middleware('maximus.auth')->prefix('auth/company-admins')->group(function
     Route::post('/', [AuthController::class, 'provisionCompanyAdmin']);
 });
 
-Route::middleware('maximus.auth')->patch('/auth/company-password', [AuthController::class, 'updateCompanyPassword']);
+Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription', 'maximus.demo-data', 'maximus.demo-identity'])
+    ->patch('/auth/company-password', [AuthController::class, 'updateCompanyPassword']);
 
 Route::middleware(['maximus.auth', 'maximus.company', 'maximus.subscription'])->prefix('modules')->group(function (): void {
     Route::get('/bootstrap', [ModuleController::class, 'bootstrap']);
@@ -202,7 +205,7 @@ Route::middleware(['maximus.central', 'maximus.auth'])->prefix('platform-setting
 Route::middleware(['maximus.auth', 'maximus.company'])->prefix('company-subscription')->group(function (): void {
     Route::get('/', [SubscriptionBillingController::class, 'showForCompany']);
     Route::get('/status', [SubscriptionBillingController::class, 'statusForCompanyMembers']);
-    Route::post('/payments', [SubscriptionBillingController::class, 'createPayment'])->middleware('throttle:withdrawals');
+    Route::post('/payments', [SubscriptionBillingController::class, 'createPayment'])->middleware(['maximus.demo-data', 'maximus.demo-money', 'throttle:withdrawals']);
     Route::get('/payments/{paymentId}', [SubscriptionBillingController::class, 'paymentStatus']);
 });
 Route::post(

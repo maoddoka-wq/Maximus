@@ -21,6 +21,11 @@ type RequestOptions = {
 
 const inflightGets = new Map<string, Promise<unknown>>();
 const cachedGets = new Map<string, { expiresAt: number; value: unknown }>();
+let activeDatasetMode: 'real' | 'demo' = 'real';
+
+export function setApiDatasetMode(mode: 'real' | 'demo'): void {
+  activeDatasetMode = mode;
+}
 
 function errorMessage(payload: unknown, fallbackMessage: string) {
   if (!payload || typeof payload !== 'object') return fallbackMessage;
@@ -44,6 +49,7 @@ async function executeRequest<T>(path: string, init: RequestInit, options: Reque
   const formData = typeof FormData !== 'undefined' && init.body instanceof FormData;
   const headers = new Headers(init.headers);
   if (!formData && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (!headers.has('X-Maximus-Dataset')) headers.set('X-Maximus-Dataset', activeDatasetMode);
 
   try {
     const response = await fetch(`/api${path}`, {
@@ -92,32 +98,33 @@ export function requestJson<T>(
   const method = (init.method ?? 'GET').toUpperCase();
   const shouldDedupe = method === 'GET' && options.dedupe !== false;
   if (!shouldDedupe) return executeRequest<T>(path, init, options);
+  const requestKey = `${activeDatasetMode}:${path}`;
 
   const cacheTtlMs = options.cacheTtlMs ?? 0;
   if (cacheTtlMs > 0) {
-    const cached = cachedGets.get(path);
+    const cached = cachedGets.get(requestKey);
     if (cached && cached.expiresAt > Date.now()) {
       return Promise.resolve(cached.value as T);
     }
-    if (cached) cachedGets.delete(path);
+    if (cached) cachedGets.delete(requestKey);
   }
 
-  const existing = inflightGets.get(path);
+  const existing = inflightGets.get(requestKey);
   if (existing) return existing as Promise<T>;
 
   const request = executeRequest<T>(path, init, options);
-  inflightGets.set(path, request);
+  inflightGets.set(requestKey, request);
   if (cacheTtlMs > 0) {
     void request.then((value) => {
-      cachedGets.set(path, { expiresAt: Date.now() + cacheTtlMs, value });
+      cachedGets.set(requestKey, { expiresAt: Date.now() + cacheTtlMs, value });
     });
   }
   void request.then(
     () => {
-      if (inflightGets.get(path) === request) inflightGets.delete(path);
+      if (inflightGets.get(requestKey) === request) inflightGets.delete(requestKey);
     },
     () => {
-      if (inflightGets.get(path) === request) inflightGets.delete(path);
+      if (inflightGets.get(requestKey) === request) inflightGets.delete(requestKey);
     },
   );
   return request;
