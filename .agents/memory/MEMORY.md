@@ -7,7 +7,7 @@
 - [Navigation Gestion de stock](stock-navigation.md) — conserver les dix rubriques et leur ordre, avec le mode de navigation choisi par entreprise.
 - [Champs vides des mouvements Stock](stock-empty-fields.md) — normaliser les chaînes vides avant insertion, car Laravel les convertit en null alors que référence et commentaire sont non nullables.
 - [Gouvernance par unité](sector-governance.md) — les managers de secteur définissent les droits de leurs employés, sans accès aux autres unités.
-- [Périmètre des dossiers employés](employee-record-scope.md) — employé limité à lui-même sans sélecteur, manager à ses unités autorisées, admin d’entreprise à tous les employés du tenant.
+- [Périmètre des dossiers employés](employee-record-scope.md) — scopes réels et démo identiques, avec collections confidentielles retirées des bootstraps staff.
 - [Persistance des présences](presence-storage.md) — les workflows Présences sont stockés dans PostgreSQL via des éléments typés, payload extensible et historique.
 - [Pointage par QR code](presence-qr-clock.md) — le gérant affiche le QR du jour ; chaque employé scanne avec son propre compte pour enregistrer arrivée puis sortie.
 - [Montage du scanner caméra](presence-camera-portal.md) — relier le démarrage au nœud vidéo monté; un portail Radix conditionnel peut sinon laisser le scanner bloqué.

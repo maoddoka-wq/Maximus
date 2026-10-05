@@ -9,6 +9,18 @@ Dans tous les modules, un compte employee ne peut consulter ou modifier que ses 
 
 **How to apply:** Pour chaque lecture, liste, sélecteur, création, mise à jour, suppression et transition qui référence un employé, dériver l’identité de l’acteur depuis la session, imposer son périmètre de rôle sur toute la requête et ne transmettre aucun choix d’employé à un compte employee. Les données sans relation employé explicite restent à traiter selon les permissions métier du module, sans les confondre avec des dossiers employés.
 
+Le même filtrage serveur s’applique aux instantanés réels et de démonstration. Les comptes employee et sector_manager ne reçoivent pas les données de facturation de l’entreprise, l’historique d’audit brut ni les notifications réservées aux administrateurs; les API spécialisées peuvent leur fournir uniquement les éléments relevant de leur périmètre.
+
+**Why:** Le bootstrap partagé peut contenir des collections confidentielles que l’interface masque ensuite; ce masquage client ne protège pas les réponses réseau.
+
+**How to apply:** Vérifier les collections du bootstrap pour chaque rôle et chaque mode de données. Garder les accès administratifs côté serveur et utiliser les routes métier déjà bornées pour les vues spécialisées.
+
+Le filtrage d’un instantané doit aussi préserver sa forme : ne pas ajouter une collection vide si elle était absente. Les records masqués restent préservés côté serveur lors de la fusion d’un instantané staff.
+
+**Why:** La validation des deltas peut interpréter une nouvelle collection vide comme une mutation interdite et refuser une sauvegarde légitime.
+
+**How to apply:** Couvrir les lectures filtrées par un test de sauvegarde du même instantané; distinguer une collection absente d’une liste présente mais vide.
+
 Dans Contrôle & coordination, un compte `employee` peut consulter et mettre à jour le statut de ses tâches assignées sans permission générale de lecture du module. Il ne peut pas créer de tâche ni consulter ou modifier la tâche d’un autre employé. Les managers non administrateurs restent soumis à la permission Voir/Créer/Modifier.
 
 **Why:** Le filtrage employé par tâche est une autorisation distincte du droit général de consulter le module; l’exiger empêchait l’employé de recevoir et traiter son travail.
