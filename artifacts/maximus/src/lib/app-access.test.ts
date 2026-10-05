@@ -78,6 +78,37 @@ test('calcule un accès employé limité à son rôle et à son unité', () => {
   assert.equal(access.sectorManager, false);
 });
 
+test('affiche en démonstration les fonctionnalités assignées dans la limite effective de l’unité', () => {
+  const { data, company, employee } = createAccessFixture();
+  company.requestedModules = ['stocks'];
+  company.allowedModules = ['stocks'];
+  company.requestedModuleFeatures = { stocks: ['products', 'reports'] };
+
+  const unit = data.orgNodes[0]!;
+  unit.moduleIds = ['stocks'];
+  unit.moduleFeatures = { stocks: ['products'] };
+  data.roles[0]!.modulePermissions = {
+    'stocks:products': ['voir'],
+    'stocks:reports': ['voir'],
+  };
+
+  const access = buildAppAccessContext({
+    data,
+    session: `employee:${employee.id}`,
+    employee,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+  });
+
+  assert.deepEqual(access.allowed, ['stocks']);
+  assert.deepEqual(
+    access.sidebarFeatureGroups.flatMap(group => group.items.map(item => item.href)),
+    ['/entreprise/stocks?tab=products'],
+  );
+});
+
 test('applique aux accès employés la limite de modules définie par les unités parentes', () => {
   const { data, company, employee } = createAccessFixture();
   const child = data.orgNodes[0]!;

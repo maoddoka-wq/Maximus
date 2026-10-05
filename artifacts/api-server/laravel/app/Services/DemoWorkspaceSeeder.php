@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AuthUser;
 use App\Support\DemoWorkspace;
+use App\Support\ModuleCatalog;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -34,6 +35,14 @@ final class DemoWorkspaceSeeder
     {
         $datasetCompanyId = DemoWorkspace::datasetCompanyId($companyId);
         $ids = fn (string $name): string => 'demo-'.substr(hash('sha256', $companyId), 0, 16).'-'.$name;
+        $workspacePayload = DB::table('maximus_app_states')->where('scope', 'workspace')->value('payload');
+        $workspaceState = is_string($workspacePayload)
+            ? json_decode($workspacePayload, true)
+            : ($workspacePayload ?? []);
+        $workspaceState = is_array($workspaceState) ? $workspaceState : [];
+        $workspaceNodes = is_array($workspaceState['orgNodes'] ?? null)
+            ? $workspaceState['orgNodes']
+            : [];
         $users = AuthUser::query()
             ->where('company_id', $companyId)
             ->whereIn('role', ['employee', 'sector_manager'])
@@ -49,6 +58,14 @@ final class DemoWorkspaceSeeder
             }
 
             $linkScope = DemoWorkspace::employeeScope($companyId, $employeeId);
+            $linkRow = DB::table('maximus_app_states')
+                ->where('scope', $linkScope)
+                ->first(['payload', 'version', 'created_at']);
+            $linkPayload = is_string($linkRow?->payload)
+                ? json_decode($linkRow->payload, true)
+                : ($linkRow?->payload ?? []);
+            $linkPayload = is_array($linkPayload) ? $linkPayload : [];
+            $upgradeLegacyUnitScopes = (int) ($linkPayload['unitAccessVersion'] ?? 0) < 1;
 
             $fingerprint = substr(hash('sha256', $employeeId), 0, 12);
             $accountIds = fn (string $name): string => $ids('account-'.$fingerprint.'-'.$name);
@@ -62,6 +79,14 @@ final class DemoWorkspaceSeeder
                 static fn (mixed $sectorId): bool => is_string($sectorId) && trim($sectorId) !== '',
             )));
             $sectorId = $sectorIds[0] ?? null;
+            $unitAccessBySector = [];
+            foreach ($sectorIds as $linkedSectorId) {
+                $unitAccessBySector[$linkedSectorId] = $this->effectiveUnitAccess(
+                    $workspaceNodes,
+                    $companyId,
+                    $linkedSectorId,
+                );
+            }
 
             $this->addEmployeeToDemoAppState(
                 $companyId,
@@ -69,6 +94,8 @@ final class DemoWorkspaceSeeder
                 $employeeId,
                 $displayName,
                 $sectorIds,
+                $unitAccessBySector,
+                $upgradeLegacyUnitScopes,
                 $accountIds,
                 $now,
             );
@@ -80,14 +107,18 @@ final class DemoWorkspaceSeeder
             // The employee scope is an initialization marker, not a reason to
             // skip seeding: insertOrIgnore and appendStateRecord backfill
             // missing fixtures without overwriting employee edits.
-            DB::table('maximus_app_states')->insertOrIgnore([
-                'scope' => $linkScope,
-                'company_id' => $companyId,
-                'payload' => json_encode(['initialized' => true], JSON_THROW_ON_ERROR),
-                'version' => 1,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
+            $linkPayload['initialized'] = true;
+            $linkPayload['unitAccessVersion'] = 1;
+            DB::table('maximus_app_states')->updateOrInsert(
+                ['scope' => $linkScope],
+                [
+                    'company_id' => $companyId,
+                    'payload' => json_encode($linkPayload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                    'version' => max(1, (int) ($linkRow?->version ?? 0)),
+                    'created_at' => $linkRow?->created_at ?? $now,
+                    'updated_at' => $now,
+                ],
+            );
         }
     }
 
@@ -97,6 +128,8 @@ final class DemoWorkspaceSeeder
         string $employeeId,
         string $displayName,
         array $sectorIds,
+        array $unitAccessBySector,
+        bool $upgradeLegacyUnitScopes,
         callable $ids,
         mixed $now,
     ): void {
@@ -137,16 +170,22 @@ final class DemoWorkspaceSeeder
         ]);
 
         foreach ($sectorIds as $index => $linkedSectorId) {
-            $this->appendStateRecord($state, 'orgNodes', [
+            $unit = [
                 'id' => $linkedSectorId,
                 'companyId' => $companyId,
                 'code' => 'DEMO-UNIT-'.strtoupper(substr(hash('sha256', $linkedSectorId), 0, 8)),
                 'name' => 'Unité de démonstration '.($index + 1),
                 'type' => 'service',
                 'parentId' => null,
-                'moduleIds' => [],
                 'managerEmployeeId' => $user->role === 'sector_manager' ? $employeeId : null,
-            ]);
+            ];
+            $unitAccess = $unitAccessBySector[$linkedSectorId] ?? [];
+            foreach (['moduleIds', 'moduleFeatures'] as $scopeKey) {
+                if (array_key_exists($scopeKey, $unitAccess)) {
+                    $unit[$scopeKey] = $unitAccess[$scopeKey];
+                }
+            }
+            $this->ensureDemoEmployeeOrgNode($state, $unit, $upgradeLegacyUnitScopes);
         }
 
         $taskId = $ids('control-task');
@@ -197,6 +236,123 @@ final class DemoWorkspaceSeeder
             'version' => ((int) $row->version) + 1,
             'updated_at' => $now,
         ]);
+    }
+
+    /**
+     * Copy the effective real-unit ceiling onto the flat demo unit. Account
+     * permissions still decide what the employee is assigned within that ceiling.
+     */
+    private function effectiveUnitAccess(array $workspaceNodes, string $companyId, string $sectorId): array
+    {
+        $nodes = [];
+        foreach ($workspaceNodes as $node) {
+            if (! is_array($node)
+                || (string) ($node['companyId'] ?? $node['company_id'] ?? '') !== $companyId) {
+                continue;
+            }
+            $id = trim((string) ($node['id'] ?? ''));
+            if ($id !== '') {
+                $nodes[$id] = $node;
+            }
+        }
+
+        $current = $nodes[$sectorId] ?? null;
+        if (! is_array($current)) {
+            return [];
+        }
+
+        $effectiveModuleIds = null;
+        $effectiveFeatures = [];
+        $visited = [];
+        while (is_array($current)) {
+            $id = trim((string) ($current['id'] ?? ''));
+            if ($id === '' || isset($visited[$id])) {
+                return ['moduleIds' => []];
+            }
+            $visited[$id] = true;
+
+            if (is_array($current['moduleIds'] ?? null)) {
+                $moduleIds = array_values(array_unique(array_filter(
+                    array_map('strval', $current['moduleIds']),
+                    static fn (string $moduleId): bool => trim($moduleId) !== '',
+                )));
+                $effectiveModuleIds = $effectiveModuleIds === null
+                    ? $moduleIds
+                    : array_values(array_intersect($effectiveModuleIds, $moduleIds));
+            }
+
+            $moduleFeatures = $current['moduleFeatures'] ?? null;
+            if (is_array($moduleFeatures)) {
+                foreach ($moduleFeatures as $moduleId => $rawFeatureIds) {
+                    $moduleId = trim((string) $moduleId);
+                    if ($moduleId === '') {
+                        continue;
+                    }
+                    try {
+                        $featureIds = ModuleCatalog::normalizeSelection(
+                            $moduleId,
+                            is_array($rawFeatureIds) ? array_map('strval', $rawFeatureIds) : [],
+                            ['featureScope' => 'explicit'],
+                        )['featureIds'];
+                    } catch (\InvalidArgumentException) {
+                        $featureIds = [];
+                    }
+                    $effectiveFeatures[$moduleId] = array_key_exists($moduleId, $effectiveFeatures)
+                        ? array_values(array_intersect($effectiveFeatures[$moduleId], $featureIds))
+                        : $featureIds;
+                }
+            }
+
+            $parentId = trim((string) ($current['parentId'] ?? ''));
+            $current = $parentId !== '' ? ($nodes[$parentId] ?? null) : null;
+        }
+
+        $access = [];
+        if ($effectiveModuleIds !== null) {
+            $access['moduleIds'] = $effectiveModuleIds;
+        }
+        if ($effectiveFeatures !== []) {
+            $access['moduleFeatures'] = $effectiveFeatures;
+        }
+
+        return $access;
+    }
+
+    /**
+     * Old demo-linked units were seeded with moduleIds=[] which denies every
+     * feature. Repair only that untouched generated default once per employee.
+     */
+    private function ensureDemoEmployeeOrgNode(array &$state, array $record, bool $upgradeLegacyUnitScopes): void
+    {
+        $records = is_array($state['orgNodes'] ?? null) ? $state['orgNodes'] : [];
+        foreach ($records as $index => $existing) {
+            if (! is_array($existing) || (string) ($existing['id'] ?? '') !== (string) $record['id']) {
+                continue;
+            }
+            if ($upgradeLegacyUnitScopes
+                && (string) ($existing['companyId'] ?? '') === (string) $record['companyId']
+                && ($existing['code'] ?? null) === $record['code']
+                && str_starts_with((string) ($existing['code'] ?? ''), 'DEMO-UNIT-')
+                && ($existing['type'] ?? null) === 'service'
+                && ($existing['parentId'] ?? null) === null
+                && ($existing['moduleIds'] ?? null) === []
+                && ! array_key_exists('moduleFeatures', $existing)) {
+                foreach (['moduleIds', 'moduleFeatures'] as $scopeKey) {
+                    if (array_key_exists($scopeKey, $record)) {
+                        $existing[$scopeKey] = $record[$scopeKey];
+                    } else {
+                        unset($existing[$scopeKey]);
+                    }
+                }
+                $records[$index] = $existing;
+                $state['orgNodes'] = array_values($records);
+            }
+
+            return;
+        }
+
+        $records[] = $record;
+        $state['orgNodes'] = array_values($records);
     }
 
     private function appendStateRecord(array &$state, string $collection, array $record): void

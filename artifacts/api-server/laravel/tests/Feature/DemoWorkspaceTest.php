@@ -382,6 +382,116 @@ class DemoWorkspaceTest extends TestCase
         );
     }
 
+    public function test_demo_employee_features_keep_the_effective_unit_scope_and_upgrade_legacy_empty_scope(): void
+    {
+        $this->prepareCompany();
+        ModuleCatalog::ensureCompanyAccess('kora', ['stocks', 'paie']);
+        DB::table('maximus_app_states')->insert([
+            'scope' => 'workspace',
+            'company_id' => null,
+            'payload' => json_encode([
+                'orgNodes' => [
+                    [
+                        'id' => 'kora-sector-parent',
+                        'companyId' => 'kora',
+                        'parentId' => null,
+                        'moduleIds' => ['stocks', 'paie'],
+                        'moduleFeatures' => ['stocks' => ['products', 'reports']],
+                    ],
+                    [
+                        'id' => 'kora-sector-child',
+                        'companyId' => 'kora',
+                        'parentId' => 'kora-sector-parent',
+                        'moduleIds' => ['stocks', 'paie'],
+                        'moduleFeatures' => ['stocks' => ['products', 'entries']],
+                    ],
+                ],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $employee = $this->createLinkedEmployeeAccount(
+            'demo-feature-employee',
+            'employee-demo-features',
+            'employee',
+            ['kora-sector-child'],
+        );
+        $assignedPermissions = [
+            'stocks:products' => ['voir'],
+            'stocks:reports' => ['voir'],
+        ];
+        $employee->forceFill(['permissions' => $assignedPermissions])->save();
+
+        DemoWorkspace::setEnabled('kora', true);
+        $demoScope = DemoWorkspace::stateScope('kora');
+        $loadDemoState = fn (): array => json_decode(
+            (string) DB::table('maximus_app_states')->where('scope', $demoScope)->value('payload'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+        $demoState = $loadDemoState();
+        $demoUnit = collect($demoState['orgNodes'])->firstWhere('id', 'kora-sector-child');
+        $this->assertSame(['stocks', 'paie'], $demoUnit['moduleIds']);
+        $this->assertSame(['products'], $demoUnit['moduleFeatures']['stocks']);
+        $demoEmployee = collect($demoState['employees'])->firstWhere('id', $employee->employee_id);
+        $demoRole = collect($demoState['roles'])->firstWhere('id', $demoEmployee['roleId']);
+        $this->assertSame($assignedPermissions, $demoRole['modulePermissions']);
+
+        $demoState['orgNodes'] = array_map(
+            static function (array $node): array {
+                if (($node['id'] ?? null) === 'kora-sector-child') {
+                    $node['moduleIds'] = [];
+                    unset($node['moduleFeatures']);
+                    $node['name'] = 'Unité modifiée en démo';
+                    $node['location'] = 'Dakar — emplacement conservé';
+                }
+
+                return $node;
+            },
+            $demoState['orgNodes'],
+        );
+        DB::table('maximus_app_states')->where('scope', $demoScope)->update([
+            'payload' => json_encode($demoState, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+        ]);
+
+        $employeeScope = DemoWorkspace::employeeScope('kora', $employee->employee_id);
+        $marker = json_decode(
+            (string) DB::table('maximus_app_states')->where('scope', $employeeScope)->value('payload'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+        unset($marker['unitAccessVersion']);
+        DB::table('maximus_app_states')->where('scope', $employeeScope)->update([
+            'payload' => json_encode($marker, JSON_THROW_ON_ERROR),
+        ]);
+
+        DemoWorkspace::setEnabled('kora', true);
+        $repairedUnit = collect($loadDemoState()['orgNodes'])->firstWhere('id', 'kora-sector-child');
+        $this->assertSame(['stocks', 'paie'], $repairedUnit['moduleIds']);
+        $this->assertSame(['products'], $repairedUnit['moduleFeatures']['stocks']);
+        $this->assertSame('Unité modifiée en démo', $repairedUnit['name']);
+        $this->assertSame('Dakar — emplacement conservé', $repairedUnit['location']);
+
+        $employeeBootstrap = $this->withSessionFor($employee)
+            ->getJson('/api/app-state/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('dataset', 'demo');
+        $this->assertSame(
+            ['products'],
+            $employeeBootstrap->json('data.orgNodes.0.moduleFeatures.stocks'),
+        );
+        $this->assertSame(
+            $assignedPermissions,
+            $employeeBootstrap->json('data.roles.0.modulePermissions'),
+        );
+
+        $this->withSessionFor($employee)
+            ->withHeader('X-Maximus-Dataset', 'demo')
+            ->getJson('/api/stock/bootstrap?scope=core&companyId=kora')
+            ->assertOk();
+    }
+
     public function test_stock_routes_use_the_synthetic_company_and_reject_a_stale_dataset_header(): void
     {
         $this->prepareCompany();
