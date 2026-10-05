@@ -18,16 +18,17 @@ final class DemoWorkspaceController extends Controller
             return response()->json(['error' => 'Acteur MAXIMUS introuvable.'], 401);
         }
 
-        if (($actor['role'] ?? null) === 'maximus_admin') {
-            if (! InstallationContext::isCentral()) {
-                return response()->json([
-                    'error' => 'Le mode Démonstration se gère depuis l’installation centrale MAXIMUS.',
-                    'code' => 'CENTRAL_INSTALLATION_ONLY',
-                ], 404);
-            }
-        } elseif (($actor['role'] ?? null) !== 'company_admin'
-            || ($actor['companyId'] ?? null) !== $companyId) {
-            return response()->json(['error' => 'Seul un administrateur peut gérer le mode Démonstration de son entreprise.'], 403);
+        if (($actor['role'] ?? null) !== 'maximus_admin') {
+            return response()->json([
+                'error' => 'Seul l’administrateur MAXIMUS peut gérer le mode Démonstration.',
+                'code' => 'DEMO_MODE_MAXIMUS_ONLY',
+            ], 403);
+        }
+        if (! InstallationContext::isCentral()) {
+            return response()->json([
+                'error' => 'Le mode Démonstration se gère depuis l’installation centrale MAXIMUS.',
+                'code' => 'CENTRAL_INSTALLATION_ONLY',
+            ], 404);
         }
 
         $company = Company::query()

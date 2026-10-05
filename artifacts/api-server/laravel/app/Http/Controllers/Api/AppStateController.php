@@ -190,7 +190,10 @@ class AppStateController extends Controller
         } else {
             $state = $this->mergeRegistryCompanies($state);
         }
-        $state = $this->hydrateCompanyBranding($state);
+        $state = $this->hydrateCompanyBranding(
+            $state,
+            ($actor['role'] ?? null) === 'maximus_admin',
+        );
         $state = $this->stripCredentials($state);
 
         return response()->json([
@@ -1017,7 +1020,7 @@ class AppStateController extends Controller
         return $state;
     }
 
-    private function hydrateCompanyBranding(array $state): array
+    private function hydrateCompanyBranding(array $state, bool $includeDemoMode): array
     {
         if (!isset($state['companies']) || !is_array($state['companies'])) {
             return $state;
@@ -1048,7 +1051,7 @@ class AppStateController extends Controller
             ->keyBy('id');
 
         $state['companies'] = array_map(
-            function (mixed $item) use ($companies, $installations): mixed {
+            function (mixed $item) use ($companies, $installations, $includeDemoMode): mixed {
                 if (!is_array($item)) {
                     return $item;
                 }
@@ -1058,7 +1061,7 @@ class AppStateController extends Controller
                     return $item;
                 }
 
-                return array_replace($item, [
+                $hydrated = array_replace($item, [
                     'profilePhoto' => $company->profile_photo,
                     'primaryColor' => $company->primary_color,
                     'accentColor' => $company->accent_color,
@@ -1068,8 +1071,13 @@ class AppStateController extends Controller
                     'navigationCustomAllowed' => (bool) $company->navigation_custom_allowed,
                     'primaryInstallationId' => $company->erp_installation_id,
                     'primaryInstallationMode' => $installations->get($company->erp_installation_id)?->mode,
-                    'demoMode' => DemoWorkspace::isEnabled((string) $company->id),
                 ]);
+                unset($hydrated['demoMode']);
+                if ($includeDemoMode) {
+                    $hydrated['demoMode'] = DemoWorkspace::isEnabled((string) $company->id);
+                }
+
+                return $hydrated;
             },
             $state['companies'],
         );

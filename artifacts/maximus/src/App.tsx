@@ -1484,17 +1484,6 @@ function AppContent() {
           }}
         />
         <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
-          {!isAdmin && currentCompany && (
-            <CompanyDemoModeBanner
-              company={currentCompany}
-              canManage={companyAdmin}
-              onUpdated={(enabled) => mutate((draft) => {
-                const item = draft.companies.find((candidate) => candidate.id === currentCompany.id);
-                if (item) item.demoMode = enabled;
-              })}
-              onRefresh={() => refreshAppState()}
-            />
-          )}
           {!isAdmin && companyId && (
             <CompanySubscriptionExpiryNotice
               companyId={companyId}
@@ -1660,83 +1649,6 @@ function AppContent() {
       <Toaster />
     </div>
     </NavigationSettingsContext.Provider>
-  );
-}
-
-function CompanyDemoModeBanner({
-  company,
-  canManage,
-  onUpdated,
-  onRefresh,
-}: {
-  company: Company;
-  canManage: boolean;
-  onUpdated: (enabled: boolean) => void;
-  onRefresh: () => Promise<boolean>;
-}) {
-  const { alert, confirm } = useAppDialog();
-  const [saving, setSaving] = useState(false);
-  const enabled = company.demoMode === true;
-
-  if (!enabled && !canManage) return null;
-
-  const changeMode = async () => {
-    const nextEnabled = !enabled;
-    if (!(await confirm({
-      title: nextEnabled ? 'Activer le mode Démonstration ?' : 'Désactiver le mode Démonstration ?',
-      description: nextEnabled
-        ? 'Les données fictives seront modifiables. Les données réelles resteront intactes et aucun paiement ou virement réel ne pourra être lancé.'
-        : 'Les données réelles seront réaffichées. Les données de démonstration resteront conservées.',
-      confirmLabel: nextEnabled ? 'Activer le mode' : 'Désactiver le mode',
-    }))) return;
-
-    setSaving(true);
-    try {
-      const response = await companyRequestApi.updateDemoMode(company.id, nextEnabled);
-      setApiDatasetMode(response.enabled ? 'demo' : 'real');
-      onUpdated(response.enabled);
-      await onRefresh();
-    } catch (error) {
-      await alert({
-        title: 'Changement de mode impossible',
-        description: error instanceof Error ? error.message : 'Le mode Démonstration n’a pas pu être modifié.',
-        confirmLabel: 'Compris',
-        tone: 'danger',
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div
-      data-testid="company-demo-mode-banner"
-      role="status"
-      className="mb-5 flex flex-col gap-3 rounded-xl border border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.08)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div>
-        <strong className="block text-sm text-[hsl(var(--primary))]">
-          {enabled ? 'Mode Démonstration actif' : 'Mode Démonstration'}
-        </strong>
-        <span className="mt-1 block text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-          {enabled
-            ? 'Vous travaillez sur des données fictives isolées. Les données réelles restent inchangées; les paiements et virements réels sont désactivés.'
-            : 'Activez un espace fictif modifiable sans toucher aux données réelles.'}
-        </span>
-      </div>
-      {canManage && (
-        <label className="inline-flex shrink-0 items-center gap-3 rounded-lg border bg-[hsl(var(--background))] px-3 py-2 text-xs font-bold">
-          <span>Mode Démonstration</span>
-          <Switch
-            checked={enabled}
-            disabled={saving}
-            aria-label={`${enabled ? 'Désactiver' : 'Activer'} le mode Démonstration`}
-            data-testid="switch-own-company-demo-mode"
-            onCheckedChange={() => void changeMode()}
-          />
-        </label>
-      )}
-    </div>
   );
 }
 

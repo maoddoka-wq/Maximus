@@ -39,11 +39,16 @@ class DemoWorkspaceTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $request = $this->asCompanyAdmin();
-        $request->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])
+        $this->asCompanyAdmin()
+            ->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])
+            ->assertForbidden()
+            ->assertJsonPath('code', 'DEMO_MODE_MAXIMUS_ONLY');
+        $this->asMaximusAdmin()
+            ->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])
             ->assertOk()
             ->assertJsonPath('enabled', true)
             ->assertJsonPath('initialized', true);
+        $request = $this->asCompanyAdmin();
         $staleState = [
             'companies' => [['id' => 'kora', 'name' => 'Kora']],
             'products' => [],
@@ -63,8 +68,12 @@ class DemoWorkspaceTest extends TestCase
 
         $demoBootstrap = $request->getJson('/api/app-state/bootstrap')
             ->assertOk()
-            ->assertJsonPath('dataset', 'demo')
-            ->assertJsonPath('data.companies.0.demoMode', true);
+            ->assertJsonPath('dataset', 'demo');
+        $this->assertArrayNotHasKey('demoMode', $demoBootstrap->json('data.companies.0'));
+        $maximusBootstrap = $this->asMaximusAdmin()->getJson('/api/app-state/bootstrap')->assertOk();
+        $koraFromMaximus = collect($maximusBootstrap->json('data.companies'))->firstWhere('id', 'kora');
+        $this->assertTrue($koraFromMaximus['demoMode']);
+        $request = $this->asCompanyAdmin();
         $demoData = $demoBootstrap->json('data');
         $this->assertCount(3, $demoData['products']);
         $this->assertSame('Ordinateur portable', $demoData['products'][0]['name']);
@@ -86,9 +95,10 @@ class DemoWorkspaceTest extends TestCase
         );
         $this->assertSame('Ordinateur modifié en démo', $demoState['products'][0]['name']);
 
-        $request->patchJson('/api/companies/kora/demo-mode', ['enabled' => false])
+        $this->asMaximusAdmin()->patchJson('/api/companies/kora/demo-mode', ['enabled' => false])
             ->assertOk()
             ->assertJsonPath('enabled', false);
+        $request = $this->asCompanyAdmin();
         $request->withHeader('X-Maximus-Dataset', 'demo')
             ->putJson('/api/app-state', ['version' => 1, 'data' => $staleState])
             ->assertStatus(409)
@@ -98,8 +108,9 @@ class DemoWorkspaceTest extends TestCase
             ->assertJsonPath('dataset', 'real');
         $this->assertSame('Article réel', $realBootstrap->json('data.products.0.name'));
 
-        $request->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])
+        $this->asMaximusAdmin()->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])
             ->assertOk();
+        $request = $this->asCompanyAdmin();
         $request->getJson('/api/app-state/bootstrap')
             ->assertOk()
             ->assertJsonPath('dataset', 'demo')
@@ -109,6 +120,30 @@ class DemoWorkspaceTest extends TestCase
             true,
             flags: JSON_THROW_ON_ERROR,
         )['products'][0]['name']);
+    }
+
+    public function test_only_maximus_admin_can_toggle_demo_mode(): void
+    {
+        $this->prepareCompany();
+        $this->asCompanyAdmin()
+            ->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])
+            ->assertForbidden()
+            ->assertJsonPath('code', 'DEMO_MODE_MAXIMUS_ONLY');
+
+        $employee = $this->createLinkedEmployeeAccount(
+            'demo-toggle-employee',
+            'employee-demo-toggle',
+        );
+        $this->withSessionFor($employee)
+            ->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])
+            ->assertForbidden()
+            ->assertJsonPath('code', 'DEMO_MODE_MAXIMUS_ONLY');
+
+        $this->asMaximusAdmin()
+            ->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])
+            ->assertOk()
+            ->assertJsonPath('enabled', true);
+        $this->assertTrue(DemoWorkspace::isEnabled('kora'));
     }
 
     public function test_demo_fixtures_use_existing_employee_accounts_and_add_accounts_created_later(): void
@@ -351,8 +386,10 @@ class DemoWorkspaceTest extends TestCase
     {
         $this->prepareCompany();
         ModuleCatalog::ensureCompanyAccess('kora', ['stocks']);
+        $this->asMaximusAdmin()
+            ->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])
+            ->assertOk();
         $request = $this->asCompanyAdmin();
-        $request->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])->assertOk();
 
         $demoCompanyId = DemoWorkspace::datasetCompanyId('kora');
         $request->withHeader('X-Maximus-Dataset', 'demo')
@@ -376,7 +413,10 @@ class DemoWorkspaceTest extends TestCase
             'sku' => 'DEMO-CREATED-001',
         ]);
 
-        $request->patchJson('/api/companies/kora/demo-mode', ['enabled' => false])->assertOk();
+        $this->asMaximusAdmin()
+            ->patchJson('/api/companies/kora/demo-mode', ['enabled' => false])
+            ->assertOk();
+        $request = $this->asCompanyAdmin();
         $request->withHeader('X-Maximus-Dataset', 'demo')
             ->getJson('/api/stock/bootstrap?scope=core')
             ->assertStatus(409)
@@ -408,8 +448,10 @@ class DemoWorkspaceTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $this->asMaximusAdmin()
+            ->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])
+            ->assertOk();
         $request = $this->asCompanyAdmin();
-        $request->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])->assertOk();
         $demoCompanyId = DemoWorkspace::datasetCompanyId('kora');
 
         $bootstrap = $request->withHeader('X-Maximus-Dataset', 'demo')
@@ -439,8 +481,10 @@ class DemoWorkspaceTest extends TestCase
     {
         $this->prepareCompany();
         ModuleCatalog::ensureCompanyAccess('kora', ['paie']);
+        $this->asMaximusAdmin()
+            ->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])
+            ->assertOk();
         $request = $this->asCompanyAdmin();
-        $request->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])->assertOk();
 
         $request->withHeader('X-Maximus-Dataset', 'demo')
             ->patchJson('/api/ecommerce/store', ['status' => 'PUBLISHED'])
@@ -469,8 +513,10 @@ class DemoWorkspaceTest extends TestCase
     public function test_demo_mode_reads_reflect_changes_made_by_another_database_worker(): void
     {
         $this->prepareCompany();
+        $this->asMaximusAdmin()
+            ->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])
+            ->assertOk();
         $request = $this->asCompanyAdmin();
-        $request->patchJson('/api/companies/kora/demo-mode', ['enabled' => true])->assertOk();
 
         DB::table('maximus_app_states')
             ->where('scope', DemoWorkspace::modeScope('kora'))
@@ -501,13 +547,31 @@ class DemoWorkspaceTest extends TestCase
 
     private function asCompanyAdmin(): self
     {
-        $user = AuthUser::query()->create([
+        $user = AuthUser::query()->updateOrCreate(['id' => 'demo-workspace-admin'], [
             'id' => 'demo-workspace-admin',
             'email' => 'demo-workspace-admin@kora.example.test',
             'password_hash' => 'not-used-in-this-test',
             'display_name' => 'Administration Kora',
             'role' => 'company_admin',
             'company_id' => 'kora',
+            'sector_ids' => [],
+            'permissions' => [],
+            'status' => 'ACTIF',
+        ]);
+
+        return $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, MaximusAuth::issueSession($user));
+    }
+
+    private function asMaximusAdmin(): self
+    {
+        $user = AuthUser::query()->updateOrCreate(['id' => 'demo-workspace-maximus-admin'], [
+            'id' => 'demo-workspace-maximus-admin',
+            'email' => 'demo-workspace-maximus-admin@example.test',
+            'password_hash' => 'not-used-in-this-test',
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'company_id' => null,
             'sector_ids' => [],
             'permissions' => [],
             'status' => 'ACTIF',
