@@ -7,11 +7,12 @@ import {
   maximusPushApi,
   subscribeCurrentBrowserToPush,
 } from '@/lib/notification-push-api';
+import { shouldShowCompanyPushPrompt } from '@/lib/company-push-prompt';
 
 type Props = {
   companyId: string;
   companyName: string;
-  onNavigate: (path: string) => void;
+  placement: 'floating' | 'bell';
 };
 
 function dismissalKey(companyId: string) {
@@ -26,14 +27,16 @@ function wasDismissed(companyId: string) {
   }
 }
 
-export function CompanyPushNotificationPrompt({ companyId, companyName, onNavigate }: Props) {
+export function CompanyPushNotificationPrompt({ companyId, companyName, placement }: Props) {
   const [accessAllowed, setAccessAllowed] = useState<boolean | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(() =>
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission,
   );
   const [busy, setBusy] = useState(false);
-  const [dismissed, setDismissed] = useState(() => wasDismissed(companyId));
+  const [dismissed, setDismissed] = useState(() =>
+    placement === 'floating' && wasDismissed(companyId),
+  );
   const [error, setError] = useState('');
   const supportError = getPushSupportMessage();
 
@@ -97,67 +100,70 @@ export function CompanyPushNotificationPrompt({ companyId, companyName, onNaviga
     }
   };
 
-  if (
-    supportError
-    || accessAllowed !== true
-    || subscribed
-    || dismissed
-    || permission === 'unsupported'
-  ) {
+  if (!shouldShowCompanyPushPrompt({
+    supportError,
+    accessAllowed,
+    subscribed,
+    dismissed,
+    permission,
+  })) {
     return null;
   }
 
+  const isFloating = placement === 'floating';
+
   return (
     <section
-      className="mb-5 rounded-2xl border border-[hsl(var(--primary)/.3)] bg-[hsl(var(--primary)/.06)] p-4 sm:p-5"
+      className={isFloating
+        ? 'card-surface fixed inset-x-3 z-[60] mx-auto max-w-lg rounded-xl border border-[hsl(var(--primary)/.25)] p-3 sm:inset-x-auto sm:right-5 sm:w-[32rem] sm:max-w-[calc(100vw-2.5rem)]'
+        : 'card-surface flex flex-col gap-3 rounded-xl border border-[hsl(var(--primary)/.25)] p-3 sm:flex-row sm:items-center sm:justify-between'}
       aria-labelledby="company-push-prompt-title"
+      aria-live="polite"
       data-testid="company-push-authorization-prompt"
+      data-placement={placement}
+      style={isFloating ? { bottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' } : undefined}
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h2 id="company-push-prompt-title" className="font-bold">
-            Notifications disponibles pour {companyName}
-          </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-            MAXIMUS a autorisé les notifications push pour votre entreprise. Autorisez-les sur cet appareil pour
-            recevoir les alertes lorsque MAXIMUS est en arrière-plan. Chaque navigateur demande son propre accord.
+      <div className={isFloating ? 'min-w-0 sm:pr-3' : 'min-w-0'}>
+        <h2 id="company-push-prompt-title" className="text-sm font-semibold">
+          Autoriser les notifications ?
+        </h2>
+        <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+          MAXIMUS peut envoyer des alertes à {companyName} lorsque l’application est en arrière-plan.
+        </p>
+        {permission === 'denied' && (
+          <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+            Le navigateur les bloque. Réactivez-les dans ses réglages, puis revenez ici.
           </p>
-          {permission === 'denied' && (
-            <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-              Le navigateur a bloqué cette autorisation. Ouvrez vos réglages de notifications pour voir comment la rétablir.
-            </p>
-          )}
-          {error && permission !== 'denied' && (
-            <p className="mt-2 text-sm text-[hsl(var(--destructive))]" role="alert">
-              {error}
-            </p>
-          )}
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {permission === 'denied' ? (
-            <Button type="button" variant="outline" onClick={() => onNavigate('/entreprise/profil')}>
-              Voir les réglages
-            </Button>
-          ) : (
-            <Button type="button" disabled={busy} onClick={() => void enablePush()}>
-              {busy ? 'Activation…' : 'Autoriser sur cet appareil'}
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setDismissed(true);
+        )}
+        {error && permission !== 'denied' && (
+          <p className="mt-2 text-xs text-[hsl(var(--destructive))]" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+      <div className={`mt-3 flex shrink-0 items-center gap-2 ${isFloating ? '' : 'mt-0'}`}>
+        {permission !== 'denied' && (
+          <Button type="button" size="sm" disabled={busy} onClick={() => void enablePush()}>
+            {busy ? 'Activation…' : 'Autoriser'}
+          </Button>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setDismissed(true);
+            if (isFloating) {
               try {
                 window.sessionStorage.setItem(dismissalKey(companyId), 'true');
               } catch {
                 // The prompt remains dismissed for this mount if session storage is unavailable.
               }
-            }}
-          >
-            Plus tard
-          </Button>
-        </div>
+            }
+          }}
+        >
+          Plus tard
+        </Button>
       </div>
     </section>
   );

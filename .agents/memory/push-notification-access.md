@@ -11,8 +11,8 @@ Le réglage central se trouve dans MAXIMUS → Entreprises → fiche de l’entr
 
 **How to apply:** placer le contrôle central dans l’onglet Accès & permissions de chaque fiche entreprise MAXIMUS, et signaler l’autorisation active dans l’espace entreprise. Vérifier l’autorisation côté serveur à l’abonnement et lors de la sélection des destinataires; garder un consentement individuel et révocable par appareil, même quand l’entreprise est bloquée. Synchroniser la décision vers les installations dédiées, sans effacer leur état local en cas d’absence temporaire du central.
 
-Les réglages locaux « Alertes sur cet appareil » sont dans Profil et restent masqués tant que MAXIMUS n’a pas autorisé les notifications pour l’entreprise. La boîte de réception reste accessible depuis la cloche.
+Ne pas afficher de panneau de réglages locaux des notifications dans l’espace entreprise. Quand MAXIMUS autorise les notifications de l’entreprise, offrir deux demandes simples : un message flottant et une entrée dans la page ouverte par la cloche. Fermer le message flottant ne masque pas l’option de la cloche.
 
-**Why:** Le 6 octobre 2026, l’utilisateur a demandé de déplacer ces réglages vers Profil et de ne les montrer que si l’entreprise est autorisée.
+**Why:** Le 6 octobre 2026, l’utilisateur a demandé de retirer les réglages visibles partout, de garder deux moyens de demander le consentement et de ne les montrer que si MAXIMUS autorise l’entreprise.
 
-**How to apply:** vérifier l’autorisation d’entreprise avec l’API avant d’afficher les réglages, rediriger leur raccourci vers Profil et éviter de dupliquer l’invitation sur cette page.
+**How to apply:** vérifier l’autorisation d’entreprise côté serveur avant d’afficher les deux demandes, ne jamais les montrer si l’autorisation manque, si l’appareil est déjà abonné ou si la demande correspondante a été repoussée, et exiger un clic explicite avant de demander l’autorisation du navigateur.

@@ -1485,14 +1485,12 @@ function AppContent() {
           }}
         />
         <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
-          {!isAdmin && companyId && currentCompany &&
-            companyRoutePath !== '/entreprise/notifications' &&
-            companyRoutePath !== '/entreprise/profil' && (
+          {!isAdmin && companyId && currentCompany && companyRoutePath !== '/entreprise/notifications' && (
             <CompanyPushNotificationPrompt
-              key={companyId}
+              key={`${companyId}-floating`}
               companyId={companyId}
               companyName={currentCompany.name}
-              onNavigate={navigate}
+              placement="floating"
             />
           )}
           {!isAdmin && companyId && (
@@ -5453,8 +5451,20 @@ function NotificationsPage({
   context: { isAdmin: boolean; companyId?: string };
 }) {
   const notifications = getVisibleNotifications(data.notifications, context);
+  const notificationCompany = context.isAdmin
+    ? undefined
+    : data.companies.find((company) => company.id === context.companyId);
+
   return (
     <div className="space-y-3">
+      {notificationCompany && (
+        <CompanyPushNotificationPrompt
+          key={`${notificationCompany.id}-bell`}
+          companyId={notificationCompany.id}
+          companyName={notificationCompany.name}
+          placement="bell"
+        />
+      )}
       {notifications.length === 0 && (
         <div className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
           Aucune notification pour le moment.
