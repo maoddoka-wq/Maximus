@@ -26,6 +26,10 @@ test('l’assistant est disponible uniquement dans l’administration principale
   assert.equal(companyNav.some(item => item.href === '/entreprise/assistant'), false);
 });
 
+test('les notifications entreprise ne figurent pas dans le menu latéral', () => {
+  assert.equal(companyNav.some(item => item.href === '/entreprise/notifications'), false);
+});
+
 test('les routes de modules sont réversibles et décrivent le même module', () => {
   for (const module of moduleRegistry) {
     assert.equal(moduleIdForPath(module.path), module.id);

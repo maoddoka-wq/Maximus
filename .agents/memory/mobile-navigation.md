@@ -14,3 +14,9 @@ Par défaut, les fonctionnalités des modules entreprise apparaissent uniquement
 **Why:** L’utilisateur a refusé les barres horizontales imposées, puis a demandé un choix explicite par entreprise entre les fonctionnalités dans le menu et les fonctionnalités horizontalement en haut. Réduire le défilement ne doit pas imposer ni doubler une navigation.
 
 **How to apply:** Respecter le mode enregistré, les permissions et l’historique de navigation. Garder les zones tactiles confortables, les recherches et actions principales accessibles et les filtres secondaires repliables sans perdre leurs valeurs. Limiter ces adaptations à l’espace entreprise, sans modifier les vitrines publiques.
+
+Dans l’espace entreprise, garder les notifications dans le bouton cloche du bandeau et ne pas ajouter une seconde entrée Notifications au menu latéral.
+
+**Why:** Le 6 octobre 2026, l’utilisateur a demandé de retirer Notifications du tiroir de navigation tout en conservant son accès dans la cloche.
+
+**How to apply:** Laisser la route et la page Notifications actives pour le bouton de cloche et les liens contextuels; retirer uniquement l’entrée du menu latéral entreprise.

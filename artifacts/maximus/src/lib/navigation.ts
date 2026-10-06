@@ -1,6 +1,5 @@
 import {
   BookOpen,
-  BellRing,
   Building2,
   CreditCard,
   FileBarChart,
@@ -117,7 +116,6 @@ export const adminNavGroups: SidebarFeatureGroup[] = [
 
 const companyCoreNav: NavigationItem[] = [
   { href: '/entreprise/dashboard', label: 'Vue d’ensemble', icon: Gauge, module: null },
-  { href: '/entreprise/notifications', label: 'Notifications', icon: BellRing, module: null },
   { href: '/entreprise/controle', label: 'Contrôle & coordination', icon: ListChecks, module: null },
   { href: '/entreprise/organisation', label: 'Organisation & accès', icon: GitBranch, module: null, peopleAdminOnly: true },
   { href: '/entreprise/guide-configuration', label: 'Guide de configuration', icon: BookOpen, module: null, peopleAdminOnly: true },
