@@ -1,15 +1,20 @@
 import { motion } from 'framer-motion';
-import { ArrowDownUp, Boxes, Package } from 'lucide-react';
-import { SceneFrame, Reveal, WordCycle } from './scene-shared';
+import { ArrowDownUp, Boxes, ClipboardCheck, Package } from 'lucide-react';
+import { SceneFrame, Reveal } from './scene-shared';
+import { DetailCards, type DetailCardItem } from './DetailCards';
 
-const WORDS = ['ARTICLES', 'MOUVEMENTS', 'SEUILS'];
+const FEATURES: DetailCardItem[] = [
+  { title: 'ARTICLES', detail: 'Références, quantités et seuils.', icon: Package },
+  { title: 'MOUVEMENTS', detail: 'Réceptions, sorties et transferts.', icon: ArrowDownUp },
+  { title: 'INVENTAIRES', detail: 'Comptez et vérifiez les écarts terrain.', icon: ClipboardCheck },
+];
 const UNITS = [0, 1, 2, 3, 4, 5];
 
 export function Scene4() {
   return (
     <SceneFrame tone="light" name="stock" durationMs={4500}>
       <Reveal className="stock-copy" delay={0.18}>
-        <span className="module-kicker">03 / FLUX</span>
+        <span className="module-kicker">03 / APPROVISIONNEMENT</span>
         <span className="module-title">GESTION<br />DE STOCK</span>
       </Reveal>
       <div className="stock-level" aria-hidden="true">
@@ -20,8 +25,7 @@ export function Scene4() {
         <motion.div className="stock-motion-icon" initial={{ x: -180, opacity: 0 }} animate={{ x: [-180, -28, 22], opacity: [0, 1, 1] }} transition={{ delay: 1.45, duration: 1.2, times: [0, 0.72, 1], ease: [0.18, 0.82, 0.22, 1] }}><ArrowDownUp size="8vmin" strokeWidth={1.5} /></motion.div>
         <Boxes className="stock-master-icon" size="18vmin" strokeWidth={1.1} />
       </div>
-      <WordCycle items={WORDS} at={[1050, 1850, 2650]} />
-      <Reveal className="stock-footer" delay={3.32} duration={0.3}>ARTICLES · ENTRÉES · SORTIES · ALERTES</Reveal>
+      <DetailCards items={FEATURES} />
     </SceneFrame>
   );
 }

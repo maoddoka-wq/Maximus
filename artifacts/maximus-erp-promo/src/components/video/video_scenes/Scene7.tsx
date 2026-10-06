@@ -1,8 +1,13 @@
 import { motion } from 'framer-motion';
-import { Clock3, UsersRound } from 'lucide-react';
-import { SceneFrame, Reveal, WordCycle } from './scene-shared';
+import { CalendarDays, Clock3, QrCode, UsersRound } from 'lucide-react';
+import { SceneFrame, Reveal } from './scene-shared';
+import { DetailCards, type DetailCardItem } from './DetailCards';
 
-const WORDS = ['POINTAGE', 'SUIVI DES ÉQUIPES'];
+const FEATURES: DetailCardItem[] = [
+  { title: 'POINTAGE PAR QR', detail: 'Chaque employé pointe avec son compte.', icon: QrCode },
+  { title: 'ABSENCES & CONGÉS', detail: 'Saisissez et suivez les demandes.', icon: CalendarDays },
+  { title: 'HORAIRES & RAPPORTS', detail: 'Organisez les horaires et consultez les suivis.', icon: Clock3 },
+];
 const TEAM = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
 export function Scene7() {
@@ -20,8 +25,7 @@ export function Scene7() {
         <motion.div className="clock-hand" initial={{ rotate: -90 }} animate={{ rotate: [ -90, 0, 96, 184 ] }} transition={{ delay: 0.72, duration: 2.72, times: [0, 0.32, 0.68, 1], ease: [0.22, 1, 0.36, 1] }} />
       </motion.div>
       <UsersRound className="presence-team-icon" size="11vmin" strokeWidth={1.25} />
-      <WordCycle items={WORDS} at={[1050, 2100]} />
-      <Reveal className="presence-footer" delay={3.05} duration={0.3}>POINTAGE · ABSENCES · HORAIRES</Reveal>
+      <DetailCards items={FEATURES} />
     </SceneFrame>
   );
 }

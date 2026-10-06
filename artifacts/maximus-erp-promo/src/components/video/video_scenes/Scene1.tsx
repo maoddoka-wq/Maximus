@@ -14,6 +14,9 @@ export function Scene1() {
         <Reveal className="opener-title" delay={0.12} duration={0.35}>UN ERP</Reveal>
         <Reveal className="opener-subtitle" delay={0.62} duration={0.28}>SEPT MODULES</Reveal>
       </div>
+      <Reveal className="opener-difference" delay={1.45} duration={0.35}>
+        Fonctions et accès choisis par entreprise.
+      </Reveal>
       <motion.div className="opener-number" initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: [0.3, 1.12, 1], opacity: [0, 1, 1] }} transition={{ delay: 1.38, duration: 0.5, times: [0, 0.56, 1], ease: [0.18, 0.82, 0.22, 1] }}>7</motion.div>
       <div className="module-orbit" aria-hidden="true">
         {POINTS.map((point, index) => (
