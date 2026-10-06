@@ -2,14 +2,14 @@
 
 ## Traitement
 
-- **Promesse :** expliquer ce que chaque module permet de gérer à l’aide d’illustrations photoréalistes des métiers, sans narration ni fonctions inventées.
+- **Promesse :** expliquer ce que chaque module permet de gérer à l’aide d’illustrations photoréalistes des métiers et de la voix off fournie, sans fonctions inventées.
 - **Public :** dirigeants et responsables d’entreprise.
 - **Format et durée :** vertical 9:16, 80,5 secondes : ouverture 3,5 s, sept modules de 10 s chacun, conclusion 7 s.
 - **Différence à expliquer :** l’entreprise choisit les modules et fonctions qui lui sont utiles; les accès sont définis par rôle; plusieurs activités sont réunies dans un espace de travail commun. Ne pas prétendre que MAXIMUS est supérieur à chaque concurrent sans preuve.
 - **Identité :** conserver les couleurs, polices et le logo local existants. Les images sont des illustrations générées, pas des captures de l’interface MAXIMUS.
 - **Mouvement :** illustrations photoréalistes recadrées lentement; cartes explicatives qui apparaissent une à une, puis restent fixes. Aucun texte qui défile en continu.
 - **Arc :** promesse immédiate, sept démonstrations lisibles, puis synthèse des choix par entreprise et des accès par rôle.
-- **Son :** musique instrumentale légère uniquement. Aucune voix, aucun bruitage. Étendre la piste instrumentale à 80,5 s avec une jonction douce; ne pas la relancer en boucle à l’intérieur du film.
+- **Son :** voix off fournie dans `attached_assets/vo_04_eve_1791249362103.mp3`, posée dès 00.00 sans accélération ni ralentissement et avec ses pauses naturelles. Elle est pré-mixée avec l’instrumental dans `public/audio/composite_audio.mp3`; la musique baisse dynamiquement pendant la parole puis continue seule jusqu’à la fin du film. Aucun bruitage.
 
 ## Rythme global
 
@@ -36,7 +36,7 @@ Les scènes sont contiguës; leur somme est de 80,5 secondes. Chaque illustratio
 - **Composition :** fond sombre de la charte, grand chiffre 7 en arrière-plan, mots dans la zone centrale sûre. Le logo est réservé à la conclusion.
 - **Chorégraphie :** 00.00–00.90, le nom et les deux titres apparaissent; 00.35–03.35, les sept repères arrivent lentement sans flash; 01.38–01.88, le chiffre 7 prend le premier plan; 01.45–01.80, la phrase de différenciation apparaît, puis reste lisible jusqu’au fondu.
 - **Transition :** fondu géométrique de 0,34 s vers l’illustration du plan 02.
-- **Son :** musique douce seule, déjà en cours; aucune voix ni effet sonore.
+- **Son :** la voix off commence dès 00.00; l’instrumental reste en fond et se baisse pendant les phrases. Aucun effet sonore.
 
 ### Plan 02 — Gestion commerciale — 03.50 à 13.50
 
@@ -101,7 +101,7 @@ Les scènes sont contiguës; leur somme est de 80,5 secondes. Chaque illustratio
 - **Composition :** fond clair de la charte, logo centré en haut, trois cartes stables sous le nom et phrase finale dans la zone sûre.
 - **Chorégraphie :** 73.50–74.40, les motifs se rassemblent autour du logo; 74.40–75.30, MAXIMUS ERP apparaît; 75.30–77.20, trois cartes se révèlent lentement; 77.20–80.50, logo, cartes et phrase restent fixes et lisibles, puis la ligne-or prépare la boucle.
 - **Transition :** la ligne rejoint le point d’ouverture sans écran vide ni flash.
-- **Son :** résolution naturelle de la musique instrumentale; aucune voix.
+- **Son :** après la fin de la piste de voix off (64,75 s), l’instrumental accompagne la synthèse et la boucle finale.
 
 ## Contrôle de véracité et de lecture
 
@@ -109,4 +109,4 @@ Les scènes sont contiguës; leur somme est de 80,5 secondes. Chaque illustratio
 - Aucune promotion n’est décrite comme disponible; aucun transfert bancaire automatique n’est promis.
 - Les illustrations photoréalistes sont générées pour le film; elles ne sont pas des photos réelles ni des captures de MAXIMUS.
 - Les cartes apparaissent lentement, ne défilent pas, et restent affichées plusieurs secondes.
-- Vérifier une durée totale de 80,5 s, une piste musicale instrumentale seule, le rendu des neuf plans, la boucle et le MP4 final.
+- Vérifier une durée totale de 80,5 s, le mix voix off/instrumental, le rendu des neuf plans, la boucle et le MP4 final.

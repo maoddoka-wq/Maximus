@@ -9,7 +9,7 @@ interface VideoAudioTrackProps {
   paused: boolean;
 }
 
-const AUDIO_SOURCE = `${import.meta.env.BASE_URL}audio/maximus-instrumental-80s.mp3`;
+const AUDIO_SOURCE = `${import.meta.env.BASE_URL}audio/composite_audio.mp3`;
 
 export function VideoAudioTrack({
   currentScene,
@@ -60,13 +60,6 @@ export function VideoAudioTrack({
     const audio = audioRef.current;
     if (!audio) return;
 
-    audio.muted = muted;
-  }, [muted]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
     if (paused) {
       if (scenePlayStartedAt.current !== null) {
         sceneElapsedMs.current += performance.now() - scenePlayStartedAt.current;
@@ -96,7 +89,6 @@ export function VideoAudioTrack({
     if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
       audio.currentTime = videoTimeMs / 1000;
     }
-    audio.muted = muted;
     void audio.play().then(
       () => setNeedsAudioGesture(false),
       () => setNeedsAudioGesture(true),
@@ -112,14 +104,14 @@ export function VideoAudioTrack({
         preload="auto"
         muted={muted}
         onError={() => setAudioUnavailable(true)}
-        aria-label="Musique instrumentale du film MAXIMUS ERP"
+        aria-label="Voix off et musique du film MAXIMUS ERP"
       />
       {audioUnavailable ? (
         <div className="audio-status" role="status">Piste audio indisponible</div>
       ) : needsAudioGesture && !paused ? (
         <button className="audio-enable" type="button" onClick={enableAudio}>
           <Volume2 aria-hidden="true" size={18} />
-          Activer la musique
+          Activer le son
         </button>
       ) : null}
     </>
