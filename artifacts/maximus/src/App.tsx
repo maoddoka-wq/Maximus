@@ -64,7 +64,6 @@ import { companyNavigationMode } from '@/lib/company-navigation';
 import { WorkspaceTabs } from '@workspace/maximus-design-system/components/ui/workspace-tabs';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { parseClientPwaPath } from '@/lib/pwa';
-import { NotificationSettings } from '@/components/notification-settings';
 import { disableCurrentBrowserPushSubscription } from '@/lib/notification-push-api';
 import { playNotificationSound } from '@/lib/notification-sound';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
@@ -1486,7 +1485,9 @@ function AppContent() {
           }}
         />
         <div className="page-pad page-content mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-10">
-          {!isAdmin && companyId && currentCompany && companyRoutePath !== '/entreprise/notifications' && (
+          {!isAdmin && companyId && currentCompany &&
+            companyRoutePath !== '/entreprise/notifications' &&
+            companyRoutePath !== '/entreprise/profil' && (
             <CompanyPushNotificationPrompt
               key={companyId}
               companyId={companyId}
@@ -5454,7 +5455,6 @@ function NotificationsPage({
   const notifications = getVisibleNotifications(data.notifications, context);
   return (
     <div className="space-y-3">
-      <NotificationSettings />
       {notifications.length === 0 && (
         <div className="card-surface rounded-2xl p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
           Aucune notification pour le moment.

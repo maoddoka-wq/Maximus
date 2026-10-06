@@ -146,6 +146,8 @@ export function NotificationSettings() {
     }
   };
 
+  if (pushAccessAllowed !== true) return null;
+
   return (
     <section className="card-surface rounded-2xl p-5" aria-labelledby="notification-settings-title">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

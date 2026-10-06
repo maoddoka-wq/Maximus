@@ -135,7 +135,7 @@ export function CompanyPushNotificationPrompt({ companyId, companyName, onNaviga
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {permission === 'denied' ? (
-            <Button type="button" variant="outline" onClick={() => onNavigate('/entreprise/notifications')}>
+            <Button type="button" variant="outline" onClick={() => onNavigate('/entreprise/profil')}>
               Voir les réglages
             </Button>
           ) : (
