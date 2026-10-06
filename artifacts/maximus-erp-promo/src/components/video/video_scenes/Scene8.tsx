@@ -16,7 +16,7 @@ const STEPS = [
 
 export function Scene8() {
   return (
-    <SceneFrame tone="dark" name="payroll" durationMs={4500}>
+    <SceneFrame tone="dark" name="payroll" durationMs={10000}>
       <Reveal className="payroll-title module-title" delay={0.2}>
         <span className="module-kicker">07 / RÉMUNÉRATION</span>
         <span>PAIE</span>

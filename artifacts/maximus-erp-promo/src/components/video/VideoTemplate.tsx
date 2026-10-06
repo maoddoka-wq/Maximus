@@ -20,13 +20,13 @@ import { Scene9 } from './video_scenes/Scene9';
 
 export const SCENE_DURATIONS = {
   opening: 3500,
-  commercial: 4500,
-  ecommerce: 4500,
-  stock: 4500,
-  transport: 4500,
-  immobilier: 4500,
-  presences: 4500,
-  payroll: 4500,
+  commercial: 10000,
+  ecommerce: 10000,
+  stock: 10000,
+  transport: 10000,
+  immobilier: 10000,
+  presences: 10000,
+  payroll: 10000,
   signature: 7000,
 };
 

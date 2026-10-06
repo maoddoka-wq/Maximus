@@ -11,7 +11,7 @@ const FEATURES: DetailCardItem[] = [
 
 export function Scene5() {
   return (
-    <SceneFrame tone="dark" name="transport" durationMs={4500}>
+    <SceneFrame tone="dark" name="transport" durationMs={10000}>
       <Reveal className="transport-title module-title" delay={0.22}>
         <span className="module-kicker">04 / MOBILITÉ</span>
         <span>TRANSPORT</span>

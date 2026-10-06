@@ -1,0 +1,223 @@
+.detail-cards {
+  position: absolute;
+  z-index: 8;
+  top: 60%;
+  left: 7%;
+  right: 7%;
+  height: 32%;
+  display: grid;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 1vmin;
+  pointer-events: none;
+}
+
+.detail-card {
+  display: grid;
+  grid-template-columns: 8.5vmin minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2vmin;
+  min-width: 0;
+  min-height: 0;
+  padding: 1.1vmin 2vmin;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+  border-radius: 1.6vmin;
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-bg-light) 90%, var(--color-secondary));
+  box-shadow: 0 1vmin 2.4vmin color-mix(in srgb, var(--color-bg-dark) 14%, transparent);
+}
+
+.tone-dark .detail-card,
+.tone-slate .detail-card {
+  color: var(--color-text-inverse);
+  background: color-mix(in srgb, var(--color-bg-dark) 78%, var(--color-secondary));
+}
+
+.detail-card-icon {
+  display: grid;
+  place-items: center;
+  width: 8.5vmin;
+  height: 8.5vmin;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 36%, transparent);
+  border-radius: 1.3vmin;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 9%, transparent);
+}
+
+.detail-card-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4vmin;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.detail-card-copy strong {
+  overflow: hidden;
+  font-size: clamp(14px, 3.25vmin, 30px);
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-card-copy > span {
+  overflow: hidden;
+  font-size: clamp(12px, 2.65vmin, 24px);
+  font-weight: 500;
+  opacity: 0.86;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-card-index {
+  align-self: center;
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: clamp(10px, 2.2vmin, 20px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.opener-difference {
+  position: absolute;
+  z-index: 6;
+  right: 9%;
+  bottom: 9%;
+  left: 9%;
+  color: var(--color-text-inverse);
+  font-size: clamp(13px, 3.2vmin, 28px);
+  font-weight: 600;
+  letter-spacing: 0.015em;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.film-scene .commercial-hub {
+  top: 30%;
+  left: 32%;
+  width: 36vmin;
+  height: 36vmin;
+}
+
+.film-scene .node-client {
+  top: 38%;
+  left: 10%;
+}
+
+.film-scene .node-quote {
+  top: 38%;
+  right: 10%;
+  bottom: auto;
+}
+
+.film-scene .catalog-stack {
+  top: 29%;
+  height: 27%;
+}
+
+.film-scene .order-token {
+  top: 37%;
+}
+
+.film-scene .stock-level {
+  top: 32%;
+  height: 25%;
+}
+
+.film-scene .taxi-route {
+  inset: auto;
+  top: 15%;
+  left: 19%;
+  width: 62%;
+  height: 44%;
+}
+
+.film-scene .taxi-car {
+  top: 29%;
+  left: 38%;
+}
+
+.film-scene .taxi-destination {
+  top: 18%;
+  right: 21%;
+}
+
+.film-scene .blueprint {
+  top: 29%;
+  height: 28%;
+}
+
+.film-scene .clock-face {
+  top: 30%;
+  left: 35.5%;
+  width: 29vmin;
+  height: 29vmin;
+}
+
+.film-scene .clock-hand {
+  width: 12vmin;
+}
+
+.film-scene .presence-team-icon {
+  top: 50%;
+  left: 45%;
+}
+
+.film-scene .payroll-track {
+  top: 32%;
+  left: 14%;
+  right: 14%;
+  gap: 1.2vmin;
+}
+
+.film-scene .payroll-card {
+  min-height: 11vmin;
+  padding: 1.2vmin 3vmin;
+}
+
+.signature-kicker {
+  position: absolute;
+  top: 7%;
+  left: 0;
+  width: 100%;
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: 2.2vmin;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-align: center;
+}
+
+.film-scene .signature-orbit {
+  inset: 0;
+}
+
+.film-scene .signature-motif {
+  width: 8vmin;
+  height: 8vmin;
+  margin: -4vmin;
+}
+
+.film-scene .signature-logo {
+  top: 17%;
+  left: calc(50% - 12vmin);
+  width: 24vmin;
+  height: 24vmin;
+}
+
+.film-scene .signature-wordmark {
+  top: 35%;
+  font-size: 7.4vmin;
+}
+
+.signature-benefits {
+  top: 56%;
+  height: 34%;
+}
+
+.film-scene .signature-line {
+  top: 92%;
+  font-size: clamp(12px, 2.9vmin, 26px);
+  line-height: 1.2;
+}

@@ -11,7 +11,7 @@ const FEATURES: DetailCardItem[] = [
 
 export function Scene6() {
   return (
-    <SceneFrame tone="slate" name="immobilier" durationMs={4500}>
+    <SceneFrame tone="slate" name="immobilier" durationMs={10000}>
       <Reveal className="realty-title module-title" delay={0.2}>
         <span className="module-kicker">05 / PATRIMOINE ET ANNONCES</span>
         <span>IMMOBILIER</span>

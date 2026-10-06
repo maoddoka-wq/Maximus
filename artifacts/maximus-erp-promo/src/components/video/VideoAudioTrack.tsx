@@ -9,7 +9,7 @@ interface VideoAudioTrackProps {
   paused: boolean;
 }
 
-const AUDIO_SOURCE = `${import.meta.env.BASE_URL}audio/final_mix.mp3`;
+const AUDIO_SOURCE = `${import.meta.env.BASE_URL}audio/maximus-instrumental-80s.mp3`;
 
 export function VideoAudioTrack({
   currentScene,
@@ -110,17 +110,16 @@ export function VideoAudioTrack({
         className="film-audio"
         src={AUDIO_SOURCE}
         preload="auto"
-        loop
         muted={muted}
         onError={() => setAudioUnavailable(true)}
-        aria-label="Musique et narration du film MAXIMUS ERP"
+        aria-label="Musique instrumentale du film MAXIMUS ERP"
       />
       {audioUnavailable ? (
         <div className="audio-status" role="status">Piste audio indisponible</div>
       ) : needsAudioGesture && !paused ? (
         <button className="audio-enable" type="button" onClick={enableAudio}>
           <Volume2 aria-hidden="true" size={18} />
-          Activer le son
+          Activer la musique
         </button>
       ) : null}
     </>

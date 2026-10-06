@@ -11,7 +11,7 @@ const FEATURES: DetailCardItem[] = [
 
 export function Scene3() {
   return (
-    <SceneFrame tone="dark" name="ecommerce" durationMs={4500}>
+    <SceneFrame tone="dark" name="ecommerce" durationMs={10000}>
       <Reveal className="ecom-title module-title" delay={0.2}>
         <span className="module-kicker">02 / VENTE EN LIGNE</span>
         <span>E-COMMERCE</span>

@@ -12,7 +12,7 @@ const UNITS = [0, 1, 2, 3, 4, 5];
 
 export function Scene4() {
   return (
-    <SceneFrame tone="light" name="stock" durationMs={4500}>
+    <SceneFrame tone="light" name="stock" durationMs={10000}>
       <Reveal className="stock-copy" delay={0.18}>
         <span className="module-kicker">03 / APPROVISIONNEMENT</span>
         <span className="module-title">GESTION<br />DE STOCK</span>
