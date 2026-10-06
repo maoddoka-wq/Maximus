@@ -434,31 +434,3 @@ mtime_ms = 1791227476448
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/e3d18a40-88ce-4fd6-90fa-7d11d3456e82/77cb36e2-1727-4617-a2aa-31986d617dd9"
 storage_version_token = "1791227476989105"
 content_type = "application/pdf"
-
-[[outputs]]
-id = "-LOCS6I59Uyy01BCtobci"
-uri = "file://artifacts/maximus-erp-promo/public/exports/MAXIMUS-ERP-vertical-42s.mp4"
-type = "video"
-title = "MAXIMUS ERP — film publicitaire vertical"
-description = "MP4 vertical 9:16, 42 secondes, avec narration française synthétique et musique originale. H.264/AAC, 1080 × 1920."
-logical_id = "82645ecd-294f-4cea-b0ce-eb691967c771"
-content_hash = "sha256:fda636e67ed15904dcd30b1471af9df136e06db1f11ca7a698523f259b4ca996"
-size = 2680142
-mtime_ms = 1791244200424
-storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/82645ecd-294f-4cea-b0ce-eb691967c771/5121da00-a356-426f-8eea-2598b1810581"
-storage_version_token = "1791244379892788"
-content_type = "video/mp4"
-
-[[outputs]]
-id = "okAY5MCvitnRFT49VDM6n"
-uri = "file://artifacts/maximus-erp-promo/public/exports/MAXIMUS-ERP-vertical-80s.mp4"
-type = "video"
-title = "MAXIMUS ERP — film vertical avec voix off"
-description = "MP4 de 80,5 s en 1080 × 1920. Voix fournie gardée à son débit d’origine; musique abaissée pendant la narration."
-logical_id = "574dc8a8-e295-4e44-8266-fe388fa18507"
-content_hash = "sha256:c2f6c9a6e5b9995668331c0b9f8289a8723ab818742d77f1e8ce33c31155fddf"
-size = 10441084
-mtime_ms = 1791250488597
-storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/574dc8a8-e295-4e44-8266-fe388fa18507/e3f21f17-4ec4-443a-8117-e3222357704c"
-storage_version_token = "1791250654302052"
-content_type = "video/mp4"
