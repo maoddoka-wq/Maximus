@@ -1,10 +1,10 @@
 ---
 name: Galeries Immobilier multimédias
-description: Décision de stockage et de représentation des photos et vidéos des biens et annonces Immobilier.
+description: Les médias Immobilier restent persistants lors du passage au Bien unique.
 ---
 
-Les galeries des biens et des annonces Immobilier réutilisent la table de galerie persistante du e-commerce avec des types de propriétaires dédiés. Chaque média conserve son MIME et l’interface affiche les vidéos comme des éléments de galerie, pas comme des images.
+La galerie persistante e-commerce sert au Bien unique. Elle regroupe les médias rattachés au Bien et ceux des anciennes annonces non archivées afin que la transition ne masque ni ne supprime les photos et vidéos existantes. Chaque média conserve son MIME.
 
-**Why:** Cela évite deux systèmes de téléversement concurrents et garantit que les médias ajoutés depuis l’espace entreprise restent disponibles dans la vitrine publique après actualisation.
+**Why:** L’utilisateur a remplacé le modèle Bien/Annonce distinct par un seul Bien ; les médias historiques doivent rester disponibles après cette transition.
 
-**How to apply:** Pour toute évolution de galerie Immobilier, conserver l’isolation par entreprise et propriétaire, valider séparément les formats image/vidéo et dériver le rendu du MIME plutôt que de l’extension du fichier.
+**How to apply:** Conserver l’isolation par entreprise et propriétaire, agréger les anciens médias liés au Bien tant qu’ils ne sont pas archivés, valider séparément image/vidéo et dériver le rendu du MIME plutôt que de l’extension.

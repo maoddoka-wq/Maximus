@@ -424,6 +424,35 @@ export interface SellerWalletBootstrap {
   };
 }
 
+export interface PublicImmobilierProperty {
+  id: string;
+  slug: string;
+  title: string;
+  propertyType: string;
+  transactionType: 'SALE' | 'RENT';
+  description: string;
+  city: string;
+  neighborhood: string;
+  price: number;
+  areaM2: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  furnished: boolean;
+  featured: boolean;
+  profileMedia: {
+    id: string;
+    url: string;
+    mime: string;
+    type: 'image' | 'video';
+  } | null;
+  gallery: Array<{
+    id: string;
+    url: string;
+    mime: string;
+    type: 'image' | 'video';
+  }>;
+}
+
 export interface PublicShopBootstrap {
   store: Omit<EcommerceStore, 'id' | 'companyId'> & {
     seller: {
@@ -473,34 +502,8 @@ export interface PublicShopBootstrap {
     createdAt: string;
     updatedAt: string;
   }>;
-  immobilierListings: Array<{
-    id: string;
-    slug: string;
-    title: string;
-    propertyType: string;
-    transactionType: 'SALE' | 'RENT';
-    description: string;
-    city: string;
-    neighborhood: string;
-    price: number;
-    areaM2: number | null;
-    bedrooms: number | null;
-    bathrooms: number | null;
-    furnished: boolean;
-    featured: boolean;
-    profileMedia: {
-      id: string;
-      url: string;
-      mime: string;
-      type: 'image' | 'video';
-    } | null;
-    gallery: Array<{
-      id: string;
-      url: string;
-      mime: string;
-      type: 'image' | 'video';
-    }>;
-  }>;
+  immobilierProperties?: PublicImmobilierProperty[];
+  immobilierListings: PublicImmobilierProperty[];
 }
 
 export type PublicDomainBootstrap = PublicShopBootstrap | { available: false };

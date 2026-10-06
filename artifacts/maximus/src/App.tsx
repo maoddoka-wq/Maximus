@@ -9431,6 +9431,7 @@ function CompanyModulesDetail({
                                   </div>
                                 </div>
                                 {!selected && <p className="mt-1 pl-6 text-[10px] text-[hsl(var(--muted-foreground))]">Fonctionnalité non visible dans l’espace entreprise.</p>}
+                                {module.id === 'immobilier' && feature.id === 'annonces' && <p className="mt-1 pl-6 text-[10px] text-[hsl(var(--muted-foreground))]">Ces droits contrôlent la création et la modification des fiches Bien dans l’espace Annonces, y compris leur statut Brouillon ou Publié.</p>}
                                 </div>
                             );
                           })}

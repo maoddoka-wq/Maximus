@@ -2,6 +2,7 @@ import { requestJson } from './api-request';
 
 export type ImmobilierListingStatus = 'DRAFT' | 'PUBLISHED' | 'RESERVED' | 'SOLD' | 'RENTED' | 'ARCHIVED';
 export type ImmobilierPropertyStatus = 'AVAILABLE' | 'RESERVED' | 'SOLD' | 'RENTED' | 'ARCHIVED';
+export type ImmobilierPublicationStatus = 'DRAFT' | 'PUBLISHED';
 export type ImmobilierLeadStatus = 'NEW' | 'CONTACTED' | 'CLOSED';
 export type ImmobilierRequestType = 'CONTACT' | 'VISIT';
 export type ImmobilierMediaSlot = 'PROFILE' | 'GALLERY';
@@ -17,6 +18,11 @@ export interface ImmobilierProperty {
   id: string;
   companyId: string;
   reference: string;
+  title: string;
+  slug: string;
+  description: string;
+  publicationStatus: ImmobilierPublicationStatus;
+  featured: boolean;
   propertyType: string;
   transactionType: 'SALE' | 'RENT';
   status: ImmobilierPropertyStatus;
@@ -82,6 +88,13 @@ export interface ImmobilierLead {
   createdAt: string;
 }
 
+export interface ImmobilierBootstrap {
+  properties: ImmobilierProperty[];
+  listings: ImmobilierListing[];
+  leads: ImmobilierLead[];
+  store: { slug: string; status: string } | null;
+}
+
 export type ImmobilierListingInput = Omit<Partial<ImmobilierListing>, 'id' | 'companyId' | 'slug' | 'createdAt' | 'updatedAt'> & {
   propertyId: string;
   title: string;
@@ -95,7 +108,7 @@ const request = <T>(path: string, options?: RequestInit) =>
 export const createImmobilierApi = (companyId: string) => {
   const withCompany = (path: string) => `${path}?companyId=${encodeURIComponent(companyId)}`;
   return {
-    bootstrap: () => request<{ properties: ImmobilierProperty[]; listings: ImmobilierListing[]; leads: ImmobilierLead[] }>(withCompany('/immobilier/bootstrap')),
+    bootstrap: () => request<ImmobilierBootstrap>(withCompany('/immobilier/bootstrap')),
     createProperty: (body: ImmobilierPropertyInput) => request<{ property: ImmobilierProperty }>(withCompany('/immobilier/properties'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
     updateProperty: (id: string, body: Partial<ImmobilierPropertyInput>) => request<{ property: ImmobilierProperty }>(withCompany(`/immobilier/properties/${encodeURIComponent(id)}`), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
     uploadPropertyMedia: (id: string, files: File[], slot: ImmobilierMediaSlot = 'GALLERY') => {
@@ -143,7 +156,7 @@ export const createImmobilierApi = (companyId: string) => {
 };
 
 export const publicImmobilierApi = {
-  createLead: (slug: string | undefined, domain: boolean, body: { listingId?: string; requestType: ImmobilierRequestType; name: string; email: string; phone?: string; preferredDate?: string; message?: string }) =>
+  createLead: (slug: string | undefined, domain: boolean, body: { propertyId?: string; listingId?: string; requestType: ImmobilierRequestType; name: string; email: string; phone?: string; preferredDate?: string; message?: string }) =>
     request<{ lead: { id: string; status: ImmobilierLeadStatus } }>(
       domain ? '/shop-domain/immobilier/leads' : `/shop/${encodeURIComponent(slug ?? '')}/immobilier/leads`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },

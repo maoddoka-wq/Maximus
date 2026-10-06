@@ -45,6 +45,126 @@ class EcommerceTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_immobilier_annonces_permission_manages_one_property_and_keeps_private_fields_hidden(): void
+    {
+        $this->setImmobilierFeatures(['dashboard', 'biens', 'annonces']);
+        $request = $this->asActor('employee', [
+            'immobilier:menu:annonces' => ['voir', 'créer', 'modifier'],
+        ]);
+
+        $response = $request->postJson('/api/immobilier/properties?companyId=kora', [
+            'reference' => 'IMM-ANN-01',
+            'title' => 'Villa témoin',
+            'description' => 'Description publique.',
+            'publicationStatus' => 'PUBLISHED',
+            'featured' => true,
+            'propertyType' => 'VILLA',
+            'transactionType' => 'SALE',
+            'status' => 'AVAILABLE',
+            'city' => 'Dakar',
+            'price' => 45000000,
+            'address' => 'Adresse privée',
+            'internalNotes' => 'Note privée',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('property.title', 'Villa témoin')
+            ->assertJsonPath('property.publicationStatus', 'PUBLISHED')
+            ->assertJsonPath('property.address', '')
+            ->assertJsonPath('property.internalNotes', '');
+
+        $propertyId = (string) $response->json('property.id');
+
+        $request->getJson('/api/immobilier/bootstrap?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('properties.0.id', $propertyId)
+            ->assertJsonPath('properties.0.publicationStatus', 'PUBLISHED')
+            ->assertJsonPath('properties.0.address', '')
+            ->assertJsonPath('properties.0.internalNotes', '');
+
+        $request->patchJson("/api/immobilier/properties/{$propertyId}?companyId=kora", [
+            'title' => 'Villa témoin en brouillon',
+            'publicationStatus' => 'DRAFT',
+            'address' => 'Nouvelle adresse privée',
+            'internalNotes' => 'Nouvelle note privée',
+        ])
+            ->assertOk()
+            ->assertJsonPath('property.publicationStatus', 'DRAFT');
+
+        $this->assertDatabaseCount('immobilier_properties', 1);
+        $this->assertDatabaseCount('immobilier_listings', 0);
+        $this->assertDatabaseHas('immobilier_properties', [
+            'id' => $propertyId,
+            'publication_status' => 'DRAFT',
+            'address' => null,
+            'internal_notes' => null,
+        ]);
+    }
+
+    public function test_public_store_returns_only_published_immobilier_properties_without_private_fields(): void
+    {
+        Company::query()->create([
+            'id' => 'kora',
+            'name' => 'KORA',
+            'manager' => 'Responsable KORA',
+            'email' => 'kora@example.test',
+            'status' => 'ACTIF',
+            'requested_modules' => ['ecommerce', 'immobilier'],
+        ]);
+        $this->setEcommerceFeatures(['catalogue']);
+        $this->setImmobilierFeatures(['dashboard', 'biens', 'annonces', 'vitrine-publique']);
+
+        DB::table('ecommerce_stores')->insert([
+            'id' => 'store-kora',
+            'company_id' => 'kora',
+            'slug' => 'kora-immobilier',
+            'name' => 'KORA Immobilier',
+            'description' => '',
+            'status' => 'PUBLISHED',
+            'currency' => 'XOF',
+            'primary_color' => '#203040',
+            'accent_color' => '#d6a400',
+            'logo_url' => '',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        foreach ([
+            ['id' => 'property-published', 'publication_status' => 'PUBLISHED', 'publication_title' => 'Villa publiée', 'publication_slug' => 'villa-publiee'],
+            ['id' => 'property-draft', 'publication_status' => 'DRAFT', 'publication_title' => 'Villa brouillon', 'publication_slug' => 'villa-brouillon'],
+        ] as $property) {
+            DB::table('immobilier_properties')->insert([
+                ...$property,
+                'company_id' => 'kora',
+                'reference' => strtoupper($property['id']),
+                'publication_description' => 'Texte visible au public.',
+                'featured' => false,
+                'property_type' => 'VILLA',
+                'transaction_type' => 'SALE',
+                'status' => 'AVAILABLE',
+                'city' => 'Dakar',
+                'neighborhood' => 'Plateau',
+                'address' => 'Adresse privée',
+                'price' => 45000000,
+                'area_m2' => 120,
+                'bedrooms' => 3,
+                'bathrooms' => 2,
+                'furnished' => false,
+                'internal_notes' => 'Note interne',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $this->getJson('/api/shop/kora-immobilier')
+            ->assertOk()
+            ->assertJsonCount(1, 'immobilierProperties')
+            ->assertJsonPath('immobilierProperties.0.id', 'property-published')
+            ->assertJsonPath('immobilierProperties.0.title', 'Villa publiée')
+            ->assertJsonPath('immobilierProperties.0.slug', 'villa-publiee')
+            ->assertJsonMissingPath('immobilierProperties.0.address')
+            ->assertJsonMissingPath('immobilierProperties.0.internalNotes');
+    }
+
     public function test_company_profile_update_does_not_revoke_existing_pos_feature_grant(): void
     {
         $this->setEcommerceFeatures(['dashboard', 'catalogue', 'vente-comptoir']);
@@ -1780,6 +1900,24 @@ class EcommerceTest extends TestCase
             ['company_id' => 'kora', 'module_id' => 'ecommerce'],
             [
                 'id' => 'company-module-kora-ecommerce',
+                'status' => 'ACTIF',
+                'feature_ids' => json_encode($featureIds),
+                'configuration' => json_encode(['featureScope' => 'explicit']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+    }
+
+    /**
+     * @param array<int, string> $featureIds
+     */
+    private function setImmobilierFeatures(array $featureIds): void
+    {
+        DB::table('maximus_company_modules')->updateOrInsert(
+            ['company_id' => 'kora', 'module_id' => 'immobilier'],
+            [
+                'id' => 'company-module-kora-immobilier',
                 'status' => 'ACTIF',
                 'feature_ids' => json_encode($featureIds),
                 'configuration' => json_encode(['featureScope' => 'explicit']),

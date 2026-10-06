@@ -274,7 +274,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const [deliveryForm, setDeliveryForm] = useState({ requesterName: '', requesterEmail: '', requesterPhone: '', address: '', deliveryZoneId: '', serviceType: 'STANDARD' as EcommerceDeliveryServiceType, desiredDate: '', note: '' });
   const [deliverySubmitted, setDeliverySubmitted] = useState<EcommerceDeliveryRequest | null>(null);
   const [immobilierSubmitted, setImmobilierSubmitted] = useState(false);
-  const [immobilierForm, setImmobilierForm] = useState({ listingId: '', requestType: 'CONTACT' as 'CONTACT' | 'VISIT', name: '', email: '', phone: '', preferredDate: '', message: '' });
+  const [immobilierForm, setImmobilierForm] = useState({ propertyId: '', requestType: 'CONTACT' as 'CONTACT' | 'VISIT', name: '', email: '', phone: '', preferredDate: '', message: '' });
   const [profileForm, setProfileForm] = useState({ name: '', phone: '' });
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' });
   const [addressForm, setAddressForm] = useState<Omit<EcommerceCustomerAddress, 'id'>>({
@@ -327,7 +327,11 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   const isLocationRoute = routePath.endsWith('/location');
   const isTransportRoute = routePath.endsWith('/transport');
   const isDeliveryRoute = routePath.endsWith('/livraison');
-  const isImmobilierRoute = routePath.endsWith('/immobilier');
+  const isImmobilierRoute = /\/immobilier(?:\/[^/]+)?$/.test(routePath);
+  const immobilierDetailSlug = useMemo(() => {
+    const match = routePath.match(/\/immobilier\/([^/]+)$/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }, [routePath]);
   const productDetailSlug = useMemo(() => {
     const match = routePath.match(/\/produit\/([^/]+)$/);
     return match ? decodeURIComponent(match[1]) : null;
@@ -888,7 +892,7 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
             : isDeliveryRoute ? enabledFeatures.livraisons ? <DeliveryPage store={store} zones={data.deliveryZones ?? []} customer={customer} requests={customerData?.deliveryRequests ?? []} form={deliveryForm} setForm={setDeliveryForm} submitted={deliverySubmitted} onSubmit={() => void submitDeliveryRequest()} submitting={submittingDelivery} onNavigate={go} /> : <FeatureUnavailable title="Livraison non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité livraison." onBack={() => go('')} />
               : isLocationRoute ? enabledFeatures.location ? <RentalPage rentals={rentals.filter(r => !('productSlug' in r))} store={store} customer={customer} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Location non activée" text="Cette entreprise n’a pas encore autorisé la fonctionnalité location." onBack={() => go('')} />
              : isTransportRoute ? enabledFeatures.transport ? <TransportPublicPage store={store} slug={slug} domain={domain} onBack={() => go('')} /> : <FeatureUnavailable title="Transport non activé" text="Cette entreprise n’a pas encore autorisé la fonctionnalité Transport." onBack={() => go('')} />
-              : isImmobilierRoute ? enabledFeatures.immobilier ? <PublicImmobilierPage listings={data.immobilierListings ?? []} store={store} slug={slug} domain={domain} form={immobilierForm} setForm={setImmobilierForm} submitted={immobilierSubmitted} onSubmitted={setImmobilierSubmitted} /> : <FeatureUnavailable title="Immobilier non activé" text="Cette entreprise n’a pas encore autorisé la vitrine immobilière." onBack={() => go('')} />
+               : isImmobilierRoute ? enabledFeatures.immobilier ? <PublicImmobilierPage properties={data.immobilierProperties ?? data.immobilierListings ?? []} detailSlug={immobilierDetailSlug} onNavigate={go} store={store} slug={slug} domain={domain} form={immobilierForm} setForm={setImmobilierForm} submitted={immobilierSubmitted} onSubmitted={setImmobilierSubmitted} /> : <FeatureUnavailable title="Immobilier non activé" text="Cette entreprise n’a pas encore autorisé la vitrine immobilière." onBack={() => go('')} />
         : productDetailSlug ? selectedProduct ? <ProductDetail product={selectedProduct} store={store} zones={data.deliveryZones} onBack={() => go('/boutique')} onAdd={() => add(selectedProduct)} /> : <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-[hsl(var(--muted-foreground))]">Ce produit n’est plus disponible.</div>
          : isHomeRoute && !store.homepageEnabled ? null
          : isHomeRoute ? <ShopHomePage products={products} rentals={rentals} locationEnabled={enabledFeatures.location} store={store} onProduct={product => go(`/produit/${encodeURIComponent(product.slug)}`)} onAdd={add} onLocation={() => go('/location')} onShop={() => go('/boutique')} />
@@ -904,31 +908,68 @@ export default function PublicShopPage({ slug, domain = false, clientApp = false
   </div>;
 }
 
-function PublicImmobilierPage({ listings, store, slug, domain, form, setForm, submitted, onSubmitted }: {
-  listings: PublicShopBootstrap['immobilierListings'];
+function PublicImmobilierPage({ properties, detailSlug, onNavigate, store, slug, domain, form, setForm, submitted, onSubmitted }: {
+  properties: PublicShopBootstrap['immobilierListings'];
+  detailSlug: string | null;
+  onNavigate: (path: string) => void;
   store: PublicShopBootstrap['store'];
   slug?: string;
   domain: boolean;
-  form: { listingId: string; requestType: 'CONTACT' | 'VISIT'; name: string; email: string; phone: string; preferredDate: string; message: string };
-  setForm: (value: { listingId: string; requestType: 'CONTACT' | 'VISIT'; name: string; email: string; phone: string; preferredDate: string; message: string }) => void;
+  form: { propertyId: string; requestType: 'CONTACT' | 'VISIT'; name: string; email: string; phone: string; preferredDate: string; message: string };
+  setForm: (value: { propertyId: string; requestType: 'CONTACT' | 'VISIT'; name: string; email: string; phone: string; preferredDate: string; message: string }) => void;
   submitted: boolean;
   onSubmitted: (submitted: boolean) => void;
 }) {
-  const selected = listings.find(item => item.id === form.listingId);
-  const [selectedListing, setSelectedListing] = useState<PublicShopBootstrap['immobilierListings'][number] | null>(null);
+  const selectedForRequest = properties.find(item => item.id === form.propertyId);
+  const detailProperty = detailSlug ? properties.find(item => item.slug === detailSlug) ?? null : null;
   const [requestFormOpen, setRequestFormOpen] = useState(false);
-  const openRequestForm = (listingId?: string) => {
-    setForm({ ...form, listingId: listingId ?? '' });
-    setSelectedListing(null);
+  const openRequestForm = (propertyId?: string) => {
+    setForm({ ...form, propertyId: propertyId ?? '' });
     setRequestFormOpen(true);
     onSubmitted(false);
-    window.setTimeout(() => document.getElementById('immobilier-contact-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   };
+
+  useEffect(() => {
+    if (requestFormOpen) {
+      document.getElementById('immobilier-contact-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [detailSlug, requestFormOpen, form.propertyId]);
+
+  if (detailSlug) {
+    if (!detailProperty) {
+      return <section className="rounded-2xl border border-dashed p-10 text-center">
+        <p className="font-bold">Ce bien n’est plus disponible.</p>
+        <button type="button" onClick={() => onNavigate('/immobilier')} className="mt-4 rounded-lg border px-4 py-2 text-sm font-bold">Retour aux biens</button>
+      </section>;
+    }
+    return <section className="space-y-6">
+      <PublicImmobilierDetail property={detailProperty} store={store} onBack={() => onNavigate('/immobilier')} onRequest={() => openRequestForm(detailProperty.id)} />
+      {requestFormOpen && <PublicImmobilierRequestForm properties={properties} slug={slug} domain={domain} form={form} setForm={setForm} submitted={submitted} onSubmitted={onSubmitted} onClose={() => setRequestFormOpen(false)} />}
+    </section>;
+  }
+
+  return <section className="space-y-6">
+    <div className="relative overflow-hidden rounded-3xl bg-[var(--shop-primary)] p-6 text-[var(--shop-primary-foreground)] sm:p-10"><span aria-hidden="true" className="absolute inset-y-0 right-0 w-1.5 bg-[var(--shop-accent)]" /><p className="inline-flex items-center gap-2 rounded-full bg-[var(--shop-primary-foreground)]/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[.16em]">Vitrine immobilière</p><h1 className="mt-2 max-w-3xl text-2xl font-bold tracking-[-.05em] sm:mt-3 sm:text-5xl">Trouvez un bien qui correspond à votre projet.</h1><p className="mt-3 max-w-2xl text-sm leading-7 opacity-85 sm:mt-4">Consultez les biens publiés par {store.name} et échangez directement avec l’agence pour organiser une visite.</p></div>
+    {properties.length === 0 ? <ShopEmpty icon={Home} title="Aucun bien publié" text="Aucun bien immobilier n’est publié pour le moment." /> : <div className="grid grid-cols-2 gap-2 min-[480px]:gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{properties.map(property => <article key={property.id} className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-soft)]"><button type="button" data-testid={`button-open-immobilier-property-${property.id}`} onClick={() => onNavigate(`/immobilier/${encodeURIComponent(property.slug)}`)} className="text-left"><ImmobilierGallery media={property.gallery} profileMedia={property.profileMedia} title={property.title} /></button><div className="flex flex-1 flex-col p-2.5 sm:p-3"><div className="flex items-center justify-between gap-2"><span className="truncate text-[8px] font-bold uppercase tracking-[.1em] text-[var(--shop-primary)]">{property.transactionType === 'SALE' ? 'À vendre' : 'À louer'}</span>{property.featured && <span className="shrink-0 rounded bg-[var(--shop-accent)]/15 px-1 py-0.5 text-[8px] font-bold">À la une</span>}</div><button type="button" onClick={() => onNavigate(`/immobilier/${encodeURIComponent(property.slug)}`)} className="mt-1 line-clamp-2 min-h-8 text-left text-xs font-semibold leading-4 sm:text-sm">{property.title}</button><p className="mt-1 truncate text-[10px] text-[hsl(var(--muted-foreground))]">{property.neighborhood ? `${property.neighborhood}, ` : ''}{property.city}</p><p className="mt-2 text-sm font-bold leading-4 sm:text-base" style={{ color: 'var(--shop-accent)' }}>{money(property.price, store.currency)}</p><div className="mt-2 flex flex-wrap gap-1 text-[9px] font-semibold text-[hsl(var(--muted-foreground))]">{property.areaM2 && <span className="rounded bg-[hsl(var(--muted))] px-1.5 py-1">{property.areaM2} m²</span>}{property.bedrooms !== null && <span className="rounded bg-[hsl(var(--muted))] px-1.5 py-1">{property.bedrooms} ch.</span>}{property.bathrooms !== null && <span className="rounded bg-[hsl(var(--muted))] px-1.5 py-1">{property.bathrooms} sdb.</span>}</div><p className="mt-2 line-clamp-2 text-[10px] leading-4 text-[hsl(var(--muted-foreground))]">{property.description || 'Contactez l’agence pour recevoir les détails du bien.'}</p><div className="mt-auto flex gap-2 pt-3"><button type="button" onClick={() => onNavigate(`/immobilier/${encodeURIComponent(property.slug)}`)} className="flex-1 rounded-lg border px-2 py-2 text-[10px] font-bold sm:text-xs">Voir le bien</button><button type="button" data-testid={`button-request-property-${property.id}`} onClick={() => openRequestForm(property.id)} className="flex-1 rounded-lg px-2 py-2 text-[10px] font-bold text-[var(--shop-accent-foreground)] sm:text-xs" style={{ backgroundColor: 'var(--shop-accent)' }}>Demander</button></div></div></article>)}</div>}
+    {requestFormOpen && <PublicImmobilierRequestForm properties={properties} slug={slug} domain={domain} form={form} setForm={setForm} submitted={submitted} onSubmitted={onSubmitted} onClose={() => setRequestFormOpen(false)} />}
+  </section>;
+}
+
+function PublicImmobilierRequestForm({ properties, slug, domain, form, setForm, submitted, onSubmitted, onClose }: {
+  properties: PublicShopBootstrap['immobilierListings'];
+  slug?: string;
+  domain: boolean;
+  form: { propertyId: string; requestType: 'CONTACT' | 'VISIT'; name: string; email: string; phone: string; preferredDate: string; message: string };
+  setForm: (value: { propertyId: string; requestType: 'CONTACT' | 'VISIT'; name: string; email: string; phone: string; preferredDate: string; message: string }) => void;
+  submitted: boolean;
+  onSubmitted: (submitted: boolean) => void;
+  onClose: () => void;
+}) {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     try {
       await publicImmobilierApi.createLead(slug, domain, {
-        listingId: form.listingId || undefined,
+        propertyId: form.propertyId || undefined,
         requestType: form.requestType,
         name: form.name,
         email: form.email,
@@ -941,17 +982,26 @@ function PublicImmobilierPage({ listings, store, slug, domain, form, setForm, su
       showAppToast(error instanceof Error ? error.message : 'Votre demande n’a pas pu être envoyée.', 'error');
     }
   };
-  if (selectedListing) {
-    return <PublicImmobilierDetail listing={selectedListing} store={store} onBack={() => setSelectedListing(null)} onRequest={() => openRequestForm(selectedListing.id)} />;
-  }
-  return <section className="space-y-6">
-    <div className="relative overflow-hidden rounded-3xl bg-[var(--shop-primary)] p-6 text-[var(--shop-primary-foreground)] sm:p-10"><span aria-hidden="true" className="absolute inset-y-0 right-0 w-1.5 bg-[var(--shop-accent)]" /><p className="inline-flex items-center gap-2 rounded-full bg-[var(--shop-primary-foreground)]/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[.16em]">Vitrine immobilière</p><h1 className="mt-2 max-w-3xl text-2xl font-bold tracking-[-.05em] sm:mt-3 sm:text-5xl">Trouvez un bien qui correspond à votre projet.</h1><p className="mt-3 max-w-2xl text-sm leading-7 opacity-85 sm:mt-4">Consultez les annonces publiées par {store.name} et échangez directement avec l’agence pour organiser une visite.</p></div>
-      {listings.length === 0 ? <ShopEmpty icon={Home} title="Aucune annonce publiée" text="Aucune annonce immobilière n’est publiée pour le moment." /> : <div className="grid grid-cols-2 gap-2 min-[480px]:gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{listings.map(listing => <article key={listing.id} className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-soft)]"><button type="button" onClick={() => setSelectedListing(listing)} className="text-left"><ImmobilierGallery media={listing.gallery} profileMedia={listing.profileMedia} title={listing.title} /></button><div className="flex flex-1 flex-col p-2.5 sm:p-3"><div className="flex items-center justify-between gap-2"><span className="truncate text-[8px] font-bold uppercase tracking-[.1em] text-[var(--shop-primary)]">{listing.transactionType === 'SALE' ? 'À vendre' : 'À louer'}</span>{listing.featured && <span className="shrink-0 rounded bg-[var(--shop-accent)]/15 px-1 py-0.5 text-[8px] font-bold">À la une</span>}</div><button type="button" onClick={() => setSelectedListing(listing)} className="mt-1 line-clamp-2 min-h-8 text-left text-xs font-semibold leading-4 sm:text-sm">{listing.title}</button><p className="mt-1 truncate text-[10px] text-[hsl(var(--muted-foreground))]">{listing.neighborhood ? `${listing.neighborhood}, ` : ''}{listing.city}</p><p className="mt-2 text-sm font-bold leading-4 sm:text-base" style={{ color: 'var(--shop-accent)' }}>{money(listing.price, store.currency)}</p><div className="mt-2 flex flex-wrap gap-1 text-[9px] font-semibold text-[hsl(var(--muted-foreground))]">{listing.areaM2 && <span className="rounded bg-[hsl(var(--muted))] px-1.5 py-1">{listing.areaM2} m²</span>}{listing.bedrooms !== null && <span className="rounded bg-[hsl(var(--muted))] px-1.5 py-1">{listing.bedrooms} ch.</span>}{listing.bathrooms !== null && <span className="rounded bg-[hsl(var(--muted))] px-1.5 py-1">{listing.bathrooms} sdb.</span>}</div><p className="mt-2 line-clamp-2 text-[10px] leading-4 text-[hsl(var(--muted-foreground))]">{listing.description || 'Contactez l’agence pour recevoir les détails du bien.'}</p><div className="mt-auto flex gap-2 pt-3"><button type="button" onClick={() => setSelectedListing(listing)} className="flex-1 rounded-lg border px-2 py-2 text-[10px] font-bold sm:text-xs">Voir le bien</button><button type="button" data-testid={`button-request-listing-${listing.id}`} onClick={() => openRequestForm(listing.id)} className="flex-1 rounded-lg px-2 py-2 text-[10px] font-bold text-[var(--shop-accent-foreground)] sm:text-xs" style={{ backgroundColor: 'var(--shop-accent)' }}>Demander</button></div></div></article>)}</div>}
-      {requestFormOpen && <div>
-        <button type="button" data-testid="button-close-immobilier-request" onClick={() => setRequestFormOpen(false)} className="mb-2 rounded-lg border px-3 py-2 text-xs font-bold">Fermer le formulaire</button>
-        <form id="immobilier-contact-form" onSubmit={submit} className="rounded-2xl border bg-white p-5 shadow-sm sm:p-7"><h2 className="text-xl font-bold">Parler à l’agence</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Laissez vos coordonnées pour être recontacté.</p>{submitted ? <div className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">Votre demande a bien été envoyée. L’agence reviendra vers vous prochainement.</div> : <div className="mt-5 grid gap-4 md:grid-cols-2"><label className="text-xs font-bold">Annonce<select value={form.listingId} onChange={e => setForm({ ...form, listingId: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="">Demande générale</option>{listings.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><label className="text-xs font-bold">Type de demande<select value={form.requestType} onChange={e => setForm({ ...form, requestType: e.target.value as 'CONTACT' | 'VISIT' })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="CONTACT">Être rappelé</option><option value="VISIT">Demander une visite</option></select></label><label className="text-xs font-bold">Nom complet<input required minLength={2} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><label className="text-xs font-bold">Email<input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><label className="text-xs font-bold">Téléphone<input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><label className="text-xs font-bold">Date souhaitée<input type="date" value={form.preferredDate} onChange={e => setForm({ ...form, preferredDate: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label><label className="text-xs font-bold md:col-span-2">Message<textarea rows={3} value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" placeholder={selected ? `Votre question sur « ${selected.title} »` : 'Votre projet immobilier'} /></label><button type="submit" className="rounded-xl px-4 py-3 text-sm font-bold text-[var(--shop-accent-foreground)] md:col-span-2" style={{ backgroundColor: 'var(--shop-accent)' }}>Envoyer ma demande</button></div>}</form>
-      </div>}
-  </section>;
+
+  return <div>
+    <button type="button" data-testid="button-close-immobilier-request" onClick={onClose} className="mb-2 rounded-lg border px-3 py-2 text-xs font-bold">Fermer le formulaire</button>
+    <form id="immobilier-contact-form" onSubmit={submit} className="rounded-2xl border bg-white p-5 shadow-sm sm:p-7">
+      <h2 className="text-xl font-bold">Parler à l’agence</h2>
+      <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Laissez vos coordonnées pour être recontacté.</p>
+      {submitted
+        ? <div className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">Votre demande a bien été envoyée. L’agence reviendra vers vous prochainement.</div>
+        : <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <label className="text-xs font-bold">Bien<select data-testid="select-immobilier-request-property" value={form.propertyId} onChange={event => setForm({ ...form, propertyId: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="">Demande générale</option>{properties.map(property => <option key={property.id} value={property.id}>{property.title}</option>)}</select></label>
+          <label className="text-xs font-bold">Type de demande<select value={form.requestType} onChange={event => setForm({ ...form, requestType: event.target.value as 'CONTACT' | 'VISIT' })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="CONTACT">Être rappelé</option><option value="VISIT">Demander une visite</option></select></label>
+          <label className="text-xs font-bold">Nom complet<input required minLength={2} value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
+          <label className="text-xs font-bold">Email<input required type="email" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
+          <label className="text-xs font-bold">Téléphone<input value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
+          <label className="text-xs font-bold">Date souhaitée<input type="date" value={form.preferredDate} onChange={event => setForm({ ...form, preferredDate: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" /></label>
+          <label className="text-xs font-bold md:col-span-2">Message<textarea rows={3} value={form.message} onChange={event => setForm({ ...form, message: event.target.value })} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" placeholder={properties.find(property => property.id === form.propertyId) ? `Votre question sur « ${properties.find(property => property.id === form.propertyId)?.title} »` : 'Votre projet immobilier'} /></label>
+          <button type="submit" data-testid="button-submit-immobilier-request" className="rounded-xl px-4 py-3 text-sm font-bold text-[var(--shop-accent-foreground)] md:col-span-2" style={{ backgroundColor: 'var(--shop-accent)' }}>Envoyer ma demande</button>
+        </div>}
+    </form>
+  </div>;
 }
 
 function ImmobilierGallery({ media, profileMedia, title }: { media: PublicShopBootstrap['immobilierListings'][number]['gallery']; profileMedia: PublicShopBootstrap['immobilierListings'][number]['profileMedia']; title: string }) {
@@ -970,18 +1020,18 @@ function ImmobilierGallery({ media, profileMedia, title }: { media: PublicShopBo
   </div>;
 }
 
-function PublicImmobilierDetail({ listing, store, onBack, onRequest }: { listing: PublicShopBootstrap['immobilierListings'][number]; store: PublicShopBootstrap['store']; onBack: () => void; onRequest: () => void }) {
+function PublicImmobilierDetail({ property, store, onBack, onRequest }: { property: PublicShopBootstrap['immobilierListings'][number]; store: PublicShopBootstrap['store']; onBack: () => void; onRequest: () => void }) {
   return <section className="mx-auto max-w-5xl">
     <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]"><ArrowLeft size={15} />Retour aux annonces</button>
     <div className="mt-6 grid gap-6 rounded-3xl border bg-white p-5 shadow-sm sm:p-8 lg:grid-cols-[1.1fr_.9fr]">
-      <ImmobilierDetailGallery media={listing.gallery} profileMedia={listing.profileMedia} title={listing.title} />
+      <ImmobilierDetailGallery media={property.gallery} profileMedia={property.profileMedia} title={property.title} />
       <div className="flex flex-col justify-center">
-        <p className="text-xs font-bold uppercase tracking-[.16em]" style={{ color: 'var(--shop-primary)' }}>{listing.transactionType === 'SALE' ? 'À vendre' : 'À louer'} · {listing.propertyType}</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-[-.04em]">{listing.title}</h1>
-        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{listing.neighborhood ? `${listing.neighborhood}, ` : ''}{listing.city}</p>
-        <p className="mt-5 text-2xl font-bold" style={{ color: 'var(--shop-accent)' }}>{money(listing.price, store.currency)}</p>
-        <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold text-[hsl(var(--muted-foreground))]">{listing.areaM2 !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{listing.areaM2} m²</span>}{listing.bedrooms !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{listing.bedrooms} chambre(s)</span>}{listing.bathrooms !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{listing.bathrooms} salle(s) de bain</span>}{listing.furnished && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">Meublé</span>}</div>
-        <p className="mt-5 whitespace-pre-line text-sm leading-7 text-[hsl(var(--muted-foreground))]">{listing.description || 'Contactez l’agence pour recevoir les détails du bien.'}</p>
+        <p className="text-xs font-bold uppercase tracking-[.16em]" style={{ color: 'var(--shop-primary)' }}>{property.transactionType === 'SALE' ? 'À vendre' : 'À louer'} · {property.propertyType}</p>
+        <h1 className="mt-3 text-3xl font-bold tracking-[-.04em]">{property.title}</h1>
+        <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{property.neighborhood ? `${property.neighborhood}, ` : ''}{property.city}</p>
+        <p className="mt-5 text-2xl font-bold" style={{ color: 'var(--shop-accent)' }}>{money(property.price, store.currency)}</p>
+        <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold text-[hsl(var(--muted-foreground))]">{property.areaM2 !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{property.areaM2} m²</span>}{property.bedrooms !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{property.bedrooms} chambre(s)</span>}{property.bathrooms !== null && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">{property.bathrooms} salle(s) de bain</span>}{property.furnished && <span className="rounded-lg bg-[hsl(var(--muted))] px-2.5 py-1.5">Meublé</span>}</div>
+        <p className="mt-5 whitespace-pre-line text-sm leading-7 text-[hsl(var(--muted-foreground))]">{property.description || 'Contactez l’agence pour recevoir les détails du bien.'}</p>
          <button type="button" data-testid="button-request-listing-detail" onClick={onRequest} className="mt-6 rounded-xl px-4 py-3 text-sm font-bold text-[var(--shop-accent-foreground)]" style={{ backgroundColor: 'var(--shop-accent)' }}>Demander des informations</button>
       </div>
     </div>

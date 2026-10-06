@@ -1308,10 +1308,11 @@ class EcommerceController extends Controller
                 ->orderBy('name')
                 ->get()
             : collect();
-        $publishedImmobilierListings = $features['immobilier']
-            ? DB::table('immobilier_listings')
+        $publishedImmobilierProperties = $features['immobilier']
+            ? DB::table('immobilier_properties')
                 ->where('company_id', $company)
-                ->where('status', 'PUBLISHED')
+                ->where('publication_status', 'PUBLISHED')
+                ->where('status', '!=', 'ARCHIVED')
                 ->orderByDesc('featured')
                 ->orderByDesc('updated_at')
                 ->get()
@@ -1330,6 +1331,9 @@ class EcommerceController extends Controller
             ])->all(),
         ];
         $galleryMap = $this->publicGalleryMap($company, $galleryOwners);
+        $publicImmobilierProperties = $publishedImmobilierProperties
+            ->map(fn ($row) => $this->publicImmobilierProperty($row, $company))
+            ->values();
 
         return response()->json([
             'store' => $this->publicStorePayload($store, $features, $galleryMap),
@@ -1349,20 +1353,44 @@ class EcommerceController extends Controller
                     )
                     ->values()
                 : collect(),
-            'immobilierListings' => $publishedImmobilierListings
-                ->map(fn ($row) => $this->publicImmobilierListing($row, $company))
-                ->values(),
+            'immobilierProperties' => $publicImmobilierProperties,
+            // Keep the old response key during the transition for clients that
+            // have not yet moved from separate Bien and Annonce records.
+            'immobilierListings' => $publicImmobilierProperties,
             'deliveryZones' => $this->publicDeliveryZones($company, $features),
         ])->getData(true);
     }
 
-    private function publicImmobilierListing(object $row, string $company): array
+    private function publicImmobilierProperty(object $row, string $company): array
     {
+        $legacyListingIds = DB::table('immobilier_listings')
+            ->where('company_id', $company)
+            ->where('property_id', (string) $row->id)
+            ->where('status', '!=', 'ARCHIVED')
+            ->orderByRaw("CASE WHEN status = 'PUBLISHED' THEN 0 ELSE 1 END")
+            ->orderByDesc('updated_at')
+            ->pluck('id')
+            ->map(fn ($id): string => (string) $id)
+            ->all();
+
         $gallery = DB::table('ecommerce_gallery_images')
             ->where('company_id', $company)
-            ->where('owner_type', 'immobilier_listing')
-            ->where('owner_id', (string) $row->id)
             ->where('collection', 'gallery')
+            ->where(function ($query) use ($row, $legacyListingIds): void {
+                $query->where(function ($propertyQuery) use ($row): void {
+                    $propertyQuery
+                        ->where('owner_type', 'immobilier_property')
+                        ->where('owner_id', (string) $row->id);
+                });
+                if ($legacyListingIds !== []) {
+                    $query->orWhere(function ($listingQuery) use ($legacyListingIds): void {
+                        $listingQuery
+                            ->where('owner_type', 'immobilier_listing')
+                            ->whereIn('owner_id', $legacyListingIds);
+                    });
+                }
+            })
+            ->orderByRaw("CASE WHEN owner_type = 'immobilier_property' THEN 0 ELSE 1 END")
             ->orderBy('sort_order')
             ->orderBy('created_at')
             ->get(['id', 'image_mime'])
@@ -1377,11 +1405,11 @@ class EcommerceController extends Controller
 
         return [
             'id' => $row->id,
-            'slug' => $row->slug,
-            'title' => $row->title,
+            'slug' => $row->publication_slug,
+            'title' => $row->publication_title ?: $row->reference,
             'propertyType' => $row->property_type,
             'transactionType' => $row->transaction_type,
-            'description' => $row->description ?? '',
+            'description' => $row->publication_description ?? '',
             'city' => $row->city,
             'neighborhood' => $row->neighborhood ?? '',
             'price' => (int) $row->price,
