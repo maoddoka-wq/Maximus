@@ -9,7 +9,7 @@
 - **Identité :** conserver les couleurs, polices et le logo local existants. Les images sont des illustrations générées, pas des captures de l’interface MAXIMUS.
 - **Mouvement :** illustrations photoréalistes recadrées lentement; cartes explicatives qui apparaissent une à une, puis restent fixes. Aucun texte qui défile en continu.
 - **Arc :** promesse immédiate, sept démonstrations lisibles, puis synthèse des choix par entreprise et des accès par rôle.
-- **Son :** voix off fournie dans `attached_assets/vo_04_eve_1791249362103.mp3`, posée dès 00.00 sans accélération ni ralentissement et avec ses pauses naturelles. Elle est pré-mixée avec l’instrumental dans `public/audio/composite_audio.mp3`; la musique baisse dynamiquement pendant la parole puis continue seule jusqu’à la fin du film. Aucun bruitage.
+- **Son :** voix off fournie dans `attached_assets/vo_04_eve_1791249362103.mp3`, posée dès 00.00 sans accélération ni ralentissement et avec ses pauses naturelles. À partir du début de Stock (23,5 s), elle reçoit 1 s de décalage fixe pour suivre le défilement. Elle est pré-mixée avec l’instrumental dans `public/audio/composite_audio.mp3`; la musique baisse dynamiquement pendant la parole puis continue seule jusqu’à la fin du film. Aucun bruitage.
 
 ## Rythme global
 

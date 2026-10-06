@@ -10,6 +10,8 @@ VIDEO="$ARTIFACT_DIR/public/exports/MAXIMUS-ERP-vertical-80s.mp4"
 ARCHIVE="$ARTIFACT_DIR/archive/MAXIMUS-ERP-vertical-80s-instrumental-only.mp4"
 MIX_TEMP="${MIX%.mp3}.tmp.mp3"
 VIDEO_TEMP="${VIDEO%.mp4}.tmp.mp4"
+STOCK_START_SECONDS=23.5
+STOCK_SYNC_DELAY_MS=1000
 
 for input in "$VOICE" "$MUSIC" "$VIDEO"; do
   if [[ ! -f "$input" ]]; then
@@ -36,7 +38,10 @@ ffmpeg -hide_banner -loglevel warning -y \
   -i "$VOICE" \
   -filter_complex \
   "[0:a]aresample=48000,asetpts=PTS-STARTPTS,volume=-2dB,apad=whole_dur=80.5,atrim=duration=80.5[bed]; \
-   [1:a]aresample=48000,asetpts=PTS-STARTPTS,loudnorm=I=-17:TP=-2:LRA=7,apad=whole_dur=80.5,atrim=duration=80.5,asplit=2[sidechain][speech]; \
+   [1:a]aresample=48000,asetpts=PTS-STARTPTS,loudnorm=I=-17:TP=-2:LRA=7,pan=stereo|c0=c0|c1=c0,asplit=2[voiceBefore][voiceAfter]; \
+   [voiceBefore]atrim=end=${STOCK_START_SECONDS},asetpts=PTS-STARTPTS[before]; \
+   [voiceAfter]atrim=start=${STOCK_START_SECONDS},asetpts=PTS-STARTPTS,adelay=${STOCK_SYNC_DELAY_MS}|${STOCK_SYNC_DELAY_MS},asetpts=PTS+${STOCK_START_SECONDS}/TB[after]; \
+   [before][after]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,apad=whole_dur=80.5,atrim=duration=80.5,asplit=2[sidechain][speech]; \
    [bed][sidechain]sidechaincompress=threshold=0.05:ratio=6:attack=20:release=350:makeup=1[ducked]; \
    [ducked][speech]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95:attack=5:release=50[out]" \
   -map "[out]" -t 80.5 -c:a libmp3lame -b:a 192k -ar 48000 -ac 2 \
