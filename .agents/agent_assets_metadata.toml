@@ -448,3 +448,17 @@ mtime_ms = 1791244200424
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/82645ecd-294f-4cea-b0ce-eb691967c771/5121da00-a356-426f-8eea-2598b1810581"
 storage_version_token = "1791244379892788"
 content_type = "video/mp4"
+
+[[outputs]]
+id = "okAY5MCvitnRFT49VDM6n"
+uri = "file://artifacts/maximus-erp-promo/public/exports/MAXIMUS-ERP-vertical-80s.mp4"
+type = "video"
+title = "MAXIMUS ERP — film vertical 80,5 s"
+description = "Export MP4 vertical 1080 × 1920, 24 i/s, H.264 avec une piste AAC issue de l’instrumental préparé."
+logical_id = "574dc8a8-e295-4e44-8266-fe388fa18507"
+content_hash = "sha256:0c0832b2ca37bca755b21a3b54b62fc6767ee0861a60f4a7c5b598e014d12076"
+size = 10459609
+mtime_ms = 1791247583923
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:c3ad13b5-ce8d-4bc4-95f0-ec0343221d71/574dc8a8-e295-4e44-8266-fe388fa18507/a2790006-71be-4377-b870-ee5b873ba715"
+storage_version_token = "1791247729119605"
+content_type = "video/mp4"

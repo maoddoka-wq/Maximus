@@ -1,0 +1,39 @@
+.module-photo {
+  position: absolute;
+  z-index: 2;
+  top: 28%;
+  left: 7%;
+  right: 7%;
+  height: 27%;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 46%, transparent);
+  border-radius: 2.2vmin;
+  background: var(--color-secondary);
+  box-shadow: 0 1.2vmin 3vmin color-mix(in srgb, var(--color-bg-dark) 24%, transparent);
+}
+
+.module-photo > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  will-change: transform;
+}
+
+.module-photo > figcaption {
+  position: absolute;
+  right: 1.6vmin;
+  bottom: 1.4vmin;
+  padding: 0.75vmin 1.3vmin;
+  border: 1px solid color-mix(in srgb, var(--color-text-inverse) 22%, transparent);
+  border-radius: 999px;
+  color: var(--color-text-inverse);
+  background: color-mix(in srgb, var(--color-bg-dark) 74%, transparent);
+  font-family: var(--font-mono);
+  font-size: clamp(9px, 1.75vmin, 16px);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  line-height: 1;
+}
