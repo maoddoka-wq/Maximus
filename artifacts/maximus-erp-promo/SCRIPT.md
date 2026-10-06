@@ -2,12 +2,12 @@
 
 ## Traitement
 
-- **Promesse :** expliquer ce que chaque module permet de gérer et montrer des écrans réels de MAXIMUS, sans narration ni fonctions inventées.
+- **Promesse :** expliquer ce que chaque module permet de gérer à l’aide de photos réelles des métiers, sans narration ni fonctions inventées.
 - **Public :** dirigeants et responsables d’entreprise.
 - **Format et durée :** vertical 9:16, 80,5 secondes : ouverture 3,5 s, sept modules de 10 s chacun, conclusion 7 s.
 - **Différence à expliquer :** l’entreprise choisit les modules et fonctions qui lui sont utiles; les accès sont définis par rôle; plusieurs activités sont réunies dans un espace de travail commun. Ne pas prétendre que MAXIMUS est supérieur à chaque concurrent sans preuve.
-- **Identité :** conserver les couleurs, polices et le logo local existants. Les captures d’écran viennent de l’ERP MAXIMUS; masquer les données personnelles ou confidentielles avant leur intégration.
-- **Mouvement :** captures réelles encadrées comme des surfaces de travail; recadrages lents et contrôlés; cartes explicatives qui apparaissent une à une, puis restent fixes. Aucun texte qui défile en continu.
+- **Identité :** conserver les couleurs, polices et le logo local existants. Les photographies montrent les métiers, pas l’interface de MAXIMUS.
+- **Mouvement :** photographies plein cadre recadrées lentement; cartes explicatives qui apparaissent une à une, puis restent fixes. Aucun texte qui défile en continu.
 - **Arc :** promesse immédiate, sept démonstrations lisibles, puis synthèse des choix par entreprise et des accès par rôle.
 - **Son :** musique instrumentale légère uniquement. Aucune voix, aucun bruitage. Étendre la piste instrumentale à 80,5 s avec une jonction douce; ne pas la relancer en boucle à l’intérieur du film.
 
@@ -42,56 +42,56 @@ Les scènes sont contiguës; leur somme est de 80,5 secondes. Chaque écran rée
 
 - **Intention :** expliquer le suivi des clients, produits, ventes, documents commerciaux, achats et caisse.
 - **Texte exact :** `GESTION COMMERCIALE`; `CLIENTS & PRODUITS — Fiches, contacts et références.`; `VENTES & FACTURES — Transactions, factures et reçus.`; `ACHATS & CAISSE — Fournisseurs, dépenses et encaissements.`
-- **Illustration réelle :** capture de l’écran MAXIMUS Gestion commerciale. N’afficher aucune donnée personnelle ou transaction réelle identifiable.
-- **Chorégraphie :** 03.50–04.40, la capture se révèle dans un cadre net; 04.40–06.50, léger recadrage sur les commandes du module; 06.50–08.10, les trois cartes apparaissent une par une, espacées et sans déplacement latéral rapide; 08.10–13.50, capture et cartes restent fixes pour lecture.
+- **Illustration réelle :** photo d’un commerce de proximité accueillant un client, sans marque lisible.
+- **Chorégraphie :** 03.50–04.20, la photo se révèle; 04.20–08.10, recadrage photographique lent et apparition des trois cartes à 03.95, 04.63 et 05.31; 05.77–13.50, photo et cartes restent stables pour lecture.
 - **Transition :** un reçu de la capture se transforme graphiquement en commande e-commerce; pas de texte qui défile.
 
 ### Plan 03 — E-commerce — 13.50 à 23.50
 
 - **Intention :** montrer la boutique, le catalogue, les commandes et leur livraison, sans présenter Promotions comme opérationnel.
 - **Texte exact :** `E-COMMERCE`; `BOUTIQUE & CATALOGUE — Présentez vos produits en ligne.`; `COMMANDES — Suivez clients, articles et paiements.`; `LIVRAISONS — De la vente jusqu’à la remise au client.`
-- **Illustration réelle :** capture de la boutique ou du panneau E-commerce MAXIMUS, avec données de démonstration non sensibles; exclure l’écran Promotions.
-- **Chorégraphie :** 13.50–14.50, le cadre s’ouvre sur la capture; 14.50–16.50, le catalogue est mis en évidence par un recadrage lent; 16.50–18.10, les cartes entrent une par une; 18.10–23.50, arrêt du mouvement et maintien pour lecture.
+- **Illustration réelle :** photo d’un vendeur préparant une commande de boutique en ligne, sans marque ni adresse visible.
+- **Chorégraphie :** 13.50–14.20, la photo se révèle; 14.20–18.10, mouvement de caméra lent et apparition des cartes à 13.95, 14.63 et 15.31; 15.77–23.50, photo et cartes restent stables. Ne montrer aucun écran Promotions.
 - **Transition :** le contour d’une commande devient le bord d’un casier de stock.
 
 ### Plan 04 — Gestion de stock — 23.50 à 33.50
 
 - **Intention :** rendre visibles les articles, mouvements et inventaires, sans inventer de quantité.
 - **Texte exact :** `GESTION DE STOCK`; `ARTICLES — Références, quantités et seuils.`; `MOUVEMENTS — Réceptions, sorties et transferts.`; `INVENTAIRES — Comptez et vérifiez les écarts terrain.`
-- **Illustration réelle :** capture de l’écran MAXIMUS Gestion de stock, avec montants ou quantités confidentiels masqués.
-- **Chorégraphie :** 23.50–24.50, révélation du tableau réel; 24.50–26.50, recadrage lent sur une liste ou un mouvement; 26.50–28.10, entrée successive des cartes; 28.10–33.50, composition stable et lecture.
+- **Illustration réelle :** photo réelle d’un employé vérifiant des cartons et scannant un code-barres en entrepôt.
+- **Chorégraphie :** 23.50–24.20, la photo se révèle; 24.20–28.10, recadrage lent et apparition des cartes à 23.95, 24.63 et 25.31; 25.77–33.50, photo et cartes restent stables pour lecture.
 - **Transition :** une ligne de mouvement se prolonge en tracé routier.
 
 ### Plan 05 — Transport — 33.50 à 43.50
 
 - **Intention :** présenter le cycle des courses Taxi, la gestion des chauffeurs et le parc de véhicules.
 - **Texte exact :** `TRANSPORT`; `COURSES TAXI — Demandes et étapes de course.`; `CHAUFFEURS — Disponibilités et affectations.`; `VÉHICULES — Gérez le parc lié à votre activité.`
-- **Illustration réelle :** capture du module Transport MAXIMUS; masquer coordonnées, téléphones et lieux privés.
-- **Chorégraphie :** 33.50–34.50, la capture arrive dans le cadre; 34.50–36.50, zoom lent sur le suivi des courses; 36.50–38.10, les cartes apparaissent l’une après l’autre; 38.10–43.50, maintien stable pour lecture.
+- **Illustration réelle :** photo réelle d’un taxi et de son chauffeur en service, sans logo commercial visible.
+- **Chorégraphie :** 33.50–34.20, la photo se révèle; 34.20–38.10, zoom photographique lent et apparition des cartes à 33.95, 34.63 et 35.31; 35.77–43.50, photo et cartes restent stables.
 - **Transition :** le marqueur d’arrivée devient une fenêtre de plan immobilier.
 
 ### Plan 06 — Immobilier — 43.50 à 53.50
 
 - **Intention :** différencier la gestion des biens de leur publication et du suivi des prospects.
 - **Texte exact :** `IMMOBILIER`; `BIENS — Gérez le patrimoine de l’agence.`; `ANNONCES — Publiez des biens sélectionnés.`; `PROSPECTS & VISITES — Traitez les contacts et demandes reçus.`
-- **Illustration réelle :** capture des écrans Biens ou Annonces MAXIMUS; données de propriétaire, adresse et contact masquées.
-- **Chorégraphie :** 43.50–44.50, apparition de l’écran réel; 44.50–46.50, recadrage lent sur un bien ou une annonce; 46.50–48.10, cartes explicatives révélées une à une; 48.10–53.50, capture maintenue sans défilement.
+- **Illustration réelle :** photo réelle d’un agent présentant un logement à des visiteurs; aucune adresse ni identité lisible.
+- **Chorégraphie :** 43.50–44.20, la photo se révèle; 44.20–48.10, panoramique photographique lent et apparition des cartes à 43.95, 44.63 et 45.31; 45.77–53.50, photo et cartes restent fixes pour lecture.
 - **Transition :** une fenêtre de la capture devient un repère d’équipe.
 
 ### Plan 07 — Présences — 53.50 à 63.50
 
 - **Intention :** montrer le pointage, les absences, congés et outils de suivi de l’équipe.
 - **Texte exact :** `PRÉSENCES`; `POINTAGE PAR QR — Chaque employé pointe avec son compte.`; `ABSENCES & CONGÉS — Saisissez et suivez les demandes.`; `HORAIRES & RAPPORTS — Organisez les horaires et consultez les suivis.`
-- **Illustration réelle :** capture du module Présences MAXIMUS; identités et horaires privés masqués.
-- **Chorégraphie :** 53.50–54.50, capture révélée; 54.50–56.50, mise en évidence lente du pointage ou du suivi; 56.50–58.10, les cartes apparaissent une à une; 58.10–63.50, cadre figé pour lecture.
+- **Illustration réelle :** photo réelle d’un employé pointant à son arrivée dans un lieu de travail; écran du téléphone illisible.
+- **Chorégraphie :** 53.50–54.20, la photo se révèle; 54.20–58.10, zoom lent et apparition des cartes à 53.95, 54.63 et 55.31; 55.77–63.50, photo et cartes restent fixes.
 - **Transition :** la ligne de temps se prolonge dans la fiche de paie.
 
 ### Plan 08 — Paie — 63.50 à 73.50
 
 - **Intention :** décrire les bénéficiaires, la préparation et le suivi sans promettre de connexion bancaire ou de versement automatique.
 - **Texte exact :** `PAIE`; `BÉNÉFICIAIRES — Gérez les personnes concernées.`; `PRÉPARER UNE PAIE — Préparez puis validez le traitement.`; `VIREMENTS & HISTORIQUE — Suivez les opérations et leur état.`
-- **Illustration réelle :** capture du module Paie MAXIMUS avec noms, montants, comptes et informations confidentielles masqués.
-- **Chorégraphie :** 63.50–64.50, capture dévoilée; 64.50–66.50, recadrage lent sur la préparation ou l’historique; 66.50–68.10, cartes révélées une à une; 68.10–73.50, arrêt du mouvement et maintien lisible.
+- **Illustration réelle :** photo réelle d’une responsable préparant des documents de paie au bureau; noms, montants et comptes absents de l’image.
+- **Chorégraphie :** 63.50–64.20, la photo se révèle; 64.20–68.10, recadrage lent et apparition des cartes à 63.95, 64.63 et 65.31; 65.77–73.50, photo et cartes restent fixes pour lecture.
 - **Transition :** les trois repères des cartes rejoignent l’écran de conclusion.
 
 ### Plan 09 — Conclusion — 73.50 à 80.50
@@ -107,6 +107,6 @@ Les scènes sont contiguës; leur somme est de 80,5 secondes. Chaque écran rée
 
 - Les sept modules montrés sont Gestion commerciale, E-commerce, Gestion de stock, Transport, Immobilier, Présences et Paie.
 - Aucune promotion n’est décrite comme disponible; aucun transfert bancaire automatique n’est promis.
-- Les captures sont issues des vrais écrans MAXIMUS; masquer les données privées avant export.
+- Les photographies sont de vrais visuels métiers, pas des captures ni des écrans MAXIMUS.
 - Les cartes apparaissent lentement, ne défilent pas, et restent affichées plusieurs secondes.
 - Vérifier une durée totale de 80,5 s, une piste musicale instrumentale seule, le rendu des neuf plans, les captures réelles, la boucle et le MP4 final.
