@@ -10,3 +10,9 @@ La valeur globale vient du catalogue d’inscription. `InstallationProfile.regis
 **Why:** Fermer le parcours automatique ne doit pas supprimer le parcours manuel, et la configuration d’un point d’entrée ne doit pas écraser le réglage global.
 
 **How to apply:** Combiner la valeur explicite du catalogue avec la restriction d’installation sans leur faire partager une source d’état. Si le catalogue est encore inconnu ou indisponible, masquer le parcours IA; conserver le formulaire manuel et ne pas réinitialiser les entreprises existantes.
+
+Quand une inscription publique depuis l’accueil choisit un secteur, envoyer la demande avec la configuration publiée de ce secteur, sans afficher l’étape de choix manuel des modules et fonctionnalités; présenter ensuite l’état « Votre demande est en attente ». Sans secteur, conserver la configuration manuelle existante.
+
+**Why:** L’utilisateur veut que MAXIMUS examine les demandes sectorielles avant que le client configure les modules et fonctionnalités.
+
+**How to apply:** Limiter ce raccourci au formulaire public d’inscription; garder la création depuis l’administration séparée et conserver les modules, packs, fonctionnalités et permissions définis par le secteur publié dans la demande.

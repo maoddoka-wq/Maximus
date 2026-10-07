@@ -2111,6 +2111,73 @@ function Signup({
   const orderedModules = [...publishedModules].sort(
     (left, right) => Number(selectedModuleSet.has(right.id)) - Number(selectedModuleSet.has(left.id)),
   );
+  const submitSignupRequest = async () => {
+    if (submitting) return;
+    if (selectedModules.length === 0) {
+      setModuleError('Le secteur doit proposer au moins un module pour envoyer la demande.');
+      return;
+    }
+    for (const moduleId of selectedModules) {
+      const module = configuredModule(moduleId);
+      const error = module
+        ? getModulePackError(module, selectedModulePackIds[moduleId] ?? [])
+        : `Le module « ${moduleId} » n’est plus publié.`;
+      if (error) {
+        setModuleError(error);
+        return;
+      }
+    }
+    const requestedModuleFeatures = Object.fromEntries(
+      selectedModules.map((moduleId) => {
+        const module = configuredModule(moduleId);
+        return [
+          moduleId,
+          module
+            ? normalizeFeatureIdsForSelectedPacks(
+                module,
+                selectedModuleFeatures[moduleId] ?? [],
+                selectedModulePackIds[moduleId] ?? [],
+              )
+            : [],
+        ];
+      }),
+    ) as Partial<Record<ModuleId, string[]>>;
+    const requestedModulePermissions = Object.fromEntries(
+      selectedModules.map((moduleId) => [
+        moduleId,
+        defaultFeaturePermissions(
+          requestedModuleFeatures[moduleId] ?? [],
+          selectedModulePermissions[moduleId],
+        ),
+      ]),
+    ) as Partial<Record<ModuleId, FeaturePermissionMap>>;
+
+    setSubmitting(true);
+    setSubmitError('');
+    setModuleError('');
+    try {
+      await companyRequestApi.create({
+        name: name.trim(),
+        manager: manager.trim(),
+        email: email.trim(),
+        password,
+        phone: phone.trim(),
+        country: country.trim(),
+        sector: sector.trim(),
+        requestedModules: selectedModules,
+        requestedModulePackIds: Object.fromEntries(
+          Object.entries(selectedModulePackIds).filter(([, packIds]) => (packIds ?? []).length),
+        ),
+        requestedModuleFeatures,
+        requestedModulePermissions,
+      });
+      setSubmitted(true);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'La demande n’a pas pu être enregistrée.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
   if (submitted) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] p-6">
@@ -2119,10 +2186,13 @@ function Signup({
             <Check size={25} />
           </span>
           <p className="mono mt-6 text-[10px] uppercase tracking-[.2em] text-[hsl(var(--primary))]">Demande envoyée</p>
-          <h1 className="mt-3 text-3xl font-bold tracking-[-.04em]">Votre entreprise est en attente de validation.</h1>
+          <h1 className="mt-3 text-3xl font-bold tracking-[-.04em]">
+            {sector.trim() ? 'Votre demande est en attente.' : 'Votre entreprise est en attente de validation.'}
+          </h1>
           <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-            Votre demande est en cours d’examen par l’administration MAXIMUS. Vous pourrez configurer votre organisation
-            depuis votre espace après activation.
+            {sector.trim()
+              ? 'L’administration MAXIMUS examine votre demande. Les modules du secteur choisi seront configurés après validation.'
+              : 'Votre demande est en cours d’examen par l’administration MAXIMUS. Vous pourrez configurer votre organisation depuis votre espace après activation.'}
           </p>
           <button
             data-testid="button-back-after-signup"
@@ -2155,8 +2225,8 @@ function Signup({
           </p>
           <h1 className="mt-3 text-3xl font-bold leading-tight tracking-[-.05em] sm:text-4xl">Commencez avec une base claire.</h1>
           <p className="mt-3 text-[hsl(var(--muted-foreground))]">
-            Renseignez votre entreprise et choisissez les fonctionnalités dont vous avez besoin. L’organisation pourra
-            être construite après l’activation de votre espace.
+            Choisissez un secteur pour envoyer directement votre demande à MAXIMUS. Sans secteur, vous pourrez configurer
+            manuellement les modules et fonctionnalités.
           </p>
           {intelligentRegistrationEnabled ? (
             <button
@@ -2176,13 +2246,21 @@ function Signup({
         <div className="min-w-0">
         <div className="mb-10 flex items-center gap-3">
           <Step n={1} label="Votre entreprise" active={step === 1} done={step > 1} />
-          <div className="h-px flex-1 bg-[hsl(var(--border))]" />
-          <Step n={2} label="Fonctionnalités" active={step === 2} done={false} />
+          {!sector.trim() && (
+            <>
+              <div className="h-px flex-1 bg-[hsl(var(--border))]" />
+              <Step n={2} label="Fonctionnalités" active={step === 2} done={false} />
+            </>
+          )}
         </div>
         {step === 1 ? (
           <form
             onSubmit={(event) => {
               event.preventDefault();
+              if (sector.trim()) {
+                void submitSignupRequest();
+                return;
+              }
               setStep(2);
             }}
             className="card-surface rounded-2xl p-6 sm:p-8"
@@ -2240,7 +2318,9 @@ function Signup({
                   ))}
                 </select>
                 <span className="mt-1 block text-[10px] font-normal leading-4 text-[hsl(var(--muted-foreground))]">
-                  Ce choix détermine les modules proposés au démarrage.
+                  {sector
+                    ? 'Le secteur sera transmis à MAXIMUS; les modules seront configurés après validation.'
+                    : 'Choisissez un secteur ou laissez ce champ vide pour configurer les modules manuellement.'}
                 </span>
               </label>
               <Field
@@ -2268,13 +2348,24 @@ function Signup({
             <p className="mt-4 rounded-lg bg-[hsl(var(--muted))] p-3 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
               Ce mot de passe servira à l’administrateur de l’entreprise après validation de votre demande.
             </p>
+              {sector && moduleError && (
+                <p role="alert" className="mt-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">
+                  {moduleError}
+                </p>
+              )}
+              {submitError && (
+                <p role="alert" className="mt-4 rounded-lg bg-[hsl(var(--destructive)/.08)] px-3 py-2 text-xs font-semibold text-[hsl(var(--destructive))]">
+                  {submitError}
+                </p>
+              )}
             <button
               type="submit"
-              disabled={!name || !manager || !email || password.length < 8 || password !== passwordConfirm}
+                disabled={!name || !manager || !email || password.length < 8 || password !== passwordConfirm || submitting}
               data-testid="button-next-signup"
               className="btn mt-8 flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Continuer <ChevronRight size={16} />
+                {sector ? (submitting ? 'Envoi…' : 'Envoyer la demande') : 'Continuer'}
+                {sector ? <Check size={16} /> : <ChevronRight size={16} />}
             </button>
           </form>
         ) : (
@@ -2517,59 +2608,9 @@ function Signup({
                  </p>
                )}
                <button
-                  disabled={selectedModules.length === 0}
+                  disabled={selectedModules.length === 0 || submitting}
                 data-testid="button-submit-signup"
-                 onClick={() => {
-                   if (submitting) return;
-                    for (const moduleId of selectedModules) {
-                      const module = configuredModule(moduleId);
-                      const error = module ? getModulePackError(module, selectedModulePackIds[moduleId] ?? []) : `Le module « ${moduleId} » n’est plus publié.`;
-                      if (error) {
-                        setModuleError(error);
-                        return;
-                      }
-                    }
-                  const requestedModuleFeatures = Object.fromEntries(
-                    selectedModules.map((moduleId) => {
-                      const module = configuredModule(moduleId);
-                      return [
-                        moduleId,
-                        module ? normalizeFeatureIdsForSelectedPacks(module, selectedModuleFeatures[moduleId] ?? [], selectedModulePackIds[moduleId] ?? []) : [],
-                      ];
-                    }),
-                  ) as Partial<Record<ModuleId, string[]>>;
-                  const requestedModulePermissions = Object.fromEntries(
-                    selectedModules.map((moduleId) => [
-                      moduleId,
-                      defaultFeaturePermissions(
-                        requestedModuleFeatures[moduleId] ?? [],
-                        selectedModulePermissions[moduleId],
-                      ),
-                    ]),
-                  ) as Partial<Record<ModuleId, FeaturePermissionMap>>;
-                   setSubmitting(true);
-                   setSubmitError('');
-                   void companyRequestApi.create({
-                     name: name.trim(),
-                     manager: manager.trim(),
-                     email: email.trim(),
-                     password,
-                      phone: phone.trim(),
-                      country: country.trim(),
-                     sector: sector.trim(),
-                     requestedModules: selectedModules,
-                     requestedModulePackIds: Object.fromEntries(
-                       Object.entries(selectedModulePackIds).filter(([, packIds]) => (packIds ?? []).length),
-                     ),
-                     requestedModuleFeatures,
-                     requestedModulePermissions,
-                   })
-                     .then(() => setSubmitted(true))
-                     .catch((error) => {
-                       setSubmitError(error instanceof Error ? error.message : 'La demande n’a pas pu être enregistrée.');
-                     })
-                     .finally(() => setSubmitting(false));
-                }}
+                  onClick={() => void submitSignupRequest()}
                  aria-busy={submitting}
                 className="btn flex items-center gap-2 rounded-lg bg-[hsl(var(--primary))] px-5 py-3 text-sm font-bold text-[hsl(var(--primary-foreground))]"
               >
