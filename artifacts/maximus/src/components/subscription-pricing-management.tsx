@@ -50,8 +50,8 @@ export function SubscriptionPricingManagement({
 
   useEffect(() => {
     let cancelled = false;
-    const load = async (showLoading: boolean) => {
-      if (showLoading) setLoading(true);
+    const load = async () => {
+      setLoading(true);
       try {
         const result = await loadSubscriptionBilling();
         if (cancelled) return;
@@ -68,17 +68,13 @@ export function SubscriptionPricingManagement({
         onActiveSubscriptionAvailabilityChange?.(null);
         setLoadError(error instanceof Error ? error.message : 'La grille tarifaire est indisponible.');
       } finally {
-        if (!cancelled && showLoading) setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    void load(true);
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void load(false);
-    }, 30_000);
+    void load();
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
     };
   }, [fallbackModules, onActiveSubscriptionAvailabilityChange, retry]);
 

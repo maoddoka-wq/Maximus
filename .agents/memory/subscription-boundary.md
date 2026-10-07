@@ -20,3 +20,9 @@ Les souscriptions et factures des entreprises supprimées ou archivées restent 
 **Pourquoi :** la suppression d’une entreprise révoque son accès, sans effacer les traces financières qui peuvent être nécessaires à la réconciliation.
 
 **Comment appliquer :** filtrer les vues et totaux selon les entreprises encore visibles; ne pas supprimer les souscriptions ou factures historiques lors de l’archivage.
+
+La grille de tarifs des modules et d’ajustement par entreprise dans les abonnements généraux MAXIMUS se charge à l’ouverture, après un enregistrement et après une relance manuelle; elle ne doit pas être rafraîchie en arrière-plan.
+
+**Pourquoi :** l’utilisateur a choisi de supprimer l’actualisation automatique répétée de cette grille.
+
+**Comment appliquer :** conserver le chargement initial, les rechargements après les mutations réussies et le bouton « Réessayer »; ne pas ajouter de minuteur ni de rafraîchissement au retour du focus.
