@@ -5,6 +5,7 @@ import {
   normalizePayrollPermissionMap,
   payrollFeatureDefinitions,
 } from './payroll-features';
+import { amicaleFeatureDefinitions, amicaleFeaturePacks } from './amicales-features';
 import type { ModuleId } from './module-ids';
 import type { CompanyWorkspaceFeatureId } from './company-workspace-features';
 import { buildSubscriptionForCompany, type CompanySubscription } from './subscription-model';
@@ -205,6 +206,14 @@ export const modules: Module[] = [
       { id: 'immobilier-manager', name: 'Manager immobilier', description: 'Superviser l’activité immobilière et les performances de l’équipe.', featureIds: ['dashboard', 'biens', 'annonces', 'prospects', 'visites', 'mandats', 'agents', 'rapports', 'parametres', 'vitrine-publique'], featurePermissions: { dashboard: ['voir'], biens: ['voir', 'créer', 'modifier'], annonces: ['voir', 'créer', 'modifier'], prospects: ['voir', 'créer', 'modifier'], visites: ['voir', 'créer', 'modifier'], mandats: ['voir', 'créer', 'modifier'], agents: ['voir', 'modifier'], rapports: ['voir'], parametres: ['voir', 'modifier'], 'vitrine-publique': ['voir', 'modifier'] } },
     ],
     status: 'ACTIF',
+  },
+  {
+    id: 'amicales',
+    name: 'Amicale étudiante',
+    description: 'Gérer les membres, les cotisations, les dépenses et la vie de l’amicale.',
+    features: amicaleFeatureDefinitions.map(feature => feature.label),
+    featurePacks: amicaleFeaturePacks,
+    status: 'BETA',
   },
   { id: 'presences', name: 'Présences', description: 'Pointage, absences, horaires et suivi quotidien des équipes.', features: presenceFeatureDefinitions.map(feature => feature.label), featureDependencies: presenceFeatureDependencies, featurePacks: presenceFeaturePacks, status: 'ACTIF' },
   { id: 'paie', name: 'Paie', description: 'Bénéficiaires, préparation des salaires et virements groupés.', features: payrollFeatureDefinitions.map(feature => feature.label), featurePacks: [

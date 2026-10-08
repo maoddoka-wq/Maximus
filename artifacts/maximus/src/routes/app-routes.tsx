@@ -170,6 +170,7 @@ export type CompanyRouteScreens = {
   stocks: Screen;
   ecommerce: Screen;
   immobilier: Screen;
+  amicales: Screen;
   finance: Screen;
   commerce: Screen;
   operational: Screen;
@@ -465,6 +466,18 @@ export function CompanyRouter({
       canModify: effective('immobilier', 'modifier'),
       featurePermissions: effectiveFeatures(moduleFeaturePermissions?.immobilier),
       activeFeatureId: query.get('feature') ?? 'dashboard',
+    });
+  }
+  if (routePath === '/entreprise/amicales') {
+    const access = serverModuleAccess?.find(module => module.id === 'amicales');
+    return renderCompanyModule(screens.amicales, {
+      companyId,
+      canCreate: effective('amicales', 'créer'),
+      canModify: effective('amicales', 'modifier'),
+      allowedFeatureIds: access?.featureIds ?? [],
+      featurePermissions: effectiveFeatures(moduleFeaturePermissions?.amicales),
+      activeFeatureId: query.get('feature') ?? 'dashboard',
+      onNavigate,
     });
   }
   if (routePath === '/entreprise/finance') {

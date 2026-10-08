@@ -1,4 +1,5 @@
 import { commerceTabDefinitions } from './commerce-permissions';
+import { amicaleFeatureDefinitions } from './amicales-features';
 import { ecommerceFeatureDefinitions } from './ecommerce-features';
 import { featureSlug } from './permission-keys';
 import { normalizePayrollFeatureIds, payrollFeatureDefinitions } from './payroll-features';
@@ -90,6 +91,9 @@ export function getModuleFeatureOptions(module: Module): ModuleFeatureOption[] {
       { id: 'parametres', label: 'Paramètres' },
       { id: 'vitrine-publique', label: 'Vitrine publique' },
     ];
+  }
+  if (module.id === 'amicales') {
+    return amicaleFeatureDefinitions.map(feature => ({ id: feature.id, label: feature.label }));
   }
   if (module.id === 'presences') {
     return optionsFromDefinitions(

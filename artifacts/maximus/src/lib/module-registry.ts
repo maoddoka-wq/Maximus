@@ -6,6 +6,7 @@ import {
   FileBarChart,
   FileClock,
   FolderKanban,
+  GraduationCap,
   Package,
   ShoppingCart,
   ShoppingBag,
@@ -29,6 +30,7 @@ export type ModuleRouteKind =
   | 'payroll'
   | 'reports'
   | 'transport'
+  | 'amicales'
   | 'operational';
 
 export type ModuleDescriptor = {
@@ -60,6 +62,7 @@ const moduleRouteConfig: Record<
   documents: { icon: FolderKanban, routeKind: 'operational' },
   transport: { icon: CarFront, routeKind: 'transport' },
   immobilier: { icon: Building2, routeKind: 'operational' },
+  amicales: { icon: GraduationCap, routeKind: 'amicales' },
   rapports: { icon: FileBarChart, routeKind: 'reports' },
 };
 

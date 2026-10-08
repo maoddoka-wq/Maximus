@@ -194,6 +194,7 @@ const StockModulePage = lazy(() => import('@/pages/stock-module'));
 const CommerceModulePage = lazy(() => import('@/pages/commerce-module'));
 const EcommerceModulePage = lazy(() => import('@/pages/ecommerce-module'));
 const ImmobilierModulePage = lazy(() => import('@/pages/immobilier-module'));
+const AmicaleModulePage = lazy(() => import('@/pages/amicales-module'));
 const PublicShopPage = lazy(() => import('@/pages/public-shop'));
 const CompanyLoginPage = lazy(() =>
   import('@/pages/company-login').then((module) => ({ default: module.CompanyLoginPage })),
@@ -1640,6 +1641,7 @@ function AppContent() {
                     stocks: StockModulePage,
                     ecommerce: EcommerceModulePage,
                     immobilier: ImmobilierModulePage,
+                    amicales: AmicaleModulePage,
                     finance: FinancePage,
                     commerce: CommerceModulePage,
                     operational: OperationalModulePage,
@@ -7743,6 +7745,16 @@ function ModulePackTestWorkbench({
               preview
             />
           )}
+          {module.id === 'amicales' && (
+            <AmicaleModulePage
+              companyId={previewCompanyId || 'module-preview'}
+              canCreate={false}
+              canModify={false}
+              allowedFeatureIds={authorizedFeatures}
+              featurePermissions={configuredPermissions}
+              preview
+            />
+          )}
           {operationalModules.includes(module.id) && module.id !== 'paie' && (
             <OperationalModulePage
               moduleId={module.id}
@@ -7752,7 +7764,7 @@ function ModulePackTestWorkbench({
             />
           )}
           {module.id === 'rapports' && <OperationalReportsPage data={data} />}
-          {!['stocks', 'commerce', 'ventes', 'ecommerce', 'transport', 'immobilier', 'finance', 'rh', 'presences', 'paie', 'rapports', ...operationalModules].includes(
+          {!['stocks', 'commerce', 'ventes', 'ecommerce', 'transport', 'immobilier', 'amicales', 'finance', 'rh', 'presences', 'paie', 'rapports', ...operationalModules].includes(
             module.id,
           ) && (
             <p className="rounded-xl border border-dashed p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">

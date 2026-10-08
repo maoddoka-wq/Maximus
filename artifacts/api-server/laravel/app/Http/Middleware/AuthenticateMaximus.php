@@ -43,6 +43,7 @@ class AuthenticateMaximus
         }
 
         $request->attributes->set('authUser', $user);
+        $request->attributes->set('authUserId', (string) $user->id);
         $request->attributes->set('authActor', MaximusAuth::actor($user));
 
         return $next($request);

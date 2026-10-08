@@ -395,6 +395,87 @@ final class ModuleCatalog
                     ],
                 ],
             ],
+            [
+                'id' => 'amicales',
+                'name' => 'Amicale étudiante',
+                'description' => 'Gérer les membres, les cotisations, les dépenses et la vie de l’amicale.',
+                'features' => ['Tableau de bord', 'Membres', 'Cotisations', 'Dépenses', 'Activités', 'Annonces', 'Bureau', 'Rapports'],
+                'feature_packs' => [
+                    [
+                        'id' => 'amicale-consultation',
+                        'name' => 'Consultation de l’amicale',
+                        'description' => 'Consulter les membres et les informations de la vie étudiante.',
+                        'feature_ids' => ['dashboard', 'membres', 'activites', 'annonces'],
+                        'feature_permissions' => [
+                            'dashboard' => ['voir'],
+                            'membres' => ['voir'],
+                            'activites' => ['voir'],
+                            'annonces' => ['voir'],
+                        ],
+                    ],
+                    [
+                        'id' => 'amicale-membres',
+                        'name' => 'Gestion des membres',
+                        'description' => 'Gérer les adhérents et la composition du bureau.',
+                        'feature_ids' => ['dashboard', 'membres', 'bureau'],
+                        'feature_permissions' => [
+                            'dashboard' => ['voir'],
+                            'membres' => ['voir', 'créer', 'modifier'],
+                            'bureau' => ['voir', 'créer', 'modifier'],
+                        ],
+                    ],
+                    [
+                        'id' => 'amicale-finances',
+                        'name' => 'Trésorerie',
+                        'description' => 'Enregistrer les cotisations, les reçus et les dépenses à approuver.',
+                        'feature_ids' => ['dashboard', 'cotisations', 'depenses', 'rapports'],
+                        'feature_permissions' => [
+                            'dashboard' => ['voir'],
+                            'cotisations' => ['voir', 'créer', 'modifier'],
+                            'depenses' => ['voir', 'créer', 'modifier'],
+                            'rapports' => ['voir'],
+                        ],
+                    ],
+                    [
+                        'id' => 'amicale-activites',
+                        'name' => 'Vie étudiante',
+                        'description' => 'Organiser les activités et publier les annonces de l’amicale.',
+                        'feature_ids' => ['dashboard', 'activites', 'annonces'],
+                        'feature_permissions' => [
+                            'dashboard' => ['voir'],
+                            'activites' => ['voir', 'créer', 'modifier'],
+                            'annonces' => ['voir', 'créer', 'modifier'],
+                        ],
+                    ],
+                    [
+                        'id' => 'amicales-employe',
+                        'name' => 'Membre de l’amicale',
+                        'description' => 'Consulter les activités et les annonces accessibles aux membres.',
+                        'feature_ids' => ['dashboard', 'activites', 'annonces'],
+                        'feature_permissions' => [
+                            'dashboard' => ['voir'],
+                            'activites' => ['voir'],
+                            'annonces' => ['voir'],
+                        ],
+                    ],
+                    [
+                        'id' => 'amicales-manager',
+                        'name' => 'Responsable d’amicale',
+                        'description' => 'Gérer les membres, les finances, les activités et la gouvernance.',
+                        'feature_ids' => ['dashboard', 'membres', 'cotisations', 'depenses', 'activites', 'annonces', 'bureau', 'rapports'],
+                        'feature_permissions' => [
+                            'dashboard' => ['voir'],
+                            'membres' => ['voir', 'créer', 'modifier'],
+                            'cotisations' => ['voir', 'créer', 'modifier'],
+                            'depenses' => ['voir', 'créer', 'modifier'],
+                            'activites' => ['voir', 'créer', 'modifier'],
+                            'annonces' => ['voir', 'créer', 'modifier'],
+                            'bureau' => ['voir', 'créer', 'modifier'],
+                            'rapports' => ['voir'],
+                        ],
+                    ],
+                ],
+            ],
         ];
     }
 
@@ -620,6 +701,12 @@ final class ModuleCatalog
                 'prospects' => 'Prospects', 'visites' => 'Visites', 'mandats' => 'Mandats',
                 'agents' => 'Agents', 'rapports' => 'Rapports', 'parametres' => 'Paramètres',
                 'vitrine-publique' => 'Vitrine publique',
+            ],
+            'amicales' => [
+                'dashboard' => 'Tableau de bord', 'membres' => 'Membres',
+                'cotisations' => 'Cotisations', 'depenses' => 'Dépenses',
+                'activites' => 'Activités', 'annonces' => 'Annonces',
+                'bureau' => 'Bureau', 'rapports' => 'Rapports',
             ],
         ];
         $options = $fixed[$definition['id']] ?? collect($definition['features'] ?? [])

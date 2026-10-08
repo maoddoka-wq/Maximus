@@ -69,6 +69,7 @@ class AuthenticateMaximusMobileToken
 
         $request->attributes->set('mobileAuthToken', $token);
         $request->attributes->set('authUser', $user);
+        $request->attributes->set('authUserId', (string) $user->id);
         $request->attributes->set('authActor', $actor);
 
         return $next($request);
