@@ -1717,7 +1717,7 @@ function Login({
       showcase={
         <>
           <Brand inverse large />
-          <div className="mt-auto max-w-xl pt-16">
+          <div className="mt-16 max-w-xl">
             <p className="mono mb-5 text-[10px] font-bold uppercase tracking-[.24em] text-[hsl(var(--accent))]">
               La gestion d’entreprise, simplement
             </p>
