@@ -273,22 +273,30 @@ export function buildSidebarFeatureGroups({
                   label: feature.label,
                   icon: feature.id === 'biens' ? Building2 : feature.id === 'annonces' ? FileText : LayoutGrid,
                 }))
-          : module.features
-            .filter(feature => selectedFeatureIds.has(featureSlug(feature)))
-            .map(feature => featureSlug(feature))
-            .map(featureId => ({
-            href: `/entreprise/${moduleId}?feature=${featureId}`,
-              label: module.features.find(feature => featureSlug(feature) === featureId) ?? featureId,
-              icon: moduleId === 'paie'
-                ? payrollFeatureIcons[featureId] ?? WalletCards
-                : moduleId === 'ventes'
-                  ? ShoppingCart
-                  : moduleId === 'finance'
-                    ? WalletCards
-                    : moduleId === 'rh'
-                      ? Users
-                      : LayoutGrid,
-            }));
+            : moduleId === 'amicales'
+              ? getModuleFeatureOptions(module)
+                .filter(feature => selectedFeatureIds.has(feature.id))
+                .map(feature => ({
+                  href: `/entreprise/amicales?feature=${feature.id}`,
+                  label: feature.label,
+                  icon: LayoutGrid,
+                }))
+              : module.features
+                .filter(feature => selectedFeatureIds.has(featureSlug(feature)))
+                .map(feature => featureSlug(feature))
+                .map(featureId => ({
+                  href: `/entreprise/${moduleId}?feature=${featureId}`,
+                  label: module.features.find(feature => featureSlug(feature) === featureId) ?? featureId,
+                  icon: moduleId === 'paie'
+                    ? payrollFeatureIcons[featureId] ?? WalletCards
+                    : moduleId === 'ventes'
+                      ? ShoppingCart
+                      : moduleId === 'finance'
+                        ? WalletCards
+                        : moduleId === 'rh'
+                          ? Users
+                          : LayoutGrid,
+                }));
 
     if (items.length) return [{ label: module.name, items }];
     if (moduleId === 'paie' && allowed.includes('paie')) {

@@ -223,6 +223,83 @@ class ModuleAccessTest extends TestCase
         );
     }
 
+    public function test_legacy_amicale_request_authorizes_the_module_when_no_access_row_exists(): void
+    {
+        Company::query()->create([
+            'id' => 'legacy-amicale-company',
+            'name' => 'Amicale historique',
+            'manager' => 'Responsable',
+            'email' => 'amicale@legacy.test',
+            'status' => 'ACTIF',
+            'requested_modules' => ['amicales'],
+            'requested_module_features' => ['amicales' => []],
+            'requested_module_pack_ids' => [],
+            'requested_module_permissions' => [],
+        ]);
+
+        $this->assertDatabaseMissing('maximus_company_modules', [
+            'company_id' => 'legacy-amicale-company',
+            'module_id' => 'amicales',
+        ]);
+        $this->assertSame('ACTIF', ModuleCatalog::statusFor('legacy-amicale-company', 'amicales'));
+        $this->assertTrue(ModuleCatalog::isEnabled('legacy-amicale-company', 'amicales'));
+        $this->assertTrue(ModuleCatalog::allowsFeature('legacy-amicale-company', 'amicales', 'dashboard'));
+
+        $module = collect(ModuleCatalog::bootstrap('legacy-amicale-company'))->firstWhere('id', 'amicales');
+        $this->assertSame('ACTIF', $module['status']);
+        $this->assertSame([], $module['featureIds']);
+        $this->assertSame([], $module['configuration']);
+    }
+
+    public function test_legacy_amicale_request_keeps_a_nonempty_feature_selection_restricted(): void
+    {
+        Company::query()->create([
+            'id' => 'restricted-amicale-company',
+            'name' => 'Amicale restreinte',
+            'manager' => 'Responsable',
+            'email' => 'amicale@restricted.test',
+            'status' => 'ACTIF',
+            'requested_modules' => ['amicales'],
+            'requested_module_features' => ['amicales' => ['dashboard', 'activites']],
+            'requested_module_pack_ids' => [],
+            'requested_module_permissions' => [],
+        ]);
+
+        $this->assertTrue(ModuleCatalog::allowsFeature('restricted-amicale-company', 'amicales', 'dashboard'));
+        $this->assertFalse(ModuleCatalog::allowsFeature('restricted-amicale-company', 'amicales', 'cotisations'));
+        $module = collect(ModuleCatalog::bootstrap('restricted-amicale-company'))->firstWhere('id', 'amicales');
+        $this->assertSame(['dashboard', 'activites'], $module['featureIds']);
+        $this->assertSame('explicit', $module['configuration']['featureScope']);
+    }
+
+    public function test_amicales_api_accepts_legacy_company_authorization_without_an_access_row(): void
+    {
+        $company = Company::query()->firstOrCreate(
+            ['id' => 'kora'],
+            [
+                'name' => 'KORA',
+                'manager' => 'Administrateur',
+                'email' => 'admin@kora.test',
+                'status' => 'ACTIF',
+                'requested_modules' => [],
+            ],
+        );
+        $company->update([
+            'requested_modules' => array_values(array_unique([
+                ...($company->requested_modules ?? []),
+                'amicales',
+            ])),
+        ]);
+        DB::table('maximus_company_modules')
+            ->where('company_id', 'kora')
+            ->where('module_id', 'amicales')
+            ->delete();
+
+        $this->asCompanyAdmin()
+            ->getJson('/api/amicales/bootstrap?companyId=kora')
+            ->assertOk();
+    }
+
     public function test_status_only_update_preserves_company_feature_selection(): void
     {
         DB::table('maximus_company_modules')

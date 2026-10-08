@@ -55,6 +55,7 @@ import {
   type AmicaleMemberInput,
 } from '@/lib/amicales-api';
 import { amicaleFeatureDefinitions } from '@/lib/amicales-features';
+import { getAmicaleDashboardSummary } from '@/lib/amicales-dashboard';
 
 type FeatureId = (typeof amicaleFeatureDefinitions)[number]['id'];
 type FormKind = 'member' | 'contribution' | 'expense' | 'activity' | 'announcement';
@@ -86,7 +87,10 @@ const labels: Record<string, string> = {
 };
 const money = (amount: number) => `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Math.trunc(amount))} XOF`;
 const dateLabel = (value?: string | null) => value ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(value)) : '—';
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
 const emptyData: AmicaleBootstrap = { members: [], contributions: [], expenses: [], activities: [], announcements: [] };
 
 export default function AmicalesModulePage({
@@ -301,9 +305,6 @@ export default function AmicalesModulePage({
   }, announcement.id);
 
   const members = activeFeature === 'bureau' ? data.members.filter(member => member.office && member.status === 'ACTIVE') : data.members;
-  const totalContributions = data.contributions.reduce((total, item) => total + item.amount, 0);
-  const totalExpenses = data.expenses.filter(item => item.status !== 'REJECTED').reduce((total, item) => total + item.amount, 0);
-  const pendingExpenses = data.expenses.filter(item => item.status === 'PENDING').length;
   const activeMembers = data.members.filter(member => member.status === 'ACTIVE').length;
   const tabItems = visibleFeatures.map(feature => ({
     id: feature.id,
@@ -328,7 +329,7 @@ export default function AmicalesModulePage({
         <EmptyPanel icon={<CircleAlert size={22} />} title="Aucune fonctionnalité accessible" description="Les fonctionnalités de l’amicale disponibles pour votre rôle apparaîtront ici après attribution des accès." testId="empty-amicales-no-access" />
       ) : (
         <>
-          {visibleFeatures.length > 0 && <WorkspaceTabs
+          {preview && visibleFeatures.length > 0 && <WorkspaceTabs
             items={tabItems}
             activeId={activeFeature}
             onChange={(id) => {
@@ -352,10 +353,7 @@ export default function AmicalesModulePage({
 
           {loading ? <LoadingPanel /> : !loadError && <section className="space-y-5" data-testid={`section-amicales-${activeFeature}`}>
             {activeFeature === 'dashboard' && <Dashboard
-              members={data.members} contributions={data.contributions} expenses={data.expenses}
-              activities={data.activities} announcements={data.announcements}
-              activeMembers={activeMembers} totalContributions={totalContributions} totalExpenses={totalExpenses}
-              pendingExpenses={pendingExpenses} onSelect={id => { setLocalFeature(id); onNavigate?.(id); }}
+              data={data} onSelect={id => { setLocalFeature(id); onNavigate?.(id); }}
               canSee={id => visibleFeatures.some(feature => feature.id === id)}
             />}
             {activeFeature === 'membres' && <MemberList members={data.members} canCreate={canCreateFor('membres')} canModify={canModifyFor('membres')} onCreate={() => openForm('member', { joinedAt: today() })} onEdit={beginEditMember} onArchive={member => void archiveMember(member)} />}
@@ -397,50 +395,55 @@ export default function AmicalesModulePage({
   }
 }
 
-function Dashboard({ members, contributions, expenses, activities, announcements, activeMembers, totalContributions, totalExpenses, pendingExpenses, onSelect, canSee }: {
-  members: AmicaleMember[]; contributions: AmicaleContribution[]; expenses: AmicaleExpense[]; activities: AmicaleActivity[];
-  announcements: AmicaleAnnouncement[]; activeMembers: number; totalContributions: number; totalExpenses: number;
-  pendingExpenses: number; onSelect: (id: FeatureId) => void; canSee: (id: string) => boolean;
+function Dashboard({ data, onSelect, canSee }: {
+  data: AmicaleBootstrap; onSelect: (id: FeatureId) => void; canSee: (id: string) => boolean;
 }) {
-  const upcoming = [...activities].filter(item => item.status === 'PLANNED').sort((a, b) => a.eventDate.localeCompare(b.eventDate)).slice(0, 3);
-  const latest = [...contributions].slice(0, 4);
+  const summary = getAmicaleDashboardSummary(data, today());
+  const metricCards = [
+    (canSee('membres') || canSee('bureau')) && <MetricCard key="members" label="Membres actifs" value={summary.activeMembers} detail={`${summary.totalMembers} fiches enregistrées`} icon={<Users size={18} />} />,
+    canSee('cotisations') && <MetricCard key="contributions" label="Cotisations enregistrées" value={money(summary.totalContributions)} detail={`${summary.contributionCount} règlements`} icon={<ArrowDownLeft size={18} />} />,
+    canSee('depenses') && <MetricCard key="expenses" label="Dépenses payées" value={money(summary.paidExpenseAmount)} detail={`${summary.approvedExpenseCount} approuvées · ${summary.pendingExpenses} en attente`} icon={<ArrowUpRight size={18} />} />,
+    canSee('activites') && <MetricCard key="activities" label="Activités à venir" value={summary.upcomingActivities.length} detail="Activités planifiées à partir d’aujourd’hui" icon={<CalendarDays size={18} />} />,
+    canSee('annonces') && <MetricCard key="announcements" label="Annonces publiées" value={summary.publishedAnnouncements} detail="Informations visibles aux membres" icon={<Megaphone size={18} />} />,
+  ].filter(Boolean);
+  const canShowData = ['membres', 'bureau', 'cotisations', 'depenses', 'activites', 'annonces']
+    .some(featureId => canSee(featureId));
+
   return <div className="space-y-5">
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <MetricCard label="Membres actifs" value={activeMembers} detail={`${members.length} adhésions au total`} icon={<Users size={18} />} />
-      <MetricCard label="Cotisations enregistrées" value={money(totalContributions)} detail={`${contributions.length} règlements`} icon={<ArrowDownLeft size={18} />} />
-      <MetricCard label="Dépenses suivies" value={money(totalExpenses)} detail={`${pendingExpenses} en attente de décision`} icon={<ArrowUpRight size={18} />} />
-      <MetricCard label="Activités planifiées" value={upcoming.length} detail={`${announcements.filter(item => item.status === 'PUBLISHED').length} annonces publiées`} icon={<CalendarDays size={18} />} />
-    </div>
+    {metricCards.length > 0 && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{metricCards}</div>}
+    {!canShowData && <Card><CardContent className="pt-6">
+      <EmptyInline title="Aucune rubrique de données accessible" description="Votre rôle ouvre le tableau de bord, mais ne donne pas encore accès aux indicateurs des membres, cotisations, dépenses ou activités." />
+    </CardContent></Card>}
     <div className="grid gap-5 lg:grid-cols-2">
-      <Card>
+      {canSee('activites') && <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <div><CardTitle>Activités à venir</CardTitle><p className="mt-1 text-sm text-muted-foreground">Prochains rendez-vous planifiés.</p></div>
-          {canSee('activites') && <Button type="button" variant="outline" size="sm" data-testid="button-open-activities" onClick={() => onSelect('activites')}>Toutes les activités</Button>}
+          <Button type="button" variant="outline" size="sm" data-testid="button-open-activities" onClick={() => onSelect('activites')}>Toutes les activités</Button>
         </CardHeader>
         <CardContent className="space-y-3">
-          {upcoming.length ? upcoming.map(item => <div key={item.id} className="flex items-start justify-between gap-3 rounded-lg border border-border p-3" data-testid={`item-upcoming-activity-${item.id}`}>
+          {summary.upcomingActivities.length ? summary.upcomingActivities.map(item => <div key={item.id} className="flex items-start justify-between gap-3 rounded-lg border border-border p-3" data-testid={`item-upcoming-activity-${item.id}`}>
             <div className="min-w-0"><p className="font-semibold">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.location || 'Lieu à confirmer'} · {dateLabel(item.eventDate)}</p></div>
             <Badge variant="secondary">{labels[item.status] ?? item.status}</Badge>
-          </div>) : <EmptyInline title="Aucune activité planifiée" description="Les activités à venir apparaîtront ici." />}
+          </div>) : <EmptyInline title="Aucune activité à venir" description="Les activités futures apparaîtront ici." />}
         </CardContent>
-      </Card>
-      <Card>
+      </Card>}
+      {canSee('cotisations') && <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <div><CardTitle>Dernières cotisations</CardTitle><p className="mt-1 text-sm text-muted-foreground">Encaissements récemment enregistrés.</p></div>
-          {canSee('cotisations') && <Button type="button" variant="outline" size="sm" data-testid="button-open-contributions" onClick={() => onSelect('cotisations')}>Voir les cotisations</Button>}
+          <Button type="button" variant="outline" size="sm" data-testid="button-open-contributions" onClick={() => onSelect('cotisations')}>Voir les cotisations</Button>
         </CardHeader>
         <CardContent className="space-y-3">
-          {latest.length ? latest.map(item => <div key={item.id} className="flex items-center justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0" data-testid={`item-latest-contribution-${item.id}`}>
+          {summary.latestContributions.length ? summary.latestContributions.map(item => <div key={item.id} className="flex items-center justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0" data-testid={`item-latest-contribution-${item.id}`}>
             <div><p className="font-semibold">{item.memberName}</p><p className="mt-1 text-xs text-muted-foreground">{item.period} · {dateLabel(item.paidOn)}</p></div>
             <span className="font-semibold tabular-nums">{money(item.amount)}</span>
           </div>) : <EmptyInline title="Aucune cotisation enregistrée" description="Les règlements apparaîtront ici après leur saisie." />}
         </CardContent>
-      </Card>
+      </Card>}
     </div>
-    {canSee('depenses') && pendingExpenses > 0 && <Alert data-testid="notice-pending-expenses">
+    {canSee('depenses') && summary.pendingExpenses > 0 && <Alert data-testid="notice-pending-expenses">
       <CircleAlert size={16} /><AlertTitle>Décisions en attente</AlertTitle>
       <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-        <span>{pendingExpenses} dépense{pendingExpenses > 1 ? 's' : ''} en attente d’approbation ou de refus.</span>
+        <span>{summary.pendingExpenses} dépense{summary.pendingExpenses > 1 ? 's' : ''} en attente d’approbation ou de refus.</span>
         <Button type="button" variant="outline" size="sm" data-testid="button-review-expenses" onClick={() => onSelect('depenses')}>Examiner les dépenses</Button>
       </AlertDescription>
     </Alert>}

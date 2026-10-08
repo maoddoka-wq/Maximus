@@ -17,6 +17,33 @@ const manage = (featureIds: readonly string[]) =>
 
 const allFeatures = amicaleFeatureDefinitions.map(feature => feature.id);
 
+export function resolveAmicaleAllowedFeatureIds(access?: {
+  featureIds?: readonly string[] | null;
+  configuration?: Record<string, unknown> | null;
+}): string[] {
+  const validIds = new Set<string>(allFeatures);
+  const normalizeIds = (values: readonly string[] | null | undefined) =>
+    [...new Set((values ?? []).filter(value => validIds.has(value)))];
+  const selectedFeatureIds = normalizeIds(access?.featureIds);
+  const configuration = access?.configuration ?? {};
+
+  if (configuration.featureScope === 'explicit' || selectedFeatureIds.length > 0) {
+    return selectedFeatureIds;
+  }
+
+  const packIds = Array.isArray(configuration.packIds)
+    ? configuration.packIds.filter((value): value is string => typeof value === 'string')
+    : [];
+  if (packIds.length > 0) {
+    return normalizeIds(amicaleFeaturePacks
+      .filter(pack => packIds.includes(pack.id))
+      .flatMap(pack => pack.featureIds));
+  }
+
+  // An active module without an explicit feature scope exposes its full manifest.
+  return [...allFeatures];
+}
+
 export const amicaleFeaturePacks = [
   {
     id: 'amicale-consultation',

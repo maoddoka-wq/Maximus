@@ -11,6 +11,7 @@ import { normalizePayrollFeatureId } from '@/lib/payroll-features';
 import type { MaximusAssistantAction, MaximusAssistantMessage, MaximusAssistantResponse } from '@/lib/maximus-assistant-api';
 import { getAdminControlRoute, getCompanyControlCapabilities } from '@/lib/control-routing';
 import type { CompanyWorkspaceFeatureId } from '@/lib/company-workspace-features';
+import { resolveAmicaleAllowedFeatureIds } from '@/lib/amicales-features';
 
 /**
  * The screen registry contains components with different prop contracts.
@@ -28,8 +29,8 @@ function renderScreen<Props extends object>(screen: Screen, props: Props): React
 }
 
 function renderCompanyModule<Props extends object>(screen: Screen, props: Props) {
-  // Les fonctionnalités de l’espace entreprise sont toujours naviguées depuis
-  // le menu latéral, pour les administrateurs comme pour les employés.
+  // La navigation des fonctionnalités est fournie par l’espace entreprise :
+  // menu vertical ou rail horizontal selon le réglage de l’entreprise.
   return renderScreen(screen, { ...props, singleModuleNavigation: true });
 }
 
@@ -474,7 +475,7 @@ export function CompanyRouter({
       companyId,
       canCreate: effective('amicales', 'créer'),
       canModify: effective('amicales', 'modifier'),
-      allowedFeatureIds: access?.featureIds ?? [],
+      allowedFeatureIds: resolveAmicaleAllowedFeatureIds(access),
       featurePermissions: effectiveFeatures(moduleFeaturePermissions?.amicales),
       activeFeatureId: query.get('feature') ?? 'dashboard',
       onNavigate,

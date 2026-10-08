@@ -661,6 +661,33 @@ final class ModuleCatalog
         ];
     }
 
+    private static function legacyRequestedModuleStatus(?object $company, string $moduleId): string
+    {
+        if (($company?->status ?? null) !== 'ACTIF') {
+            return 'INACTIF';
+        }
+
+        return in_array(
+            $moduleId,
+            self::decodeArray($company?->requested_modules ?? null),
+            true,
+        ) ? 'ACTIF' : 'INACTIF';
+    }
+
+    private static function decodeArray(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+        if (! is_string($value)) {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
     private static function featureSlug(string $value): string
     {
         // Match permission-keys.ts: accents are part of persisted permission IDs.
@@ -750,7 +777,31 @@ final class ModuleCatalog
             ->where('module_id', $moduleId)
             ->first(['feature_ids', 'configuration']);
         if (! $row) {
-            return false;
+            $company = DB::table('companies')
+                ->where('id', $companyId)
+                ->first(['requested_module_features', 'requested_module_pack_ids']);
+            $requestedFeatures = self::decodeArray($company?->requested_module_features ?? null);
+            $requestedPacks = self::decodeArray($company?->requested_module_pack_ids ?? null);
+            $featureIds = self::decodeArray($requestedFeatures[$moduleId] ?? null);
+            $packIds = self::decodeArray($requestedPacks[$moduleId] ?? null);
+
+            // Legacy company access has no explicit feature scope when neither
+            // a feature selection nor a pack was stored in the signup request.
+            if ($featureIds === [] && $packIds === []) {
+                return $moduleId !== 'ecommerce'
+                    || ! in_array($featureId, ['vente-numerique', 'vente-comptoir', 'rapport-ventes'], true);
+            }
+
+            try {
+                $selection = self::normalizeSelection($moduleId, $featureIds, [
+                    ...($featureIds !== [] ? ['featureScope' => 'explicit'] : []),
+                    'packIds' => $packIds,
+                ]);
+            } catch (\InvalidArgumentException) {
+                return false;
+            }
+
+            return in_array($featureId, $selection['featureIds'], true);
         }
 
         $featureIds = json_decode($row->feature_ids ?? '[]', true);
@@ -783,10 +834,20 @@ final class ModuleCatalog
 
     public static function statusFor(string $companyId, string $moduleId): string
     {
-        return (string) (DB::table('maximus_company_modules')
+        $access = DB::table('maximus_company_modules')
             ->where('company_id', $companyId)
             ->where('module_id', $moduleId)
-            ->value('status') ?? 'INACTIF');
+            ->first(['status']);
+
+        if ($access) {
+            return (string) $access->status;
+        }
+
+        $company = DB::table('companies')
+            ->where('id', $companyId)
+            ->first(['status', 'requested_modules']);
+
+        return self::legacyRequestedModuleStatus($company, $moduleId);
     }
 
     public static function bootstrap(string $companyId): array
@@ -795,15 +856,65 @@ final class ModuleCatalog
             ->where('company_id', $companyId)
             ->get()
             ->keyBy('module_id');
+        $company = DB::table('companies')
+            ->where('id', $companyId)
+            ->first([
+                'status',
+                'requested_modules',
+                'requested_module_features',
+                'requested_module_pack_ids',
+                'requested_module_permissions',
+            ]);
+        $requestedFeatures = self::decodeArray($company?->requested_module_features ?? null);
+        $requestedPacks = self::decodeArray($company?->requested_module_pack_ids ?? null);
+        $requestedPermissions = self::decodeArray($company?->requested_module_permissions ?? null);
 
-        return collect(self::definitionsWithCustom())->map(function (array $definition) use ($access): array {
+        return collect(self::definitionsWithCustom())->map(function (array $definition) use (
+            $access,
+            $company,
+            $requestedFeatures,
+            $requestedPacks,
+            $requestedPermissions,
+        ): array {
             $row = $access->get($definition['id']);
+            if ($row) {
+                $status = (string) $row->status;
+                $featureIds = self::decodeArray($row->feature_ids ?? null);
+                $configuration = self::decodeArray($row->configuration ?? null);
+            } else {
+                $moduleId = $definition['id'];
+                $requestedFeatureIds = self::decodeArray($requestedFeatures[$moduleId] ?? null);
+                $packIds = self::decodeArray($requestedPacks[$moduleId] ?? null);
+                $featurePermissions = self::decodeArray($requestedPermissions[$moduleId] ?? null);
+                $configuration = [];
+                if ($requestedFeatureIds !== []) {
+                    $configuration['featureScope'] = 'explicit';
+                }
+                if ($packIds !== []) {
+                    $configuration['packIds'] = $packIds;
+                }
+                if ($featurePermissions !== []) {
+                    $configuration['featurePermissions'] = $featurePermissions;
+                }
+                $featureIds = [];
+                if ($requestedFeatureIds !== [] || $packIds !== []) {
+                    try {
+                        $selection = self::normalizeSelection($moduleId, $requestedFeatureIds, $configuration);
+                        $featureIds = $selection['featureIds'];
+                        $configuration = $selection['configuration'];
+                    } catch (\InvalidArgumentException) {
+                        // A stale signup selection must not expand access.
+                        $configuration = ['featureScope' => 'explicit'];
+                    }
+                }
+                $status = self::legacyRequestedModuleStatus($company, $moduleId);
+            }
 
             return [
                 ...$definition,
-                'status' => $row?->status ?? 'INACTIF',
-                'featureIds' => $row ? json_decode($row->feature_ids ?? '[]', true) : [],
-                'configuration' => $row ? json_decode($row->configuration ?? '{}', true) : [],
+                'status' => $status,
+                'featureIds' => $featureIds,
+                'configuration' => $configuration,
                 'featurePacks' => collect($definition['feature_packs'] ?? [])
                     ->map(fn (array $pack): array => [
                         'id' => $pack['id'],

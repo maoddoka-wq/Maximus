@@ -92,7 +92,14 @@ export function buildAppAccessContext({
     'INACTIF';
   const isModuleActive = (moduleId: ModuleId) => !['INACTIF', 'MAINTENANCE'].includes(moduleStatus(moduleId));
   const localCompanyAllowed = data.companies.find(company => company.id === companyId)?.allowedModules ?? [];
-  const companyAllowed = (sectorTestCompanyId || serverModuleAccessReady ? localCompanyAllowed : [])
+  const serverCompanyAllowed = (serverModuleAccess ?? [])
+    .filter(module => module.status === 'ACTIF' || module.status === 'BETA')
+    .map(module => module.id as ModuleId);
+  const companyAllowed = (sectorTestCompanyId
+    ? localCompanyAllowed
+    : serverModuleAccessReady
+      ? [...new Set([...localCompanyAllowed, ...serverCompanyAllowed])]
+      : [])
     .filter(isModuleActive);
   const companyAdmin = session.startsWith('company:') && !sectorTestCompanyId;
   const keepCompanySettings = (
@@ -135,10 +142,17 @@ export function buildAppAccessContext({
     }
 
     const requestedFeatures = activeCompany.requestedModuleFeatures;
-    if (!requestedFeatures || !Object.prototype.hasOwnProperty.call(requestedFeatures, module.id)) {
+    const requestedFeatureIds = requestedFeatures?.[module.id];
+    if (
+      !requestedFeatures
+      || !Object.prototype.hasOwnProperty.call(requestedFeatures, module.id)
+      || !Array.isArray(requestedFeatureIds)
+      || requestedFeatureIds.length === 0
+    ) {
       // Comme les autres modules, un module autorisé sans sélection détaillée
-      // expose ses fonctionnalités historiques. Les nouvelles capacités du
-      // Commerce unifié restent opt-in pour les entreprises déjà configurées.
+      // expose ses fonctionnalités. Une sélection explicitement vide est
+      // reconnue par featureScope=explicit dans l’accès serveur ci-dessus.
+      // Les nouvelles capacités du Commerce unifié restent opt-in.
       return module.id === 'ecommerce'
         ? getModuleFeatureOptions(module)
           .map(feature => feature.id)
@@ -173,7 +187,13 @@ export function buildAppAccessContext({
     }
 
     const requestedFeatures = activeCompany.requestedModuleFeatures;
-    if (!requestedFeatures || !Object.prototype.hasOwnProperty.call(requestedFeatures, module.id)) {
+    const requestedFeatureIds = requestedFeatures?.[module.id];
+    if (
+      !requestedFeatures
+      || !Object.prototype.hasOwnProperty.call(requestedFeatures, module.id)
+      || !Array.isArray(requestedFeatureIds)
+      || requestedFeatureIds.length === 0
+    ) {
       return module.id === 'ecommerce'
         ? new Set(getModuleFeatureOptions(module)
           .map(feature => feature.id)

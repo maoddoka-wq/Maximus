@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildAppAccessContext } from './app-access';
 import { emptyStoreData, type Company, type Employee, type OrgNode, type Role } from './store';
+import type { ServerModuleAccess } from './module-api';
 
 function createAccessFixture() {
   const data = emptyStoreData();
@@ -643,4 +644,101 @@ test('ne donne pas automatiquement la vente comptoir aux anciens accès e-commer
   assert.equal(access.sidebarFeatureGroups.some(group =>
     group.items.some(item => item.href.endsWith('?tab=vente-comptoir')),
   ), false);
+});
+
+test('utilise une autorisation Amicales active du serveur malgré une liste entreprise en retard', () => {
+  const { data, company } = createAccessFixture();
+  company.requestedModuleFeatures = { amicales: [] };
+  const serverAccess: ServerModuleAccess = {
+    id: 'amicales',
+    name: 'Amicale étudiante',
+    description: '',
+    features: [],
+    featurePacks: [],
+    featureDependencies: {},
+    status: 'ACTIF',
+    featureIds: [],
+    configuration: {},
+  };
+
+  const access = buildAppAccessContext({
+    data,
+    session: `company:${company.id}`,
+    employee: null,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+    serverModuleAccess: [serverAccess],
+    serverModuleAccessReady: true,
+  });
+
+  assert.ok(access.allowed.includes('amicales'));
+  const amicaleGroup = access.sidebarFeatureGroups.find(group => group.label === 'Amicale étudiante');
+  assert.ok(amicaleGroup);
+  assert.ok(amicaleGroup.items.some(item => item.href.includes('?feature=dashboard')));
+});
+
+test('une sélection de fonctionnalités explicitement vide reste un refus', () => {
+  const { data, company } = createAccessFixture();
+  company.allowedModules = ['commerce', 'amicales'];
+  company.requestedModules = ['commerce', 'amicales'];
+  company.requestedModuleFeatures = { amicales: [] };
+  const serverAccess: ServerModuleAccess = {
+    id: 'amicales',
+    name: 'Amicale étudiante',
+    description: '',
+    features: [],
+    featurePacks: [],
+    featureDependencies: {},
+    status: 'ACTIF',
+    featureIds: [],
+    configuration: { featureScope: 'explicit' },
+  };
+
+  const access = buildAppAccessContext({
+    data,
+    session: `company:${company.id}`,
+    employee: null,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+    serverModuleAccess: [serverAccess],
+    serverModuleAccessReady: true,
+  });
+
+  assert.ok(access.allowed.includes('amicales'));
+  assert.equal(access.sidebarFeatureGroups.some(group => group.label === 'Amicale étudiante'), false);
+});
+
+test('un accès serveur désactivé prévaut sur un ancien module localement autorisé', () => {
+  const { data, company } = createAccessFixture();
+  company.allowedModules = ['commerce', 'amicales'];
+  company.requestedModules = ['commerce', 'amicales'];
+  const serverAccess: ServerModuleAccess = {
+    id: 'amicales',
+    name: 'Amicale étudiante',
+    description: '',
+    features: [],
+    featurePacks: [],
+    featureDependencies: {},
+    status: 'INACTIF',
+    featureIds: [],
+    configuration: {},
+  };
+
+  const access = buildAppAccessContext({
+    data,
+    session: `company:${company.id}`,
+    employee: null,
+    activeCompanyId: company.id,
+    activeCompany: company,
+    sectorTestCompanyId: null,
+    serverModuleStatuses: null,
+    serverModuleAccess: [serverAccess],
+    serverModuleAccessReady: true,
+  });
+
+  assert.equal(access.allowed.includes('amicales'), false);
 });
