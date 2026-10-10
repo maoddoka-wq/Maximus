@@ -984,6 +984,12 @@ class EcommerceTest extends TestCase
             ->postJson('/api/shop/commandes-transition-test/orders', $payload)
             ->assertOk()
             ->assertJson($first->json());
+        $state = DB::table('maximus_app_states')->where('scope', 'workspace')->first();
+        $notifications = json_decode((string) $state->payload, true)['notifications'] ?? [];
+        $this->assertCount(1, array_filter(
+            $notifications,
+            fn (array $notification): bool => ($notification['id'] ?? null) === 'ecommerce-order-'.$first->json('id'),
+        ));
 
         $order = DB::table('ecommerce_orders')->where('reference', $first->json('reference'))->first();
         $this->assertNotNull($order);

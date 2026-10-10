@@ -8,6 +8,7 @@ use App\Support\CompanyRegistry;
 use App\Support\ModuleAuthorization;
 use App\Support\ModuleCatalog;
 use App\Services\EcommerceDomainVerifier;
+use App\Services\AppNotificationService;
 use App\Services\PublicSiteDomainService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class EcommerceController extends Controller
     public function __construct(
         private readonly EcommerceDomainVerifier $domainVerifier,
         private readonly PublicSiteDomainService $publicSiteDomains,
+        private readonly AppNotificationService $appNotifications,
     ) {
     }
 
@@ -2048,6 +2050,19 @@ class EcommerceController extends Controller
                     'deliveryZoneFee' => $deliveryFee,
                 ];
             });
+
+            $this->appNotifications->publish([
+                'id' => 'ecommerce-order-'.$order['id'],
+                'title' => 'Nouvelle commande en ligne',
+                'text' => 'La commande '.$order['reference'].' vient d’être passée sur la boutique.',
+                'read' => false,
+                'date' => now()->format('d/m/Y H:i'),
+                'audience' => 'all',
+                'companyId' => (string) $store->company_id,
+                'module' => 'ecommerce',
+                'severity' => 'success',
+                'href' => '/entreprise/ecommerce?tab=commandes',
+            ], $request->getHost());
 
             return response()->json($order, 201);
         } catch (Throwable $error) {

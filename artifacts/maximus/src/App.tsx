@@ -44,6 +44,7 @@ import {
   Warehouse,
   X,
   UserRoundCog,
+  Volume2,
 } from 'lucide-react';
 import { Link, useLocation, useSearch, Router as WouterRouter } from 'wouter';
 import { Toaster } from '@workspace/maximus-design-system/components/ui/toaster';
@@ -65,7 +66,11 @@ import { WorkspaceTabs } from '@workspace/maximus-design-system/components/ui/wo
 import { ErrorBoundary } from '@/components/error-boundary';
 import { parseClientPwaPath } from '@/lib/pwa';
 import { disableCurrentBrowserPushSubscription } from '@/lib/notification-push-api';
-import { playNotificationSound } from '@/lib/notification-sound';
+import {
+  isNotificationSoundEnabled,
+  playNotificationSound,
+  setNotificationSoundEnabled,
+} from '@/lib/notification-sound';
 import { ConfirmDialogProvider, useAppDialog } from '@/components/confirm-dialog';
 import { ModulePackDraftForm } from '@/components/module-pack-draft-form';
 import { SubscriptionPricingManagement } from '@/components/subscription-pricing-management';
@@ -5494,12 +5499,28 @@ function NotificationsPage({
   context: { isAdmin: boolean; companyId?: string };
 }) {
   const notifications = getVisibleNotifications(data.notifications, context);
+  const [soundEnabled, setSoundEnabled] = useState(isNotificationSoundEnabled);
   const notificationCompany = context.isAdmin
     ? undefined
     : data.companies.find((company) => company.id === context.companyId);
+  const toggleSound = () => {
+    const nextEnabled = !soundEnabled;
+    setNotificationSoundEnabled(nextEnabled);
+    setSoundEnabled(nextEnabled);
+    if (nextEnabled) void playNotificationSound(true);
+  };
 
   return (
     <div className="space-y-3">
+      <div className="card-surface flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4">
+        <div className="flex items-center gap-3">
+          <Volume2 size={17} aria-hidden="true" />
+          <span className="text-sm font-medium">Son des notifications dans MAXIMUS</span>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={toggleSound}>
+          {soundEnabled ? 'Désactiver le son' : 'Activer le son'}
+        </Button>
+      </div>
       {notificationCompany && (
         <CompanyPushNotificationPrompt
           key={`${notificationCompany.id}-bell`}
