@@ -38,12 +38,9 @@ self.addEventListener('push', (event) => {
         && client.visibilityState === 'visible';
     });
 
-    if (visibleMaximusWindows.length > 0) {
-      visibleMaximusWindows.forEach((client) => {
-        client.postMessage({ type: 'MAXIMUS_PUSH_NOTIFICATION', notification });
-      });
-      return;
-    }
+    visibleMaximusWindows.forEach((client) => {
+      client.postMessage({ type: 'MAXIMUS_PUSH_NOTIFICATION', notification });
+    });
 
     await self.registration.showNotification(notification.title, {
       body: notification.body,
