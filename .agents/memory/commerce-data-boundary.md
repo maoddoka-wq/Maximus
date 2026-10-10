@@ -14,3 +14,9 @@ Le POS E-commerce maintient son propre stock sur les produits de la boutique et 
 **Why:** Les produits e-commerce et les articles d’entrepôt utilisent des identités et des tables distinctes; écrire dans le grand livre de stock sans correspondance de produit et d’entrepôt désynchroniserait les inventaires.
 
 **How to apply:** Conserver les ventes comptoir dans l’inventaire e-commerce. Ne synchroniser vers le module Gestion de stock qu’après définition d’une correspondance produit/entrepôt explicite.
+
+Les évolutions Commerce destinées aux magasins de produits physiques doivent garder un modèle commun pour toutes les catégories. Les besoins meubles, informatique ou autres secteurs utilisent des options et attributs facultatifs, pas des tableaux métier séparés ni des champs obligatoires propres à un secteur.
+
+**Why:** Les clients visés vendent des familles de produits physiques variées; un modèle spécialisé par métier rendrait le module plus coûteux à faire évoluer et moins réutilisable.
+
+**How to apply:** Pour les changements de catalogue, caisse et stock, privilégier les attributs communs et configurables. N’activer les numéros de série, garanties, variantes ou services comme options quand le type de produit l’exige.
