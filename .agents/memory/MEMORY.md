@@ -13,7 +13,7 @@
 - [Montage du scanner caméra](presence-camera-portal.md) — relier le démarrage au nœud vidéo monté; un portail Radix conditionnel peut sinon laisser le scanner bloqué.
 - [Parcours Organisation](organization-workflow.md) — construire la hiérarchie, configurer les rôles, puis créer les employés et désigner les managers.
 - [Validation des vues authentifiées](authenticated-preview.md) — pour contrôler les écrans connectés, conserver une session locale via le navigateur CDP avant les captures.
-- [Frontière des données Commerce](commerce-data-boundary.md) — relier les stocks par correspondance explicite et garder un modèle générique pour tous les produits physiques.
+- [Frontière des données Commerce](commerce-data-boundary.md) — stock Commerce maître uniquement après lien confirmé; préserver les produits E-commerce existants et le modèle physique générique.
 - [Devises des ventes en ligne](ecommerce-order-currency.md) — enregistrer la devise au checkout; les anciennes ventes sans instantané restent « inconnue », jamais reclassées selon la devise actuelle.
 - [Routage avec paramètres](query-routing.md) — les routeurs d’espace doivent comparer le chemin sans query string, car les onglets internes modifient l’URL courante.
 - [Thème du menu entreprise](company-menu-theme.md) — le fond du menu reste distinct, mais les états actif et survol reprennent la couleur principale de l’entreprise.

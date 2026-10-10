@@ -20,3 +20,9 @@ Les évolutions Commerce destinées aux magasins de produits physiques doivent g
 **Why:** Les clients visés vendent des familles de produits physiques variées; un modèle spécialisé par métier rendrait le module plus coûteux à faire évoluer et moins réutilisable.
 
 **How to apply:** Pour les changements de catalogue, caisse et stock, privilégier les attributs communs et configurables. N’activer les numéros de série, garanties, variantes ou services comme options quand le type de produit l’exige.
+
+Le stock de Commerce est la référence pour les produits explicitement reliés à un produit e-commerce, et cette liaison exige que les deux modules soient autorisés. Les produits et quantités E-commerce déjà en production restent inchangés et non reliés par défaut.
+
+**Why:** Le catalogue E-commerce actif contient des produits réels; une migration ou une synchronisation globale pourrait écraser leur stock ou interrompre des ventes.
+
+**How to apply:** Relier les produits un par un, afficher les références et quantités actuelles, demander confirmation en cas d’écart, puis synchroniser uniquement après activation des deux modules. Les produits non reliés conservent leur comportement E-commerce actuel.
