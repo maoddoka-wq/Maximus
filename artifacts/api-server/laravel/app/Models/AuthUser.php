@@ -24,6 +24,8 @@ class AuthUser extends Model
         'sector_ids',
         'permissions',
         'status',
+        'last_login_at',
+        'last_seen_at',
     ];
 
     protected $hidden = [
@@ -37,6 +39,8 @@ class AuthUser extends Model
             'permissions' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
+            'last_login_at' => 'datetime',
+            'last_seen_at' => 'datetime',
         ];
     }
 }

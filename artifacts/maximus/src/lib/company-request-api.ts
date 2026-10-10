@@ -11,6 +11,14 @@ export type CompanyRequest = {
   rejectionReason: string | null;
 };
 
+export type CompanyConnectivity = {
+  companyId: string;
+  online: boolean;
+  lastSeenAt: string | null;
+  lastLoginAt: string | null;
+  connectionSource: 'utilisateurs' | 'installation' | null;
+};
+
 export type PublicSiteDomain = {
   id: string;
   companyId: string;
@@ -35,6 +43,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const companyRequestApi = {
+  connectivity: () => request<{ companies: CompanyConnectivity[] }>('/companies/connectivity'),
   createAdministrative: (input: {
     name: string;
     manager: string;

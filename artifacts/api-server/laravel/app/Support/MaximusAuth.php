@@ -124,7 +124,6 @@ final class MaximusAuth
             'expires_at' => Carbon::now()->addHours(8),
             'created_at' => Carbon::now(),
         ]);
-
         return $token;
     }
 

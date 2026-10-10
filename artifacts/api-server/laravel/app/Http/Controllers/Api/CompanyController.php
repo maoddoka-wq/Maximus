@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Str;
 
 class CompanyController extends Controller
@@ -102,6 +103,55 @@ class CompanyController extends Controller
             ->values();
 
         return response()->json(['requests' => $requests]);
+    }
+
+    public function connectivity(Request $request): JsonResponse
+    {
+        if (($request->attributes->get('authActor')['role'] ?? null) !== 'maximus_admin') {
+            return response()->json(['error' => 'Accès réservé à MAXIMUS.'], 403);
+        }
+
+        try {
+            $companies = AuthUser::query()
+                ->selectRaw('company_id, MAX(last_seen_at) as last_seen_at, MAX(last_login_at) as last_login_at')
+                ->whereNotNull('company_id')
+                ->groupBy('company_id')
+                ->get();
+            $installations = DB::table('maximus_installations')
+                ->selectRaw('company_id, MAX(last_seen_at) as last_seen_at')
+                ->whereNotNull('company_id')
+                ->whereNull('revoked_at')
+                ->whereIn('status', ['READY', 'CONNECTED'])
+                ->groupBy('company_id')
+                ->get()
+                ->keyBy('company_id');
+        } catch (QueryException $exception) {
+            report($exception);
+            return response()->json(['error' => 'Le suivi des connexions n’est pas encore disponible.'], 503);
+        }
+        $onlineUserThreshold = now()->subMinutes(3);
+        $onlineInstallationThreshold = now()->subMinutes(12);
+
+        return response()->json([
+            'companies' => $companies->map(function (AuthUser $user) use ($installations, $onlineUserThreshold, $onlineInstallationThreshold): array {
+                $installationSeenAt = $installations->get($user->company_id)?->last_seen_at;
+                $installationSeenAt = $installationSeenAt ? \Illuminate\Support\Carbon::parse($installationSeenAt) : null;
+                $userOnline = $user->last_seen_at !== null && $user->last_seen_at->greaterThanOrEqualTo($onlineUserThreshold);
+                $installationOnline = $installationSeenAt !== null && $installationSeenAt->greaterThanOrEqualTo($onlineInstallationThreshold);
+                $lastSeenAt = $user->last_seen_at;
+                if ($installationSeenAt !== null && ($lastSeenAt === null || $installationSeenAt->greaterThan($lastSeenAt))) {
+                    $lastSeenAt = $installationSeenAt;
+                }
+
+                return [
+                    'companyId' => (string) $user->company_id,
+                    'lastSeenAt' => $lastSeenAt?->toISOString(),
+                    'lastLoginAt' => $user->last_login_at?->toISOString(),
+                    'online' => $userOnline || $installationOnline,
+                    'connectionSource' => $userOnline ? 'utilisateurs' : ($installationOnline ? 'installation' : null),
+                ];
+            })->values(),
+        ]);
     }
 
     public function approve(Request $request, string $companyId): JsonResponse

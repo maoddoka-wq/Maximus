@@ -147,7 +147,7 @@ import { CompanyInstallationAccess } from '@/components/company-installation-acc
 import { CompanyPushNotificationAccess } from '@/components/company-push-notification-access';
 import { CompanyPushNotificationPrompt } from '@/components/company-push-notification-prompt';
 import { CompanySubscriptionExpiryNotice } from '@/components/company-subscription-expiry-notice';
-import { companyRequestApi, type CompanyRequest } from '@/lib/company-request-api';
+import { companyRequestApi, type CompanyConnectivity, type CompanyRequest } from '@/lib/company-request-api';
 import { loadCompanyPaymentAccess, setCompanyPaymentAccess } from '@/lib/company-payment-api';
 import { useCompanySubscriptionBillingMode } from '@/hooks/use-company-subscription-billing-mode';
 import { createEcommerceApi, type EcommerceDomain } from '@/lib/ecommerce-api';
@@ -858,6 +858,22 @@ function AppContent() {
       window.removeEventListener('keydown', unlockOnGesture, true);
     };
   }, []);
+  useEffect(() => {
+    if (!activeCompanyId || !session || session === 'admin' || sectorTestCompanyId) return undefined;
+
+    const sendHeartbeat = () => {
+      if (document.visibilityState === 'visible') {
+        void authApi.heartbeat().catch(() => undefined);
+      }
+    };
+    sendHeartbeat();
+    const timer = window.setInterval(sendHeartbeat, 60_000);
+    document.addEventListener('visibilitychange', sendHeartbeat);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', sendHeartbeat);
+    };
+  }, [activeCompanyId, sectorTestCompanyId, session]);
   useEffect(() => {
     if (!session || !appStateReady) {
       observedNotificationsRef.current = null;
@@ -3434,6 +3450,56 @@ function CompaniesPage({
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [updatingDeletionLock, setUpdatingDeletionLock] = useState<string | null>(null);
   const [updatingDemoMode, setUpdatingDemoMode] = useState<string | null>(null);
+  const [connectivityState, setConnectivityState] = useState<{
+    status: 'loading' | 'ready' | 'error';
+    byCompanyId: Record<string, CompanyConnectivity>;
+  }>({ status: 'loading', byCompanyId: {} });
+  useEffect(() => {
+    let cancelled = false;
+    const refreshConnectivity = async () => {
+      try {
+        const response = await companyRequestApi.connectivity();
+        if (cancelled) return;
+        setConnectivityState({
+          status: 'ready',
+          byCompanyId: Object.fromEntries(response.companies.map((company) => [company.companyId, company])),
+        });
+      } catch {
+        if (!cancelled) setConnectivityState((current) => ({ ...current, status: 'error' }));
+      }
+    };
+    void refreshConnectivity();
+    const timer = window.setInterval(() => void refreshConnectivity(), 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+  const renderCompanyConnectivity = (company: Company) => {
+    if (connectivityState.status === 'loading') {
+      return <span className="text-xs text-[hsl(var(--muted-foreground))]">Chargement…</span>;
+    }
+    if (connectivityState.status === 'error') {
+      return <span className="text-xs text-[hsl(var(--muted-foreground))]">Indisponible</span>;
+    }
+    const presence = connectivityState.byCompanyId[company.id];
+    if (presence?.online) {
+      return (
+        <span className="inline-flex items-center gap-2 text-xs font-semibold">
+          <span className="h-2 w-2 rounded-full bg-[hsl(var(--primary))]" aria-hidden="true" />
+          {presence.connectionSource === 'installation' ? 'Installation connectée' : 'En ligne'}
+        </span>
+      );
+    }
+    const lastActivityAt = presence?.lastSeenAt ?? presence?.lastLoginAt;
+    return (
+      <span className="text-xs text-[hsl(var(--muted-foreground))]">
+        {lastActivityAt
+          ? `Vu le ${new Date(lastActivityAt).toLocaleString('fr-FR')}`
+          : 'Aucune activité enregistrée'}
+      </span>
+    );
+  };
   const list = directoryCompanies
     .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
     .filter(
@@ -3541,7 +3607,7 @@ function CompaniesPage({
         </p>
       </div>
       <DataTable
-        headers={['Entreprise', 'Responsable', 'Pays', 'Modules', 'Statut', 'Actions']}
+        headers={['Entreprise', 'Responsable', 'Pays', 'Modules', 'Statut', 'Connexion', 'Actions']}
         rows={companies.map((c) => [
           <button
             data-testid={`button-open-company-${c.id}`}
@@ -3564,6 +3630,7 @@ function CompaniesPage({
           c.country,
           `${c.allowedModules.length} / ${c.requestedModules.length}`,
           <StatusBadge status={c.status} />,
+          renderCompanyConnectivity(c),
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"

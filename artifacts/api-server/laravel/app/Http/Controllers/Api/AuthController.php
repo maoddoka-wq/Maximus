@@ -77,6 +77,7 @@ class AuthController extends Controller
         }
 
         $token = MaximusAuth::issueSession($user);
+        $this->recordLoginActivity($user);
 
         return response()
             ->json(['user' => MaximusAuth::actor($user)])
@@ -160,6 +161,7 @@ class AuthController extends Controller
         }
 
         $token = MaximusAuth::issueSession($user);
+        $this->recordLoginActivity($user);
         return response()
             ->json(['user' => MaximusAuth::actor($user)])
             ->withCookie(cookie(
@@ -436,6 +438,45 @@ class AuthController extends Controller
         return response()->json([
             'user' => $user ? MaximusAuth::actor($user) : null,
         ]);
+    }
+
+    public function heartbeat(Request $request): JsonResponse
+    {
+        $user = $request->attributes->get('authUser');
+        if (! $user instanceof AuthUser) {
+            return response()->json(['error' => 'Session MAXIMUS absente ou expirée.'], 401);
+        }
+
+        if ($user->company_id !== null) {
+            $seenAt = now();
+            try {
+                AuthUser::query()->whereKey($user->id)->update(['last_seen_at' => $seenAt]);
+            } catch (QueryException $exception) {
+                report($exception);
+                return response()->json(['error' => 'Le suivi des connexions n’est pas encore disponible.'], 503);
+            }
+        } else {
+            $seenAt = null;
+        }
+
+        return response()->json(['ok' => true, 'seenAt' => $seenAt]);
+    }
+
+    private function recordLoginActivity(AuthUser $user): void
+    {
+        if ($user->company_id === null) {
+            return;
+        }
+
+        $loggedInAt = now();
+        try {
+            $user->forceFill([
+                'last_login_at' => $loggedInAt,
+                'last_seen_at' => $loggedInAt,
+            ])->save();
+        } catch (QueryException $exception) {
+            report($exception);
+        }
     }
 
     public function logout(Request $request): Response

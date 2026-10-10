@@ -22,6 +22,54 @@ class MaximusAuthTest extends TestCase
             ->assertJson(['ok' => true]);
     }
 
+    public function test_company_heartbeat_updates_activity_and_maximus_can_read_it(): void
+    {
+        $companyUser = AuthUser::query()->create([
+            'id' => 'connectivity-company-admin',
+            'email' => 'connectivity@kora.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!', '00112233445566778899aabbccddeeff'),
+            'display_name' => 'Admin Kora',
+            'role' => 'company_admin',
+            'company_id' => 'kora',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $login = $this->postJson('/api/auth/login', [
+            'email' => 'connectivity@kora.demo',
+            'password' => 'Admin123!',
+        ])->assertOk();
+        $companyToken = $login->getCookie(MaximusAuth::COOKIE, false)->getValue();
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $companyToken)
+            ->postJson('/api/auth/heartbeat')
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        $activity = $companyUser->fresh();
+        $this->assertNotNull($activity?->last_login_at);
+        $this->assertNotNull($activity?->last_seen_at);
+        $this->assertTrue($activity->last_seen_at->greaterThanOrEqualTo(now()->subMinute()));
+
+        $admin = AuthUser::query()->create([
+            'id' => 'connectivity-maximus-admin',
+            'email' => 'connectivity-admin@maximus.demo',
+            'password_hash' => MaximusPassword::hash('Admin123!', '00112233445566778899aabbccddeeff'),
+            'display_name' => 'Administration MAXIMUS',
+            'role' => 'maximus_admin',
+            'sector_ids' => [],
+            'status' => 'ACTIF',
+        ]);
+        $adminToken = MaximusAuth::issueSession($admin);
+
+        $this->withCredentials()
+            ->withUnencryptedCookie(MaximusAuth::COOKIE, $adminToken)
+            ->getJson('/api/companies/connectivity')
+            ->assertOk()
+            ->assertJsonPath('companies.0.companyId', 'kora')
+            ->assertJsonPath('companies.0.online', true);
+    }
+
     public function test_laravel_accepts_the_existing_maximus_scrypt_format(): void
     {
         $this->assertTrue(MaximusPassword::check(

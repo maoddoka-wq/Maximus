@@ -37,6 +37,7 @@ export const authApi = {
       body: JSON.stringify({ email, password }),
     }),
   session: () => request<{ user: AuthUser | null }>('/auth/session'),
+  heartbeat: () => request<{ ok: true; seenAt: string | null }>('/auth/heartbeat', { method: 'POST' }),
   logout: () => request<void>('/auth/logout', { method: 'POST' }),
   provisionAccount: (input: {
     id: string;
