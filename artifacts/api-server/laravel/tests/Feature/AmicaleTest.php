@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Models\AmicaleRecord;
 use App\Models\AuthUser;
 use App\Support\MaximusAuth;
+use App\Support\CompanyPaymentAccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class AmicaleTest extends TestCase
@@ -133,6 +136,97 @@ class AmicaleTest extends TestCase
             'amount' => 10000,
             'expenseDate' => '2026-10-08',
         ])->assertForbidden();
+    }
+
+    public function test_student_sees_only_their_own_cotisations_and_cannot_use_the_treasury_register(): void
+    {
+        $admin = $this->asActor('dues-admin');
+        $first = $admin->postJson('/api/amicales/members?companyId=kora', [
+            'name' => 'Étudiant A',
+            'email' => 'student-a@kora.test',
+        ])->assertCreated()->json('member');
+        $second = $admin->postJson('/api/amicales/members?companyId=kora', [
+            'name' => 'Étudiant B',
+            'email' => 'student-b@kora.test',
+        ])->assertCreated()->json('member');
+        $admin->postJson('/api/amicales/dues-periods?companyId=kora', [
+            'period' => '2026-2027',
+            'amount' => 12000,
+        ])->assertCreated()->assertJsonPath('duesPeriod.amount', 12000);
+        foreach ([$first, $second] as $member) {
+            $admin->postJson('/api/amicales/contributions?companyId=kora', [
+                'memberId' => $member['id'],
+                'period' => '2026-2027',
+                'amount' => 12000,
+                'paidOn' => '2026-10-10',
+                'method' => 'WAVE',
+            ])->assertCreated();
+        }
+
+        $student = $this->asActor('student-a', 'employee', [
+            'amicales:menu:mes-cotisations' => ['voir', 'créer'],
+        ]);
+        $student->getJson('/api/amicales/bootstrap?companyId=kora')
+            ->assertOk()
+            ->assertJsonCount(0, 'members')
+            ->assertJsonCount(1, 'contributions')
+            ->assertJsonPath('contributions.0.memberId', $first['id'])
+            ->assertJsonPath('duesPeriods.0.amount', 12000);
+        $student->postJson('/api/amicales/contributions?companyId=kora', [
+            'memberId' => $first['id'],
+            'period' => '2026-2027',
+            'amount' => 12000,
+            'paidOn' => '2026-10-10',
+            'method' => 'CASH',
+        ])->assertForbidden();
+    }
+
+    public function test_member_checkout_uses_the_fixed_period_amount_and_confirms_only_from_provider_status(): void
+    {
+        $admin = $this->asActor('online-dues-admin');
+        $member = $admin->postJson('/api/amicales/members?companyId=kora', [
+            'name' => 'Étudiante en ligne',
+            'email' => 'student-online@kora.test',
+        ])->assertCreated()->json('member');
+        $admin->postJson('/api/amicales/dues-periods?companyId=kora', [
+            'period' => '2026-2027',
+            'amount' => 12000,
+        ])->assertCreated();
+        CompanyPaymentAccess::ensure('kora', 'ACTIF');
+        DB::table('company_payment_settings')->where('company_id', 'kora')->update(['status' => 'ACTIF']);
+        config([
+            'services.diamanopay.base_url' => 'https://api.diamanopay.test',
+            'services.diamanopay.access_token' => 'test-token',
+            'services.diamanopay.webhook_secret' => 'test-secret',
+            'services.diamanopay.webhook_url' => 'https://maximus.test',
+        ]);
+        Http::fake([
+            'https://api.diamanopay.test/api/charges' => Http::response([
+                'data' => ['id' => 'charge-amicale-1', 'checkoutUrl' => 'https://checkout.diamanopay.test/pay/1'],
+            ]),
+            'https://api.diamanopay.test/api/charges/charge-amicale-1' => Http::response([
+                'data' => ['status' => 'PAID', 'amount' => 12000],
+            ]),
+        ]);
+
+        $student = $this->asActor('student-online', 'employee', [
+            'amicales:menu:mes-cotisations' => ['voir', 'créer'],
+        ]);
+        $checkout = $student->postJson('/api/amicales/contributions/checkout?companyId=kora', [
+            'period' => '2026-2027',
+            'provider' => 'WAVE',
+            'status' => 'PAID',
+        ])->assertCreated()
+            ->assertJsonPath('checkoutUrl', 'https://checkout.diamanopay.test/pay/1')
+            ->assertJsonPath('contribution.status', 'PENDING');
+        $contributionId = $checkout->json('contribution.id');
+        $this->assertDatabaseHas('amicale_records', ['id' => $contributionId, 'status' => 'PENDING', 'amount' => 12000]);
+
+        $student->getJson('/api/amicales/contributions/'.$contributionId.'/payment-status?companyId=kora')
+            ->assertOk()
+            ->assertJsonPath('contribution.status', 'PAID')
+            ->assertJsonPath('contribution.memberId', $member['id']);
+        $this->assertDatabaseHas('amicale_records', ['id' => $contributionId, 'status' => 'PAID']);
     }
 
     public function test_activities_and_announcements_are_persisted_with_valid_counts(): void

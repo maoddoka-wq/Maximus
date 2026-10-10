@@ -49,6 +49,7 @@ import {
   type AmicaleBootstrap,
   type AmicaleContribution,
   type AmicaleContributionInput,
+  type AmicaleDuesPeriod,
   type AmicaleExpense,
   type AmicaleExpenseInput,
   type AmicaleMember,
@@ -58,11 +59,12 @@ import { amicaleFeatureDefinitions } from '@/lib/amicales-features';
 import { getAmicaleDashboardSummary } from '@/lib/amicales-dashboard';
 
 type FeatureId = (typeof amicaleFeatureDefinitions)[number]['id'];
-type FormKind = 'member' | 'contribution' | 'expense' | 'activity' | 'announcement';
+type FormKind = 'member' | 'contribution' | 'dues' | 'expense' | 'activity' | 'announcement';
 type FormValues = Record<string, string>;
 const formFieldsByKind: Record<FormKind, string[]> = {
   member: ['name', 'studentIdentifier', 'email', 'phone', 'faculty', 'studyYear', 'joinedAt', 'office', 'mandateStart', 'mandateEnd', 'notes'],
-  contribution: ['memberId', 'period', 'amount', 'paidOn', 'method', 'note'],
+  contribution: ['memberId', 'period', 'amount', 'paidOn', 'method', 'transactionReference', 'note'],
+  dues: ['period', 'amount'],
   expense: ['title', 'category', 'amount', 'expenseDate', 'vendor', 'description'],
   activity: ['title', 'description', 'location', 'eventDate', 'participantCount', 'attendeeCount', 'status'],
   announcement: ['title', 'body', 'status'],
@@ -77,6 +79,7 @@ const featureCopy: Record<FeatureId, { title: string; description: string; eyebr
   annonces: { title: 'Annonces', description: 'Préparez les messages et publiez les informations de l’amicale.', eyebrow: 'Communication' },
   bureau: { title: 'Bureau & mandats', description: 'Consultez et gérez la composition du bureau et les échéances de mandat.', eyebrow: 'Gouvernance' },
   rapports: { title: 'Rapports', description: 'Consultez les indicateurs disponibles sur les cotisations et les dépenses.', eyebrow: 'Pilotage' },
+  'mes-cotisations': { title: 'Mes cotisations', description: 'Consultez votre situation et réglez le forfait d’une période par Wave ou Orange Money.', eyebrow: 'Espace membre' },
 };
 
 const labels: Record<string, string> = {
@@ -84,6 +87,7 @@ const labels: Record<string, string> = {
   REJECTED: 'Refusée', PAID: 'Payée', PLANNED: 'Planifiée', COMPLETED: 'Terminée',
   CANCELLED: 'Annulée', DRAFT: 'Brouillon', PUBLISHED: 'Publiée',
   CASH: 'Espèces', MOBILE_MONEY: 'Mobile money', BANK_TRANSFER: 'Virement', OTHER: 'Autre',
+  WAVE: 'Wave', ORANGE_MONEY: 'Orange Money', FREE_MONEY: 'Free Money',
 };
 const money = (amount: number) => `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Math.trunc(amount))} XOF`;
 const dateLabel = (value?: string | null) => value ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(value)) : '—';
@@ -91,7 +95,7 @@ const today = () => {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
-const emptyData: AmicaleBootstrap = { members: [], contributions: [], expenses: [], activities: [], announcements: [] };
+const emptyData: AmicaleBootstrap = { members: [], contributions: [], expenses: [], activities: [], announcements: [], duesPeriods: [] };
 
 export default function AmicalesModulePage({
   companyId,
@@ -126,7 +130,7 @@ export default function AmicalesModulePage({
   const visibleFeatures = amicaleFeatureDefinitions.filter(({ id }) => {
     if (!allowedFeatureIds.includes(id)) return false;
     const permissions = featurePermissions?.[id];
-    return !permissions || permissions.includes('voir') || permissions.includes('modifier') || permissions.includes('créer');
+    return featurePermissions ? Boolean(permissions?.includes('voir')) : true;
   });
   const hasVisibleFeatures = visibleFeatures.length > 0;
   const activeFeature = visibleFeatures.some(({ id }) => id === activeFeatureId)
@@ -134,10 +138,12 @@ export default function AmicalesModulePage({
     : visibleFeatures.some(({ id }) => id === localFeature) ? localFeature : (visibleFeatures[0]?.id ?? 'dashboard');
   const currentFeature = featureCopy[activeFeature];
 
-  const canCreateFor = (feature: string) =>
-    featurePermissions?.[feature] ? featurePermissions[feature]!.includes('créer') && canCreate : canCreate;
-  const canModifyFor = (feature: string) =>
-    featurePermissions?.[feature] ? featurePermissions[feature]!.includes('modifier') && canModify : canModify;
+  const canCreateFor = (feature: string) => featurePermissions
+    ? Boolean(featurePermissions[feature]?.includes('voir') && featurePermissions[feature]?.includes('créer'))
+    : canCreate;
+  const canModifyFor = (feature: string) => featurePermissions
+    ? Boolean(featurePermissions[feature]?.includes('voir') && featurePermissions[feature]?.includes('créer') && featurePermissions[feature]?.includes('modifier'))
+    : canModify;
 
   useEffect(() => {
     if (preview || !hasVisibleFeatures) {
@@ -203,10 +209,18 @@ export default function AmicalesModulePage({
           paidOn: values.paidOn,
           method: values.method as AmicaleContributionInput['method'],
           note: values.note?.trim(),
+          transactionReference: values.transactionReference?.trim(),
         };
         const result = await api.createContribution(body);
         setData(current => ({ ...current, contributions: [result.contribution, ...current.contributions] }));
         showAppToast('Cotisation enregistrée. Le reçu est disponible dans son enregistrement.', 'success');
+      } else if (formKind === 'dues') {
+        const result = await api.createDuesPeriod({
+          period: values.period.trim(),
+          amount: Math.trunc(Number(values.amount)),
+        });
+        setData(current => ({ ...current, duesPeriods: [...current.duesPeriods, result.duesPeriod] }));
+        showAppToast('Forfait de cotisation créé pour cette période.', 'success');
       } else if (formKind === 'expense') {
         const body: AmicaleExpenseInput = {
           title: values.title.trim(),
@@ -278,6 +292,25 @@ export default function AmicalesModulePage({
     }
   };
 
+  const createMemberCheckout = async (period: string, provider: 'WAVE' | 'ORANGE_MONEY') => {
+    try {
+      const result = await api.createMemberCheckout(period, provider);
+      window.location.assign(result.checkoutUrl);
+    } catch (error) {
+      showAppToast(error instanceof Error ? error.message : 'Le paiement en ligne n’a pas pu être ouvert.', 'error');
+    }
+  };
+
+  const checkMemberPayment = async (id: string) => {
+    try {
+      const result = await api.checkMemberPayment(id);
+      setData(current => ({ ...current, contributions: current.contributions.map(item => item.id === id ? result.contribution : item) }));
+      showAppToast(result.contribution.status === 'PAID' ? 'Paiement confirmé.' : 'Le paiement est toujours en attente de confirmation.', result.contribution.status === 'PAID' ? 'success' : 'info');
+    } catch (error) {
+      showAppToast(error instanceof Error ? error.message : 'Le statut du paiement n’a pas pu être vérifié.', 'error');
+    }
+  };
+
   const archiveMember = async (member: AmicaleMember) => {
     if (preview || !window.confirm(`Archiver le membre « ${member.name} » ?`)) return;
     try {
@@ -309,7 +342,7 @@ export default function AmicalesModulePage({
   const tabItems = visibleFeatures.map(feature => ({
     id: feature.id,
     label: feature.label,
-    icon: ({ dashboard: Activity, membres: Users, cotisations: Banknote, depenses: Wallet, activites: CalendarDays, annonces: Megaphone, bureau: Users, rapports: ClipboardList } as Record<string, typeof Activity>)[feature.id],
+    icon: ({ dashboard: Activity, membres: Users, cotisations: Banknote, 'mes-cotisations': Banknote, depenses: Wallet, activites: CalendarDays, annonces: Megaphone, bureau: Users, rapports: ClipboardList } as Record<string, typeof Activity>)[feature.id],
   }));
 
   return (
@@ -358,7 +391,17 @@ export default function AmicalesModulePage({
             />}
             {activeFeature === 'membres' && <MemberList members={data.members} canCreate={canCreateFor('membres')} canModify={canModifyFor('membres')} onCreate={() => openForm('member', { joinedAt: today() })} onEdit={beginEditMember} onArchive={member => void archiveMember(member)} />}
             {activeFeature === 'bureau' && <MemberList bureau members={members} canCreate={canCreateFor('bureau')} canModify={canModifyFor('bureau')} onCreate={() => openForm('member', { joinedAt: today() })} onEdit={beginEditMember} onArchive={member => void archiveMember(member)} />}
-            {activeFeature === 'cotisations' && <ContributionList contributions={data.contributions} canCreate={canCreateFor('cotisations') && activeMembers > 0} onCreate={() => openForm('contribution', { paidOn: today(), method: 'CASH' })} />}
+            {activeFeature === 'cotisations' && <div className="space-y-5">
+              <ContributionList contributions={data.contributions} canCreate={canCreateFor('cotisations') && activeMembers > 0} onCreate={() => openForm('contribution', { paidOn: today(), method: 'CASH' })} />
+              <DuesPeriodList periods={data.duesPeriods} canCreate={canCreateFor('cotisations')} canModify={canModifyFor('cotisations')} onCreate={() => openForm('dues')} onUpdate={async (id, amount) => {
+                try {
+                  const result = await api.updateDuesPeriod(id, amount);
+                  setData(current => ({ ...current, duesPeriods: current.duesPeriods.map(item => item.id === id ? result.duesPeriod : item) }));
+                  showAppToast('Forfait mis à jour.', 'success');
+                } catch (error) { showAppToast(error instanceof Error ? error.message : 'La modification a échoué.', 'error'); }
+              }} />
+            </div>}
+            {activeFeature === 'mes-cotisations' && <MemberDuesList periods={data.duesPeriods} contributions={data.contributions} canPay={canCreateFor('mes-cotisations')} onPay={createMemberCheckout} onCheck={checkMemberPayment} />}
             {activeFeature === 'depenses' && <ExpenseList expenses={data.expenses} canCreate={canCreateFor('depenses')} canModify={canModifyFor('depenses')} onCreate={() => openForm('expense', { expenseDate: today() })} onDecide={decideExpense} onPaid={expense => void markPaid(expense)} />}
             {activeFeature === 'activites' && <ActivityList activities={data.activities} canCreate={canCreateFor('activites')} canModify={canModifyFor('activites')} onCreate={() => openForm('activity', { eventDate: today(), status: 'PLANNED', participantCount: '0', attendeeCount: '0' })} onEdit={beginEditActivity} />}
             {activeFeature === 'annonces' && <AnnouncementList announcements={data.announcements} canCreate={canCreateFor('annonces')} canModify={canModifyFor('annonces')} onCreate={() => openForm('announcement', { status: 'DRAFT' })} onEdit={beginEditAnnouncement} />}
@@ -489,15 +532,86 @@ function ContributionList({ contributions, canCreate, onCreate }: { contribution
     <CardContent>
       {!contributions.length ? <EmptyInline title="Aucune cotisation enregistrée" description="Les règlements et leurs références de reçu seront listés ici." /> :
         <div className="table-scroll"><table className="w-full text-left text-sm" data-testid="table-amicale-contributions">
-          <thead><tr><th className="px-4">Reçu</th><th className="px-4">Membre</th><th className="px-4">Période</th><th className="px-4">Date</th><th className="px-4">Moyen</th><th className="px-4">Montant XOF</th></tr></thead>
+          <thead><tr><th className="px-4">Reçu</th><th className="px-4">Membre</th><th className="px-4">Période</th><th className="px-4">Date</th><th className="px-4">Moyen / référence</th><th className="px-4">Statut</th><th className="px-4">Montant XOF</th></tr></thead>
           <tbody className="divide-y divide-border">{contributions.map(item => <tr key={item.id} data-testid={`row-amicale-contribution-${item.id}`}>
             <td className="px-4 py-3 font-semibold">{item.reference}</td><td className="px-4 py-3">{item.memberName}</td><td className="px-4 py-3">{item.period}</td>
-            <td className="px-4 py-3">{dateLabel(item.paidOn)}</td><td className="px-4 py-3">{labels[item.method] ?? item.method}</td>
+            <td className="px-4 py-3">{dateLabel(item.paidOn)}</td><td className="px-4 py-3">{labels[item.method] ?? item.method}{item.transactionReference && <span className="block text-xs text-muted-foreground">{item.transactionReference}</span>}</td>
+            <td className="px-4 py-3">{labels[item.status] ?? item.status}</td>
             <td className="px-4 py-3 text-right font-semibold tabular-nums">{money(item.amount)}</td>
           </tr>)}</tbody>
         </table></div>}
     </CardContent>
   </Card>;
+}
+
+function DuesPeriodList({ periods, canCreate, canModify, onCreate, onUpdate }: {
+  periods: AmicaleDuesPeriod[]; canCreate: boolean; canModify: boolean;
+  onCreate: () => void; onUpdate: (id: string, amount: number) => void;
+}) {
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  return <Card data-testid="card-amicale-dues-periods">
+    <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+      <div><CardTitle>Forfaits par période</CardTitle><p className="mt-1 text-sm text-muted-foreground">Le montant configuré est celui proposé au membre pour son paiement en ligne.</p></div>
+      {canCreate && <Button type="button" variant="outline" data-testid="button-create-dues-period" onClick={onCreate}><Plus size={16} />Configurer une période</Button>}
+    </CardHeader>
+    <CardContent>
+      {!periods.length ? <EmptyInline title="Aucun forfait configuré" description="Ajoutez une période et un montant fixe avant d’ouvrir le paiement en ligne." /> :
+        <div className="space-y-3">{periods.map(period => <div key={period.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
+          <strong>{period.period}</strong>
+          <div className="flex items-center gap-2">
+            {canModify ? <Input aria-label={`Montant ${period.period}`} type="number" min="1" step="1" className="w-36" value={amounts[period.id] ?? String(period.amount)} onChange={event => setAmounts(current => ({ ...current, [period.id]: event.target.value }))} /> : <span className="font-semibold tabular-nums">{money(period.amount)}</span>}
+            {canModify && <Button type="button" variant="outline" size="sm" data-testid={`button-update-dues-${period.id}`} onClick={() => {
+              const amount = Math.trunc(Number(amounts[period.id] ?? period.amount));
+              if (amount > 0) onUpdate(period.id, amount);
+            }}>Enregistrer</Button>}
+          </div>
+        </div>)}</div>}
+    </CardContent>
+  </Card>;
+}
+
+function MemberDuesList({ periods, contributions, canPay, onPay, onCheck }: {
+  periods: AmicaleDuesPeriod[]; contributions: AmicaleContribution[]; canPay: boolean;
+  onPay: (period: string, provider: 'WAVE' | 'ORANGE_MONEY') => void;
+  onCheck: (id: string) => void;
+}) {
+  return <div className="space-y-5" data-testid="member-amicale-dues">
+    <Card>
+      <CardHeader><CardTitle>Forfaits à régler</CardTitle><p className="mt-1 text-sm text-muted-foreground">Le montant est fixé par le trésorier. Le paiement n’est confirmé qu’après validation de DiamanoPay.</p></CardHeader>
+      <CardContent className="space-y-3">
+        {!periods.length ? <EmptyInline title="Aucun forfait disponible" description="Le trésorier n’a pas encore configuré de période de cotisation." /> :
+          periods.map(period => {
+            const payment = contributions.find(item => item.period === period.period);
+            const pendingProvider = payment?.status === 'PENDING'
+              && (payment.method === 'WAVE' || payment.method === 'ORANGE_MONEY')
+              ? payment.method
+              : null;
+            return <div key={period.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3" data-testid={`member-dues-${period.id}`}>
+              <div><strong>{period.period}</strong><p className="text-sm text-muted-foreground">{money(period.amount)} · {payment ? labels[payment.status] ?? payment.status : 'À régler'}</p></div>
+              <div className="flex flex-wrap gap-2">
+                {payment?.status === 'PENDING' && <Button type="button" variant="outline" size="sm" onClick={() => onCheck(payment.id)}>Vérifier le paiement</Button>}
+                {canPay && payment?.status !== 'PAID' && (pendingProvider
+                  ? <Button type="button" size="sm" onClick={() => onPay(period.period, pendingProvider)}>Continuer avec {labels[pendingProvider]}</Button>
+                  : <>
+                      <Button type="button" size="sm" onClick={() => onPay(period.period, 'WAVE')}>Payer avec Wave</Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => onPay(period.period, 'ORANGE_MONEY')}>Orange Money</Button>
+                    </>)}
+              </div>
+            </div>;
+          })}
+      </CardContent>
+    </Card>
+    <Card>
+      <CardHeader><CardTitle>Mes règlements</CardTitle></CardHeader>
+      <CardContent>
+        {!contributions.length ? <EmptyInline title="Aucun règlement pour le moment" description="Vos paiements confirmés ou en attente apparaîtront ici." /> :
+          <div className="space-y-2">{contributions.map(item => <div key={item.id} className="flex flex-wrap justify-between gap-2 border-b border-border py-2 last:border-0" data-testid={`member-contribution-${item.id}`}>
+            <span>{item.period} · {labels[item.status] ?? item.status} · {labels[item.method] ?? item.method}</span>
+            <strong className="tabular-nums">{money(item.amount)}</strong>
+          </div>)}</div>}
+      </CardContent>
+    </Card>
+  </div>;
 }
 
 function ExpenseList({ expenses, canCreate, canModify, onCreate, onDecide, onPaid }: {
@@ -571,12 +685,13 @@ function AnnouncementList({ announcements, canCreate, canModify, onCreate, onEdi
 }
 
 function Reports({ contributions, expenses, members }: { contributions: AmicaleContribution[]; expenses: AmicaleExpense[]; members: AmicaleMember[] }) {
+  const paidContributions = contributions.filter(item => item.status === 'PAID');
   const sum = (items: { amount: number }[]) => items.reduce((total, item) => total + item.amount, 0);
   const paidExpenses = expenses.filter(item => item.status === 'PAID');
   const waiting = expenses.filter(item => item.status === 'PENDING');
   return <div className="space-y-5">
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <MetricCard label="Cotisations cumulées" value={money(sum(contributions))} detail={`${contributions.length} reçus enregistrés`} icon={<ArrowDownLeft size={18} />} />
+      <MetricCard label="Cotisations cumulées" value={money(sum(paidContributions))} detail={`${paidContributions.length} règlements confirmés`} icon={<ArrowDownLeft size={18} />} />
       <MetricCard label="Dépenses payées" value={money(sum(paidExpenses))} detail={`${paidExpenses.length} dépenses`} icon={<ArrowUpRight size={18} />} />
       <MetricCard label="En attente de décision" value={money(sum(waiting))} detail={`${waiting.length} demandes`} icon={<ClipboardList size={18} />} />
       <MetricCard label="Membres actifs" value={members.filter(item => item.status === 'ACTIVE').length} detail={`${members.length} fiches au total`} icon={<Users size={18} />} />
@@ -584,7 +699,7 @@ function Reports({ contributions, expenses, members }: { contributions: AmicaleC
     <Card><CardHeader><CardTitle>Historique financier</CardTitle><p className="text-sm text-muted-foreground">Montants exacts en XOF, sans arrondi monétaire.</p></CardHeader>
       <CardContent>
         {!contributions.length && !expenses.length ? <EmptyInline title="Aucune donnée financière" description="Les rapports apparaîtront après l’enregistrement de cotisations ou de dépenses." /> : <div className="grid gap-5 md:grid-cols-2">
-          <div><h3 className="mb-3 text-sm font-semibold">Cotisations par période</h3>{groupAmounts(contributions.map(item => ({ period: item.period, amount: item.amount }))).map(item => <div key={item.period} className="flex justify-between border-b border-border py-2 text-sm" data-testid={`report-period-${item.period}`}><span>{item.period}</span><strong className="tabular-nums">{money(item.amount)}</strong></div>)}</div>
+          <div><h3 className="mb-3 text-sm font-semibold">Cotisations par période</h3>{groupAmounts(paidContributions.map(item => ({ period: item.period, amount: item.amount }))).map(item => <div key={item.period} className="flex justify-between border-b border-border py-2 text-sm" data-testid={`report-period-${item.period}`}><span>{item.period}</span><strong className="tabular-nums">{money(item.amount)}</strong></div>)}</div>
           <div><h3 className="mb-3 text-sm font-semibold">Dépenses par statut</h3>{groupAmounts(expenses.map(item => ({ period: labels[item.status] ?? item.status, amount: item.amount }))).map(item => <div key={item.period} className="flex justify-between border-b border-border py-2 text-sm" data-testid={`report-expense-status-${item.period}`}><span>{item.period}</span><strong className="tabular-nums">{money(item.amount)}</strong></div>)}</div>
         </div>}
       </CardContent>
@@ -604,6 +719,7 @@ function FormDialog({ kind, values, onSubmit, onClose, saving, members, editing 
     contribution: 'Enregistrer une cotisation', expense: 'Soumettre une dépense',
     activity: editing ? 'Modifier l’activité' : 'Nouvelle activité',
     announcement: editing ? 'Modifier l’annonce' : 'Nouvelle annonce',
+    dues: 'Configurer une cotisation',
   };
   const submitLabel = kind === 'expense' ? 'Soumettre' : kind === 'contribution' ? 'Enregistrer le règlement' : editing ? 'Enregistrer' : 'Créer';
   const field = (name: string, label: string, required = false, type = 'text', placeholder?: string) => (
@@ -679,8 +795,13 @@ function FormDialog({ kind, values, onSubmit, onClose, saving, members, editing 
     {select('memberId', 'Membre', members.map(member => ({ value: member.id, label: `${member.name} · ${member.studentIdentifier}` })))}
     {field('period', 'Période de cotisation', true, 'text', 'Ex. 2025–2026')}{amount}
     {field('paidOn', 'Date du règlement', true, 'date')}
-    {select('method', 'Moyen de paiement', [{ value: 'CASH', label: 'Espèces' }, { value: 'MOBILE_MONEY', label: 'Mobile money' }, { value: 'BANK_TRANSFER', label: 'Virement bancaire' }, { value: 'OTHER', label: 'Autre' }])}
+    {select('method', 'Moyen de paiement', [{ value: 'CASH', label: 'Espèces' }, { value: 'WAVE', label: 'Wave' }, { value: 'ORANGE_MONEY', label: 'Orange Money' }, { value: 'FREE_MONEY', label: 'Free Money' }, { value: 'BANK_TRANSFER', label: 'Virement bancaire' }, { value: 'MOBILE_MONEY', label: 'Autre mobile money' }, { value: 'OTHER', label: 'Autre' }])}
+    {field('transactionReference', 'Référence du paiement externe')}
     <div className="sm:col-span-2">{field('note', 'Note pour le reçu')}</div>
+  </>;
+  else if (kind === 'dues') fields = <>
+    {field('period', 'Période de cotisation', true, 'text', 'Ex. 2026–2027')}
+    {field('amount', 'Forfait fixe (XOF)', true, 'number')}
   </>;
   else if (kind === 'expense') fields = <>
     {field('title', 'Intitulé', true)}{field('category', 'Catégorie', true)}

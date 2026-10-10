@@ -7,6 +7,7 @@ export const amicaleFeatureDefinitions = [
   { id: 'annonces', label: 'Annonces' },
   { id: 'bureau', label: 'Bureau' },
   { id: 'rapports', label: 'Rapports' },
+  { id: 'mes-cotisations', label: 'Mes cotisations' },
 ] as const;
 
 const viewOnly = (featureIds: readonly string[]) =>
@@ -66,9 +67,10 @@ export const amicaleFeaturePacks = [
     id: 'amicale-finances',
     name: 'Trésorerie',
     description: 'Enregistrer les cotisations, les reçus et les dépenses à approuver.',
-    featureIds: ['dashboard', 'cotisations', 'depenses', 'rapports'],
+    featureIds: ['dashboard', 'membres', 'cotisations', 'depenses', 'rapports'],
     featurePermissions: {
       dashboard: ['voir'],
+      membres: ['voir'],
       ...manage(['cotisations', 'depenses']),
       rapports: ['voir'],
     },
@@ -87,8 +89,11 @@ export const amicaleFeaturePacks = [
     id: 'amicales-employe',
     name: 'Membre de l’amicale',
     description: 'Consulter les activités et les annonces accessibles aux membres.',
-    featureIds: ['dashboard', 'activites', 'annonces'],
-    featurePermissions: viewOnly(['dashboard', 'activites', 'annonces']),
+    featureIds: ['dashboard', 'activites', 'annonces', 'mes-cotisations'],
+    featurePermissions: {
+      ...viewOnly(['dashboard', 'activites', 'annonces', 'mes-cotisations']),
+      'mes-cotisations': ['voir', 'créer'],
+    },
   },
   {
     id: 'amicales-manager',

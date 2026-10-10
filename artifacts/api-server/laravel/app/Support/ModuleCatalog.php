@@ -399,7 +399,7 @@ final class ModuleCatalog
                 'id' => 'amicales',
                 'name' => 'Amicale étudiante',
                 'description' => 'Gérer les membres, les cotisations, les dépenses et la vie de l’amicale.',
-                'features' => ['Tableau de bord', 'Membres', 'Cotisations', 'Dépenses', 'Activités', 'Annonces', 'Bureau', 'Rapports'],
+                'features' => ['Tableau de bord', 'Membres', 'Cotisations', 'Dépenses', 'Activités', 'Annonces', 'Bureau', 'Rapports', 'Mes cotisations'],
                 'feature_packs' => [
                     [
                         'id' => 'amicale-consultation',
@@ -428,9 +428,10 @@ final class ModuleCatalog
                         'id' => 'amicale-finances',
                         'name' => 'Trésorerie',
                         'description' => 'Enregistrer les cotisations, les reçus et les dépenses à approuver.',
-                        'feature_ids' => ['dashboard', 'cotisations', 'depenses', 'rapports'],
+                        'feature_ids' => ['dashboard', 'membres', 'cotisations', 'depenses', 'rapports'],
                         'feature_permissions' => [
                             'dashboard' => ['voir'],
+                            'membres' => ['voir'],
                             'cotisations' => ['voir', 'créer', 'modifier'],
                             'depenses' => ['voir', 'créer', 'modifier'],
                             'rapports' => ['voir'],
@@ -451,11 +452,12 @@ final class ModuleCatalog
                         'id' => 'amicales-employe',
                         'name' => 'Membre de l’amicale',
                         'description' => 'Consulter les activités et les annonces accessibles aux membres.',
-                        'feature_ids' => ['dashboard', 'activites', 'annonces'],
+                        'feature_ids' => ['dashboard', 'activites', 'annonces', 'mes-cotisations'],
                         'feature_permissions' => [
                             'dashboard' => ['voir'],
                             'activites' => ['voir'],
                             'annonces' => ['voir'],
+                            'mes-cotisations' => ['voir', 'créer'],
                         ],
                     ],
                     [

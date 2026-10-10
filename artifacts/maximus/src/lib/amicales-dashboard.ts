@@ -5,6 +5,7 @@ export function getAmicaleDashboardSummary(data: AmicaleBootstrap, today: string
     .filter(activity => activity.status === 'PLANNED' && activity.eventDate.slice(0, 10) >= today)
     .sort((left, right) => left.eventDate.localeCompare(right.eventDate))
     .slice(0, 3);
+  const paidContributions = data.contributions.filter(item => item.status === 'PAID');
   const latestContributions = [...data.contributions]
     .sort((left, right) =>
       right.paidOn.localeCompare(left.paidOn) || right.createdAt.localeCompare(left.createdAt),
@@ -16,8 +17,8 @@ export function getAmicaleDashboardSummary(data: AmicaleBootstrap, today: string
   return {
     activeMembers: data.members.filter(member => member.status === 'ACTIVE').length,
     totalMembers: data.members.length,
-    totalContributions: data.contributions.reduce((total, item) => total + item.amount, 0),
-    contributionCount: data.contributions.length,
+    totalContributions: paidContributions.reduce((total, item) => total + item.amount, 0),
+    contributionCount: paidContributions.length,
     paidExpenseAmount: paidExpenses.reduce((total, item) => total + item.amount, 0),
     paidExpenseCount: paidExpenses.length,
     approvedExpenseCount: approvedExpenses.length,

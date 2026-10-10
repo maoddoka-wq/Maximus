@@ -4,6 +4,14 @@ export type AmicaleMemberStatus = 'ACTIVE' | 'ARCHIVED';
 export type AmicaleExpenseStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAID';
 export type AmicaleActivityStatus = 'PLANNED' | 'COMPLETED' | 'CANCELLED';
 export type AmicaleAnnouncementStatus = 'DRAFT' | 'PUBLISHED';
+export type AmicalePaymentMethod = 'CASH' | 'WAVE' | 'ORANGE_MONEY' | 'FREE_MONEY' | 'MOBILE_MONEY' | 'BANK_TRANSFER' | 'OTHER';
+
+export interface AmicaleDuesPeriod {
+  id: string;
+  period: string;
+  amount: number;
+  status: 'ACTIVE';
+}
 
 export interface AmicaleMember {
   id: string;
@@ -34,8 +42,10 @@ export interface AmicaleContribution {
   period: string;
   amount: number;
   paidOn: string;
-  method: 'CASH' | 'MOBILE_MONEY' | 'BANK_TRANSFER' | 'OTHER';
+  method: AmicalePaymentMethod;
   note: string;
+  transactionReference: string;
+  status: 'PENDING' | 'PAID' | 'FAILED';
   createdBy: string;
   createdAt: string;
 }
@@ -91,6 +101,7 @@ export interface AmicaleBootstrap {
   expenses: AmicaleExpense[];
   activities: AmicaleActivity[];
   announcements: AmicaleAnnouncement[];
+  duesPeriods: AmicaleDuesPeriod[];
 }
 
 export type AmicaleMemberInput = Pick<AmicaleMember, 'name'> & Partial<
@@ -104,6 +115,7 @@ export type AmicaleContributionInput = {
   paidOn: string;
   method: AmicaleContribution['method'];
   note?: string;
+  transactionReference?: string;
 };
 
 export type AmicaleExpenseInput = {
@@ -130,6 +142,8 @@ export type AmicaleAnnouncementInput = {
   body: string;
   status?: AmicaleAnnouncementStatus;
 };
+
+export type AmicaleDuesPeriodInput = { period: string; amount: number };
 
 const request = <T>(path: string, options?: RequestInit) =>
   requestJson<T>(path, options, {
@@ -164,6 +178,22 @@ export const createAmicaleApi = (companyId: string) => {
       request<{ contribution: AmicaleContribution }>(
         scopedPath('/amicales/contributions'),
         json(body),
+      ),
+    createDuesPeriod: (body: AmicaleDuesPeriodInput) =>
+      request<{ duesPeriod: AmicaleDuesPeriod }>(scopedPath('/amicales/dues-periods'), json(body)),
+    updateDuesPeriod: (id: string, amount: number) =>
+      request<{ duesPeriod: AmicaleDuesPeriod }>(
+        scopedPath(`/amicales/dues-periods/${encodeURIComponent(id)}`),
+        { ...json({ amount }), method: 'PATCH' },
+      ),
+    createMemberCheckout: (period: string, provider: 'WAVE' | 'ORANGE_MONEY') =>
+      request<{ contribution: AmicaleContribution; checkoutUrl: string }>(
+        scopedPath('/amicales/contributions/checkout'),
+        json({ period, provider }),
+      ),
+    checkMemberPayment: (id: string) =>
+      request<{ contribution: AmicaleContribution }>(
+        scopedPath(`/amicales/contributions/${encodeURIComponent(id)}/payment-status`),
       ),
     createExpense: (body: AmicaleExpenseInput) =>
       request<{ expense: AmicaleExpense }>(scopedPath('/amicales/expenses'), json(body)),

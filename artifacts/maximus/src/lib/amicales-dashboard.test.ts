@@ -9,8 +9,8 @@ const fixture: AmicaleBootstrap = {
     { id: 'm2', companyId: 'c1', reference: 'M2', name: 'Moussa', studentIdentifier: 'S2', email: '', phone: '', faculty: '', studyYear: '', joinedAt: '2026-01-01', office: '', mandateStart: '', mandateEnd: '', notes: '', status: 'ARCHIVED', createdAt: '2026-01-01', updatedAt: '2026-01-01' },
   ],
   contributions: [
-    { id: 'old', companyId: 'c1', reference: 'R1', memberId: 'm1', memberName: 'Awa', period: 'Janvier', amount: 1000, paidOn: '2026-01-10', method: 'CASH', note: '', createdBy: 'u1', createdAt: '2026-01-10T12:00:00Z' },
-    { id: 'new', companyId: 'c1', reference: 'R2', memberId: 'm1', memberName: 'Awa', period: 'Février', amount: 2000, paidOn: '2026-02-10', method: 'CASH', note: '', createdBy: 'u1', createdAt: '2026-02-10T12:00:00Z' },
+    { id: 'old', companyId: 'c1', reference: 'R1', memberId: 'm1', memberName: 'Awa', period: 'Janvier', amount: 1000, paidOn: '2026-01-10', method: 'CASH', note: '', transactionReference: '', status: 'PAID', createdBy: 'u1', createdAt: '2026-01-10T12:00:00Z' },
+    { id: 'new', companyId: 'c1', reference: 'R2', memberId: 'm1', memberName: 'Awa', period: 'Février', amount: 2000, paidOn: '2026-02-10', method: 'CASH', note: '', transactionReference: '', status: 'PAID', createdBy: 'u1', createdAt: '2026-02-10T12:00:00Z' },
   ],
   expenses: [
     { id: 'pending', companyId: 'c1', reference: 'D1', title: 'À décider', category: '', amount: 9000, expenseDate: '2026-02-01', description: '', vendor: '', status: 'PENDING', decisionNote: '', createdBy: 'u1', approvedBy: '', createdAt: '2026-02-01', updatedAt: '2026-02-01' },
@@ -26,6 +26,7 @@ const fixture: AmicaleBootstrap = {
   announcements: [
     { id: 'published', companyId: 'c1', reference: 'N1', title: 'Publiée', body: '', status: 'PUBLISHED', publishedAt: '2026-02-01', createdAt: '2026-02-01', updatedAt: '2026-02-01' },
   ],
+  duesPeriods: [],
 };
 
 test('le tableau de bord ne compte que les activités futures planifiées et les dépenses payées', () => {

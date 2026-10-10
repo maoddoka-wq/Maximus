@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuthUser;
 use App\Models\AmicaleRecord;
+use App\Services\DiamanoPayService;
+use App\Support\CompanyPaymentAccess;
 use App\Support\ModuleAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +16,8 @@ use Illuminate\Support\Str;
 
 class AmicaleController extends Controller
 {
+    public function __construct(private readonly DiamanoPayService $diamanoPay) {}
+
     private const RECORD_FEATURES = [
         'member' => 'membres',
         'contribution' => 'cotisations',
@@ -32,12 +37,26 @@ class AmicaleController extends Controller
             ->filter(fn (string $feature): bool => $this->allows($request, 'view', $feature))
             ->keys()
             ->all();
+        $canSeeAllContributions = $this->allows($request, 'view', 'cotisations');
+        $canSeeOwnContributions = $this->allows($request, 'view', 'mes-cotisations');
+        if ($canSeeOwnContributions && ! in_array('contribution', $visibleTypes, true)) {
+            $visibleTypes[] = 'contribution';
+        }
 
         $records = AmicaleRecord::query()
             ->where('company_id', $companyId)
             ->whereIn('type', $visibleTypes)
             ->orderByDesc('updated_at')
             ->get();
+        $ownMember = $canSeeOwnContributions && ! $canSeeAllContributions
+            ? $this->currentMember($request)
+            : null;
+        if (! $canSeeAllContributions) {
+            $records = $records->reject(fn (AmicaleRecord $record): bool =>
+                $record->type === 'contribution'
+                && ($ownMember === null || $record->member_id !== $ownMember->id)
+            )->values();
+        }
 
         $memberNames = AmicaleRecord::query()
             ->where('company_id', $companyId)
@@ -56,6 +75,11 @@ class AmicaleController extends Controller
                     $memberNames->get($record->member_id)?->title,
                 ))
                 ->values(),
+            'duesPeriods' => ($canSeeAllContributions || $canSeeOwnContributions)
+                ? AmicaleRecord::query()->where('company_id', $companyId)->where('type', 'dues_period')
+                    ->where('status', 'ACTIVE')->orderBy('title')->get()
+                    ->map(fn (AmicaleRecord $record): array => $this->duesPeriod($record))->values()
+                : [],
             'expenses' => $records->where('type', 'expense')
                 ->map(fn (AmicaleRecord $record): array => $this->expense($record))
                 ->values(),
@@ -162,30 +186,226 @@ class AmicaleController extends Controller
             'period' => ['required', 'string', 'max:40'],
             'amount' => ['required', 'integer', 'min:1', 'max:999999999999999'],
             'paidOn' => ['required', 'date'],
-            'method' => ['required', 'in:CASH,MOBILE_MONEY,BANK_TRANSFER,OTHER'],
+            'method' => ['required', 'in:CASH,WAVE,ORANGE_MONEY,FREE_MONEY,MOBILE_MONEY,BANK_TRANSFER,OTHER'],
             'note' => ['nullable', 'string', 'max:1000'],
+            'transactionReference' => ['nullable', 'string', 'max:120'],
         ])->validate();
 
         $member = $this->record($request, $input['memberId'], 'member');
         if (! $member || $member->status !== 'ACTIVE') {
             return response()->json(['error' => 'Choisissez un membre actif de cette amicale.'], 422);
         }
+        $period = trim($input['period']);
+        $dues = AmicaleRecord::query()->where('company_id', $this->company($request))
+            ->where('type', 'dues_period')->where('title', $period)->where('status', 'ACTIVE')->first();
+        if ($dues && (int) $dues->amount !== (int) $input['amount']) {
+            return response()->json(['error' => 'Le montant ne correspond pas au forfait fixe de cette période.'], 422);
+        }
+        $alreadyPaid = AmicaleRecord::query()->where('company_id', $this->company($request))
+            ->where('type', 'contribution')->where('member_id', $member->id)->where('status', 'PAID')
+            ->where('payload->period', $period)->exists();
+        if ($alreadyPaid) {
+            return response()->json(['error' => 'Cette cotisation est déjà réglée pour cette période.'], 409);
+        }
 
-        $record = $this->storeRecord($request, 'contribution', 'Cotisation '.$input['period'], 'PAID', [
+        $record = $this->storeRecord($request, 'contribution', 'Cotisation '.$period, 'PAID', [
             'member_id' => $member->id,
             'amount' => (int) $input['amount'],
             'occurred_on' => $input['paidOn'],
             'payload' => [
                 'member_name' => $member->title,
-                'period' => trim($input['period']),
+                'period' => $period,
                 'method' => $input['method'],
                 'note' => trim((string) ($input['note'] ?? '')),
+                'transactionReference' => trim((string) ($input['transactionReference'] ?? '')),
             ],
         ]);
 
         return response()->json([
             'contribution' => $this->contribution($record, $member->title),
         ], 201);
+    }
+
+    public function createDuesPeriod(Request $request): JsonResponse
+    {
+        if (! $this->allows($request, 'create', 'cotisations')) {
+            return $this->forbidden();
+        }
+        $input = Validator::make($request->all(), [
+            'period' => ['required', 'string', 'max:40'],
+            'amount' => ['required', 'integer', 'min:1', 'max:999999999999999'],
+        ])->validate();
+        $period = trim($input['period']);
+        $companyId = $this->company($request);
+        if (AmicaleRecord::query()->where('company_id', $companyId)->where('type', 'dues_period')
+            ->where('title', $period)->exists()) {
+            return response()->json(['error' => 'Cette période de cotisation existe déjà.'], 409);
+        }
+        $record = $this->storeRecord($request, 'dues_period', $period, 'ACTIVE', [
+            'amount' => (int) $input['amount'],
+            'payload' => ['period' => $period],
+        ]);
+
+        return response()->json(['duesPeriod' => $this->duesPeriod($record)], 201);
+    }
+
+    public function updateDuesPeriod(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allows($request, 'edit', 'cotisations')) {
+            return $this->forbidden();
+        }
+        $record = $this->record($request, $id, 'dues_period');
+        if (! $record) {
+            return $this->notFound();
+        }
+        if ((int) $record->amount !== (int) $request->input('amount')
+            && AmicaleRecord::query()->where('company_id', $record->company_id)
+                ->where('type', 'contribution')->where('status', 'PENDING')
+                ->where('payload->period', $record->title)->exists()) {
+            return response()->json([
+                'error' => 'Un paiement de cette période est encore en attente. Vérifiez-le avant de changer le forfait.',
+            ], 409);
+        }
+        $input = Validator::make($request->all(), [
+            'amount' => ['required', 'integer', 'min:1', 'max:999999999999999'],
+        ])->validate();
+        $record->update([
+            'amount' => (int) $input['amount'],
+            'updated_by' => $this->actorName($request),
+            'updated_by_user_id' => $this->actorId($request),
+        ]);
+        $this->audit($request, $record, 'dues_period.update', ['amount' => (int) $input['amount']]);
+
+        return response()->json(['duesPeriod' => $this->duesPeriod($record->fresh())]);
+    }
+
+    public function createMemberCheckout(Request $request): JsonResponse
+    {
+        if (! $this->allows($request, 'create', 'mes-cotisations')) {
+            return $this->forbidden();
+        }
+        if (str_starts_with($this->company($request), 'demo-')) {
+            return response()->json(['error' => 'Les paiements réels sont désactivés en mode Démonstration.'], 403);
+        }
+        if (! CompanyPaymentAccess::isEnabled($this->company($request))) {
+            return response()->json(['error' => 'Les paiements en ligne ne sont pas activés pour cette entreprise.'], 403);
+        }
+        $input = Validator::make($request->all(), [
+            'period' => ['required', 'string', 'max:40'],
+            'provider' => ['required', 'in:WAVE,ORANGE_MONEY'],
+        ])->validate();
+        $member = $this->currentMember($request);
+        if (! $member) {
+            return response()->json(['error' => 'Votre compte doit être associé à une fiche membre active avec la même adresse e-mail. Contactez le trésorier.'], 422);
+        }
+        $companyId = $this->company($request);
+        $period = trim($input['period']);
+        try {
+            return DB::transaction(function () use ($request, $member, $companyId, $period, $input): JsonResponse {
+                $due = AmicaleRecord::query()->where('company_id', $companyId)->where('type', 'dues_period')
+                    ->where('title', $period)->where('status', 'ACTIVE')->lockForUpdate()->first();
+                if (! $due) {
+                    return response()->json(['error' => 'Cette période de cotisation n’est plus ouverte.'], 404);
+                }
+                $existing = AmicaleRecord::query()->where('company_id', $companyId)->where('type', 'contribution')
+                    ->where('member_id', $member->id)->where('payload->period', $period)
+                    ->whereIn('status', ['PAID', 'PENDING'])->lockForUpdate()->first();
+                if ($existing?->status === 'PAID') {
+                    return response()->json(['error' => 'Cette cotisation est déjà réglée.'], 409);
+                }
+                if ($existing?->status === 'PENDING' && ($existing->payload['checkout_url'] ?? '') !== '') {
+                    if (($existing->payload['method'] ?? '') !== $input['provider']) {
+                        return response()->json(['error' => 'Un paiement est déjà en attente avec un autre moyen. Reprenez-le ou vérifiez son statut.'], 409);
+                    }
+                    return response()->json([
+                        'contribution' => $this->contribution($existing, $member->title),
+                        'checkoutUrl' => $existing->payload['checkout_url'],
+                    ]);
+                }
+                $record = $existing ?? $this->storeRecord($request, 'contribution', 'Cotisation '.$period, 'PENDING', [
+                    'member_id' => $member->id,
+                    'amount' => (int) $due->amount,
+                    'payload' => [
+                        'member_name' => $member->title, 'period' => $period,
+                        'method' => $input['provider'], 'note' => '',
+                    ],
+                ]);
+                $webhook = rtrim((string) config('services.diamanopay.webhook_url', $request->getSchemeAndHttpHost()), '/')
+                    .'/api/payments/diamanopay/amicales-webhook';
+                $charge = $this->diamanoPay->createCharge([
+                    'amount' => (int) $due->amount, 'currency' => 'XOF',
+                    'provider' => $input['provider'], 'description' => 'Cotisation '.$period,
+                    'clientReference' => $record->reference,
+                    'redirectUrl' => $request->getSchemeAndHttpHost().'/entreprise/amicales?feature=mes-cotisations',
+                    'webhook' => $webhook, 'feeOnCustomer' => false,
+                ], 'amicale:'.$record->id);
+                $data = is_array($charge['data'] ?? null) ? array_merge($charge, $charge['data']) : $charge;
+                $chargeId = trim((string) ($data['id'] ?? $data['charge_id'] ?? $data['chargeId'] ?? ''));
+                $checkoutUrl = trim((string) ($data['checkout_url'] ?? $data['checkoutUrl'] ?? $data['payment_url'] ?? $data['paymentUrl'] ?? ''));
+                if ($chargeId === '' || filter_var($checkoutUrl, FILTER_VALIDATE_URL) === false
+                    || strtolower((string) parse_url($checkoutUrl, PHP_URL_SCHEME)) !== 'https') {
+                    return response()->json(['error' => 'DiamanoPay n’a pas retourné de lien de paiement valide.'], 502);
+                }
+                $payload = $record->payload ?? [];
+                $payload['provider_charge_id'] = $chargeId;
+                $payload['checkout_url'] = $checkoutUrl;
+                $record->update(['payload' => $payload]);
+
+                return response()->json([
+                    'contribution' => $this->contribution($record->fresh(), $member->title),
+                    'checkoutUrl' => $checkoutUrl,
+                ], 201);
+            });
+        } catch (\Throwable $error) {
+            report($error);
+            return response()->json(['error' => 'Le paiement en ligne n’a pas pu être préparé. Réessayez.'], 503);
+        }
+    }
+
+    public function checkMemberPayment(Request $request, string $id): JsonResponse
+    {
+        if (! $this->allows($request, 'view', 'mes-cotisations')) {
+            return $this->forbidden();
+        }
+        $member = $this->currentMember($request);
+        $record = $member
+            ? AmicaleRecord::query()->where('company_id', $this->company($request))->where('type', 'contribution')
+                ->where('member_id', $member->id)->whereKey($id)->first()
+            : null;
+        if (! $record) {
+            return $this->notFound();
+        }
+        if ($record->status === 'PENDING' && ($record->payload['provider_charge_id'] ?? '') !== '') {
+            $result = $this->diamanoPay->chargeStatus((string) $record->payload['provider_charge_id']);
+            $data = is_array($result['data'] ?? null) ? array_merge($result, $result['data']) : $result;
+            $this->applyProviderStatus($request, $record, $data);
+            $record->refresh();
+        }
+
+        return response()->json(['contribution' => $this->contribution($record, $member->title)]);
+    }
+
+    public function amicalePaymentWebhook(Request $request): JsonResponse
+    {
+        $body = $request->getContent();
+        if (! $this->diamanoPay->verifyWebhook($body, $request->header('X-Diamanopay-Signature'))) {
+            return response()->json(['error' => 'Signature webhook invalide.'], 401);
+        }
+        $payload = json_decode($body, true);
+        if (! is_array($payload)) {
+            return response()->json(['error' => 'Payload webhook invalide.'], 422);
+        }
+        $data = is_array($payload['data'] ?? null) ? array_merge($payload, $payload['data']) : $payload;
+        $chargeId = trim((string) ($data['id'] ?? $data['charge_id'] ?? $data['chargeId'] ?? ''));
+        if ($chargeId !== '') {
+            $record = AmicaleRecord::query()->where('type', 'contribution')
+                ->where('payload->provider_charge_id', $chargeId)->first();
+            if ($record) {
+                $this->applyProviderStatus($request, $record, $data);
+            }
+        }
+
+        return response()->json(['received' => true]);
     }
 
     public function createExpense(Request $request): JsonResponse
@@ -482,6 +702,7 @@ class AmicaleController extends Controller
         $referencePrefix = match ($type) {
             'member' => 'MEM',
             'contribution' => 'REC',
+            'dues_period' => 'DUE',
             'expense' => 'EXP',
             'activity' => 'ACT',
             default => 'ANN',
@@ -596,6 +817,8 @@ class AmicaleController extends Controller
             'paidOn' => (string) ($record->occurred_on ?? ''),
             'method' => $payload['method'] ?? 'OTHER',
             'note' => $payload['note'] ?? '',
+            'transactionReference' => $payload['transactionReference'] ?? '',
+            'status' => $record->status,
             'createdBy' => $record->created_by,
             'createdAt' => $record->created_at?->toISOString(),
         ];
@@ -669,6 +892,63 @@ class AmicaleController extends Controller
             $action,
             $feature,
         );
+    }
+
+    private function currentMember(Request $request): ?AmicaleRecord
+    {
+        $userId = $request->attributes->get('authUserId');
+        if (! is_string($userId) || $userId === '') {
+            return null;
+        }
+        $actor = (array) $request->attributes->get('authActor', []);
+        $email = strtolower(trim((string) AuthUser::query()
+            ->whereKey($userId)
+            ->where('company_id', (string) ($actor['companyId'] ?? ''))
+            ->value('email')));
+        if ($email === '') {
+            return null;
+        }
+        $matches = AmicaleRecord::query()->where('company_id', $this->company($request))
+            ->where('type', 'member')->where('status', 'ACTIVE')->get()
+            ->filter(fn (AmicaleRecord $record): bool =>
+                strtolower(trim((string) ($record->payload['email'] ?? ''))) === $email
+            );
+
+        return $matches->count() === 1 ? $matches->first() : null;
+    }
+
+    private function duesPeriod(AmicaleRecord $record): array
+    {
+        return [
+            'id' => $record->id,
+            'period' => $record->title,
+            'amount' => (int) ($record->amount ?? 0),
+            'status' => $record->status,
+        ];
+    }
+
+    private function applyProviderStatus(Request $request, AmicaleRecord $record, array $data): void
+    {
+        $status = strtolower(trim((string) ($data['status'] ?? $data['paymentStatus'] ?? $data['payment_status'] ?? $data['state'] ?? '')));
+        if (in_array($status, ['paid', 'success', 'successful', 'completed', 'confirmed'], true)) {
+            $amount = (int) ($data['amount'] ?? 0);
+            if ($amount > 0 && $amount !== (int) $record->amount) {
+                return;
+            }
+            if ($record->status !== 'PENDING') {
+                return;
+            }
+            $record->update(['status' => 'PAID', 'occurred_on' => now()->toDateString()]);
+            $this->audit($request, $record, 'contribution.payment_confirmed', [
+                'provider_charge_id' => $record->payload['provider_charge_id'] ?? '',
+            ]);
+        } elseif (in_array($status, ['failed', 'declined', 'cancelled', 'canceled', 'expired'], true)
+            && $record->status === 'PENDING') {
+            $record->update(['status' => 'FAILED']);
+            $this->audit($request, $record, 'contribution.payment_failed', [
+                'provider_charge_id' => $record->payload['provider_charge_id'] ?? '',
+            ]);
+        }
     }
 
     private function company(Request $request): string

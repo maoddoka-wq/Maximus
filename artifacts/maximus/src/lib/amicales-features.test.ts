@@ -22,3 +22,10 @@ test('un accès Amicales limité à un pack n’expose que les fonctionnalités 
     ['dashboard', 'activites', 'annonces'],
   );
 });
+
+test('le pack membre voit ses cotisations et peut initier le paiement sans droit sur le registre de trésorerie', () => {
+  assert.deepEqual(
+    resolveAmicaleAllowedFeatureIds({ featureIds: [], configuration: { packIds: ['amicales-employe'] } }),
+    ['dashboard', 'activites', 'annonces', 'mes-cotisations'],
+  );
+});

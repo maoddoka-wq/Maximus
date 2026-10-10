@@ -25,6 +25,7 @@ final class DemoWorkspaceSeeder
         $this->seedPayroll($datasetCompanyId, $ids, $now);
         $this->seedTransport($datasetCompanyId, $ids, $now);
         $this->seedImmobilier($datasetCompanyId, $ids, $now);
+        $this->seedAmicales($datasetCompanyId, $ids, $now);
     }
 
     /**
@@ -1505,6 +1506,60 @@ final class DemoWorkspaceSeeder
             'created_at' => $now,
             'updated_at' => $now,
         ]]);
+    }
+
+    private function seedAmicales(string $companyId, callable $ids, mixed $now): void
+    {
+        $members = [
+            ['aissatou', 'Aïssatou Ndiaye', 'ETU-2026-001', 'aissatou.ndiaye@example.test', 'Sciences', 'Licence 2'],
+            ['mamadou', 'Mamadou Fall', 'ETU-2026-002', 'mamadou.fall@example.test', 'Droit', 'Licence 3'],
+            ['fatou', 'Fatou Sarr', 'ETU-2026-003', 'fatou.sarr@example.test', 'Économie', 'Master 1'],
+        ];
+        $rows = [];
+        foreach ($members as [$key, $name, $studentId, $email, $faculty, $year]) {
+            $memberId = $ids('amicale-member-'.$key);
+            $rows[] = [
+                'id' => $memberId, 'company_id' => $companyId, 'type' => 'member',
+                'reference' => 'MEM-DEMO-'.strtoupper($key), 'title' => $name,
+                'student_identifier' => $studentId, 'status' => 'ACTIVE',
+                'payload' => json_encode([
+                    'email' => $email, 'phone' => '+221 70 000 00 0'.(count($rows) + 1),
+                    'faculty' => $faculty, 'studyYear' => $year,
+                    'joinedAt' => $now->copy()->subMonths(4)->toDateString(),
+                    'office' => '', 'notes' => 'Fiche fictive de démonstration.',
+                ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                'created_by' => 'Jeu de démonstration', 'updated_by' => 'Jeu de démonstration',
+                'created_at' => $now, 'updated_at' => $now,
+            ];
+            $rows[] = [
+                'id' => $ids('amicale-dues-2026-2027'), 'company_id' => $companyId,
+                'type' => 'dues_period', 'reference' => 'COT-DEMO-2026-2027',
+                'title' => '2026–2027', 'amount' => 12000, 'status' => 'ACTIVE',
+                'payload' => json_encode(['period' => '2026–2027'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                'created_by' => 'Jeu de démonstration', 'updated_by' => 'Jeu de démonstration',
+                'created_at' => $now, 'updated_at' => $now,
+            ];
+            if ($key !== 'fatou') {
+                $rows[] = [
+                    'id' => $ids('amicale-contribution-'.$key), 'company_id' => $companyId,
+                    'type' => 'contribution', 'reference' => 'REC-DEMO-'.strtoupper($key),
+                    'title' => 'Cotisation 2026–2027', 'member_id' => $memberId,
+                    'amount' => 12000, 'occurred_on' => $now->copy()->subDays($key === 'aissatou' ? 8 : 2)->toDateString(),
+                    'status' => 'PAID',
+                    'payload' => json_encode([
+                        'member_name' => $name, 'period' => '2026–2027',
+                        'method' => $key === 'aissatou' ? 'CASH' : 'WAVE',
+                        'note' => 'Paiement fictif de démonstration.',
+                        'transactionReference' => $key === 'aissatou' ? '' : 'DEMO-WAVE-2026',
+                    ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                    'created_by' => 'Trésorier de démonstration', 'updated_by' => 'Trésorier de démonstration',
+                    'created_at' => $now, 'updated_at' => $now,
+                ];
+            }
+        }
+        if (Schema::hasTable('amicale_records')) {
+            DB::table('amicale_records')->insertOrIgnore($rows);
+        }
     }
 
     private function upsert(string $table, array $rows, array $uniqueBy = ['id']): void
